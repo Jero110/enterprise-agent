@@ -29,3 +29,11 @@ PROGRESS: T4 - Added T3CODE_DEV_INSTANCE env var to DesktopConfig
 PROGRESS: T4 - Added devInstanceId to DesktopEnvironment service
 PROGRESS: T4 - Modified DesktopUserData to use instance-specific userData paths
 ASSUMED: T4 - Manual validation required: launch with T3CODE_DEV_INSTANCE=jero and T3CODE_DEV_INSTANCE=gerry
+RESULT: T4 PASS - Committed 1fce3df40
+
+DISPATCH: T5 anthropic/claude-opus-4-5 profile=none (executor self)
+PROGRESS: T5 - Added Team, member directory, usage, publication, and grant contracts
+PROGRESS: T5 - Added TeamDirectory service with admin-only team management and team-scoped usage access
+PROGRESS: T5 - Added TeamPublication service enforcing owner publication and current-team content access
+PROGRESS: T5 - Added CrossEnvironmentGrants service with explicit revocable message/start-agent scopes
+RESULT: T5 PASS - 18 focused server tests pass; server typecheck passes
