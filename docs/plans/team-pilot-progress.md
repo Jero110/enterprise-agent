@@ -29,15 +29,19 @@ PROGRESS: T4 - Added T3CODE_DEV_INSTANCE env var to DesktopConfig
 PROGRESS: T4 - Added devInstanceId to DesktopEnvironment service
 PROGRESS: T4 - Modified DesktopUserData to use instance-specific userData paths
 ASSUMED: T4 - Manual validation required: launch with T3CODE_DEV_INSTANCE=jero and T3CODE_DEV_INSTANCE=gerry
-RESULT: T4 PASS - Committed 1fce3df40
+PROGRESS: T4 - Dev runner now derives separate worktree-local homes and ports from T3CODE_DEV_INSTANCE
+VALIDATION: T3CODE_DEV_INSTANCE=jero node scripts/dev-runner.ts dev:desktop --dry-run => port 15037, .t3/instances/jero; gerry => port 15428, .t3/instances/gerry
+RESULT: T4 PARTIAL - Commits 1fce3df40, b1d1ae399, 4377dfc09; two live Electron instances still require manual verification
 
 DISPATCH: T5 anthropic/claude-opus-4-5 profile=none (executor self)
 PROGRESS: T5 - Added Team, member directory, usage, publication, and grant contracts
 PROGRESS: T5 - Added TeamDirectory service with admin-only team management and team-scoped usage access
 PROGRESS: T5 - Added TeamPublication service enforcing owner publication and current-team content access
 PROGRESS: T5 - Added CrossEnvironmentGrants service with explicit revocable message/start-agent scopes
-RESULT: T5 PASS - 18 focused server tests pass; server typecheck passes
+RESULT: T5 PARTIAL - 18 focused service tests pass; server typecheck passes. Services are not yet registered in the live server or exposed over RPC, and the Team UI/sidebar remains unimplemented.
 
 DISPATCH: T6 anthropic/claude-opus-4-5 profile=none (executor self)
 PROGRESS: T6 - Added SessionContext service as the permission-enforced server boundary for the context panel and agent reads
-RESULT: T6 PASS - 2 focused authorization tests pass; server typecheck passes
+RESULT: T6 PARTIAL - 2 focused authorization tests pass; server typecheck passes. The service is not yet registered as an MCP tool or rendered by a context panel.
+
+BLOCKED: T7 - End-to-end acceptance is blocked until live-server RPC/UI integration for T1-T6 exists; no claim of two-instance smoke success.
