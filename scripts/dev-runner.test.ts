@@ -23,6 +23,7 @@ import {
   createDevRunnerEnv,
   findFirstAvailableOffset,
   resolveModePortOffsets,
+  resolveInstanceT3Home,
   runDevRunnerWithInput,
 } from "./dev-runner.ts";
 
@@ -70,6 +71,30 @@ const devServerInput = {
 } as const;
 
 it.layer(NodeServices.layer)("dev-runner", (it) => {
+  describe("resolveInstanceT3Home", () => {
+    it("creates a deterministic isolated home below the worktree home", () => {
+      assert.equal(
+        resolveInstanceT3Home({
+          baseHome: "/repo/.t3",
+          devInstance: "jero",
+          joinPath: NodePath.join,
+        }),
+        "/repo/.t3/instances/jero",
+      );
+    });
+
+    it("makes instance names safe as directory names", () => {
+      assert.equal(
+        resolveInstanceT3Home({
+          baseHome: "/repo/.t3",
+          devInstance: "gerry/team-a",
+          joinPath: NodePath.join,
+        }),
+        "/repo/.t3/instances/gerry-team-a",
+      );
+    });
+  });
+
   describe("createDevRunnerEnv", () => {
     it.effect("forwards the reusable auth token to web dev and removes it for desktop", () =>
       Effect.gen(function* () {

@@ -220,6 +220,18 @@ const OffsetConfig = Config.all({
   devInstance: optionalStringConfig("T3CODE_DEV_INSTANCE"),
 });
 
+export function resolveInstanceT3Home(input: {
+  readonly baseHome: string;
+  readonly devInstance: string | undefined;
+  readonly joinPath: (...paths: ReadonlyArray<string>) => string;
+}): string {
+  const instance = input.devInstance?.trim();
+  if (!instance) return input.baseHome;
+
+  const safeInstance = instance.replace(/[^a-zA-Z0-9._-]+/g, "-");
+  return input.joinPath(input.baseHome, "instances", safeInstance || "default");
+}
+
 export function resolveOffset(config: {
   readonly portOffset: number | undefined;
   readonly devInstance: string | undefined;
@@ -735,10 +747,19 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
   // Trim before choosing: `--home-dir ""` is not a selection, and treating it
   // as one would skip the worktree default and land on the shared home —
   // exactly the outcome this precedence exists to prevent.
-  const resolvedT3Home =
+  const configuredT3Home =
     (input.t3Home?.trim() || undefined) ??
     worktreeHome ??
     (hostEnvironment.T3CODE_HOME?.trim() || undefined);
+  const path = yield* Path.Path;
+  const resolvedT3Home =
+    configuredT3Home === undefined
+      ? undefined
+      : resolveInstanceT3Home({
+          baseHome: configuredT3Home,
+          devInstance,
+          joinPath: path.join,
+        });
   const env = yield* createDevRunnerEnv({
     mode: input.mode,
     baseEnv: hostEnvironment,

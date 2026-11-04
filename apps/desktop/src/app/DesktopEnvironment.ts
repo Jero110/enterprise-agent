@@ -172,7 +172,13 @@ const make = Effect.fn("desktop.environment.make")(function* (
     isDevelopment,
     appVersion: input.appVersion,
   });
-  const displayName = branding.displayName;
+  const devInstanceDisplayName = Option.map(config.devInstanceId, (instance) =>
+    instance === "jero" ? "Jero" : instance === "gerry" ? "Gerry" : instance,
+  );
+  const displayName =
+    isDevelopment && Option.isSome(devInstanceDisplayName)
+      ? `${branding.displayName}: ${devInstanceDisplayName.value}`
+      : branding.displayName;
   const stateDir = resolveDesktopStateDir({
     baseDir,
     isDevelopment,
