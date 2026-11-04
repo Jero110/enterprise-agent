@@ -37,3 +37,7 @@ PROGRESS: T5 - Added TeamDirectory service with admin-only team management and t
 PROGRESS: T5 - Added TeamPublication service enforcing owner publication and current-team content access
 PROGRESS: T5 - Added CrossEnvironmentGrants service with explicit revocable message/start-agent scopes
 RESULT: T5 PASS - 18 focused server tests pass; server typecheck passes
+
+DISPATCH: T6 anthropic/claude-opus-4-5 profile=none (executor self)
+PROGRESS: T6 - Added SessionContext service as the permission-enforced server boundary for the context panel and agent reads
+RESULT: T6 PASS - 2 focused authorization tests pass; server typecheck passes
