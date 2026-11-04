@@ -108,7 +108,13 @@ export const make = Effect.gen(function* () {
   const shell = yield* ElectronShell.ElectronShell;
 
   // Must not yield: the bridge registers a scheme Electron rejects once ready.
-  const userDataPath = yield* DesktopUserData.resolveUserDataPath(environment);
+  const devInstanceId = Option.getOrUndefined(environment.devInstanceId);
+  const userDataPath = yield* DesktopUserData.resolveUserDataPath({
+    appDataDirectory: environment.appDataDirectory,
+    isDevelopment: environment.isDevelopment,
+    platform: environment.platform,
+    ...(devInstanceId !== undefined ? { devInstanceId } : {}),
+  });
   yield* electronApp.setPath("userData", userDataPath);
 
   // Clerk skips the profile lock on macOS. Interrupt before runtime construction because quit is asynchronous.

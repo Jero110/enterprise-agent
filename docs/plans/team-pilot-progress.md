@@ -22,3 +22,10 @@ PROGRESS: T3 - Created AreaKnowledge contracts (packages/contracts/src/areaKnowl
 PROGRESS: T3 - Created Markdown fixtures (apps/server/src/knowledge/fixtures/)
 PROGRESS: T3 - Created AreaKnowledge service (apps/server/src/knowledge/AreaKnowledge.ts)
 PROGRESS: T3 - All 12 TDD tests passing (AreaKnowledge.test.ts)
+RESULT: T3 PASS - Committed 5be75547d
+
+DISPATCH: T4 anthropic/claude-opus-4-5 profile=none (executor self)
+PROGRESS: T4 - Added T3CODE_DEV_INSTANCE env var to DesktopConfig
+PROGRESS: T4 - Added devInstanceId to DesktopEnvironment service
+PROGRESS: T4 - Modified DesktopUserData to use instance-specific userData paths
+ASSUMED: T4 - Manual validation required: launch with T3CODE_DEV_INSTANCE=jero and T3CODE_DEV_INSTANCE=gerry
