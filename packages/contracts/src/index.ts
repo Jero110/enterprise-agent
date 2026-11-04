@@ -74,3 +74,4 @@ export * from "./settingsSecretValue.ts";
 export * from "./clientRpcPermissions.ts";
 export * from "./teamIdentity.ts";
 export * from "./teamEnrollment.ts";
+export * from "./areaKnowledge.ts";
