@@ -723,7 +723,8 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
     return yield* new DevRunnerBuiltNeedsShareError({ mode: input.mode });
   }
 
-  const worktreePath = yield* resolveGitWorktreePath(yield* HostProcess.WorkingDirectory);
+  const workingDirectory = yield* HostProcess.WorkingDirectory;
+  const worktreePath = yield* resolveGitWorktreePath(workingDirectory);
 
   const { offset, source } = yield* resolveOffset({
     portOffset,
@@ -743,15 +744,16 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
   // A dev server started inside a worktree defaults to that worktree's own
   // (gitignored) `.t3` — see @t3tools/shared/devHome for why this must
   // outrank an ambient T3CODE_HOME. `--home-dir` still wins.
-  const worktreeHome = yield* resolveWorktreeT3Home(yield* HostProcess.WorkingDirectory);
+  const worktreeHome = yield* resolveWorktreeT3Home(workingDirectory);
   // Trim before choosing: `--home-dir ""` is not a selection, and treating it
   // as one would skip the worktree default and land on the shared home —
   // exactly the outcome this precedence exists to prevent.
+  const path = yield* Path.Path;
   const configuredT3Home =
     (input.t3Home?.trim() || undefined) ??
     worktreeHome ??
+    (devInstance?.trim() ? path.join(workingDirectory, ".t3") : undefined) ??
     (hostEnvironment.T3CODE_HOME?.trim() || undefined);
-  const path = yield* Path.Path;
   const resolvedT3Home =
     configuredT3Home === undefined
       ? undefined
