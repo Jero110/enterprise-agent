@@ -78,3 +78,5 @@ export * from "./teamIdentity.ts";
 export * from "./teamEnrollment.ts";
 export * from "./areaKnowledge.ts";
 export * from "./teamActivity.ts";
+
+export * from "./runRecords.ts";
