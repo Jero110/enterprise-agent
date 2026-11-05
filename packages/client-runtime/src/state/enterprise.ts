@@ -19,6 +19,18 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     tag: WS_METHODS.enterpriseMembersList,
     staleTimeMs: 10_000,
   });
+  const org = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:org",
+    tag: WS_METHODS.enterpriseOrg,
+    staleTimeMs: 10_000,
+  });
+  // The conversation's knowledge cards: hub-filtered documents plus this thread's switches and reads.
+  const threadContext = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:thread-context",
+    tag: WS_METHODS.enterpriseThreadContext,
+    staleTimeMs: 0,
+    idleTtlMs: 0,
+  });
   // The hub filters by the member's scope on every read; revoked grants vanish on refresh.
   const knowledgeList = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:enterprise:knowledge-list",
@@ -51,6 +63,7 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
   const refreshAll = (registry: AtomRegistry.AtomRegistry, environmentId: EnvironmentId) => {
     registry.refresh(status({ environmentId, input: {} }));
     registry.refresh(members({ environmentId, input: {} }));
+    registry.refresh(org({ environmentId, input: {} }));
     registry.refresh(knowledgeList({ environmentId, input: {} }));
     registry.refresh(proposalInbox({ environmentId, input: {} }));
     registry.refresh(proposalInbox({ environmentId, input: { countOnly: true } }));
@@ -59,6 +72,16 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
   return {
     status,
     members,
+    org,
+    threadContext,
+    setThreadContext: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:thread-context-set",
+      tag: WS_METHODS.enterpriseThreadContextSet,
+      onSuccess: ({ environmentId, input }, registry) =>
+        Effect.sync(() =>
+          registry.refresh(threadContext({ environmentId, input: { threadId: input.threadId } })),
+        ),
+    }),
     knowledgeList,
     knowledgeGet,
     proposalInbox,

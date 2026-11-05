@@ -280,6 +280,7 @@ import { useSideChat } from "./chat/useSideChat";
 import { useRemoteOpenState } from "~/remoteOpen";
 import { shouldShowOpenInPicker } from "./chat/OpenInPicker.logic";
 import { useOpenFavoriteEditorShortcut } from "./chat/OpenInPickerShortcut";
+import { EnterpriseHeaderControls } from "./chat/EnterpriseHeaderControls";
 import {
   PanelLayoutControls,
   type PanelLayoutControlsProps,
@@ -3257,6 +3258,9 @@ export default function ChatView(props: ChatViewProps) {
     <PanelLayoutControls
       {...panelToggleControlProps}
       showThreadPanelControl={!inlineRightPanelOwnsTitleBar}
+      leadingControls={
+        <EnterpriseHeaderControls threadId={activeThread.id} isServerThread={isServerThread} />
+      }
     />
   );
   const threadPanelHeaderControl = <ThreadPanelHeaderControl {...panelToggleControlProps} />;
