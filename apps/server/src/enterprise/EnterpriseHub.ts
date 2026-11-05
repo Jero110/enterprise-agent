@@ -237,10 +237,14 @@ const make = Effect.gen(function* () {
           code: "access_denied",
           message: "The ingestion admin no longer has access.",
         });
-      return yield* proposals.propose(member.email, {
-        ...input,
-        evidence: [...new Set([...input.evidence, `ingestion:${run.id}`])],
-      });
+      return yield* proposals.propose(
+        member.email,
+        {
+          ...input,
+          evidence: [...new Set([...input.evidence, `ingestion:${run.id}`])],
+        },
+        true,
+      );
     }),
     knowledgePropose: Effect.fn("EnterpriseHub.knowledgePropose")(function* (sessionId, input) {
       return yield* proposals.propose((yield* whoami(sessionId)).email, input);

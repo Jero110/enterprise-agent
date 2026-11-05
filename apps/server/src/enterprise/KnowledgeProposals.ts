@@ -21,6 +21,7 @@ export class KnowledgeProposals extends Context.Service<
     readonly propose: (
       email: string,
       input: KnowledgeProposeInput,
+      ingestion?: boolean,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
     readonly inbox: (
       email: string,
@@ -65,6 +66,7 @@ export const layer = Layer.effect(
     const propose = Effect.fn("KnowledgeProposals.propose")(function* (
       email: string,
       input: KnowledgeProposeInput,
+      ingestion = false,
     ) {
       const member = yield* memberOf(email);
       if (!input.reason.trim() || input.evidence.some((e) => !e.trim() || /[\r\n]/.test(e)))
@@ -146,8 +148,10 @@ export const layer = Layer.effect(
             proposal.scope === input.scope &&
             proposal.path === input.path &&
             proposal.content === input.content &&
-            proposal.reason === input.reason &&
-            JSON.stringify(proposal.evidence) === JSON.stringify(input.evidence),
+            (ingestion
+              ? proposal.evidence.some((e) => e.startsWith("ingestion:"))
+              : proposal.reason === input.reason &&
+                JSON.stringify(proposal.evidence) === JSON.stringify(input.evidence)),
         );
         if (existing !== undefined) return existing;
       }

@@ -55,10 +55,20 @@ describe("EnterpriseHub", () => {
         folder: "/source",
         status: "running",
       });
-      expect(yield* hub.ingestionPropose("thread-1", proposal)).toMatchObject({
+      const first = yield* hub.ingestionPropose("thread-1", proposal);
+      expect(first).toMatchObject({
         proposedBy: JERO,
         evidence: ["ingestion:run-1"],
       });
+      yield* store.saveIngestionRun({
+        id: "run-repeat",
+        threadId: "thread-repeat",
+        adminEmail: JERO,
+        folder: "/source",
+        status: "running",
+      });
+      const repeated = yield* hub.ingestionPropose("thread-repeat", proposal);
+      expect(repeated.id).toBe(first.id);
       yield* store.saveIngestionRun({
         id: "run-2",
         threadId: "thread-2",
