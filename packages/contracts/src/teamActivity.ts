@@ -71,17 +71,6 @@ export const ThreadMetadata = Schema.Struct({
 });
 export type ThreadMetadata = typeof ThreadMetadata.Type;
 
-export const CrossEnvironmentGrant = Schema.Struct({
-  id: TrimmedNonEmptyString,
-  grantorEnvironmentId: TrimmedNonEmptyString,
-  grantorEmail: TrimmedNonEmptyString,
-  granteeEmail: TrimmedNonEmptyString,
-  scopes: Schema.Array(Schema.Literals(["message", "start-agent"])),
-  grantedAt: Schema.DateTimeUtc,
-  revokedAt: Schema.optionalKey(Schema.DateTimeUtc),
-});
-export type CrossEnvironmentGrant = typeof CrossEnvironmentGrant.Type;
-
 export class TeamActivityError extends Schema.TaggedError<TeamActivityError>()(
   "TeamActivityError",
   {
