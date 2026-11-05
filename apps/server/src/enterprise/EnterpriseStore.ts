@@ -1,4 +1,4 @@
-import { TeamMemberRole } from "@t3tools/contracts";
+import { KnowledgeProposal, TeamMemberRole } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -79,6 +79,8 @@ export class EnterpriseStore extends Context.Service<
   EnterpriseStore,
   {
     /** Inserts what is missing; never overwrites what an admin changed. */
+    readonly listProposals: Effect.Effect<ReadonlyArray<KnowledgeProposal>>;
+    readonly saveProposal: (proposal: KnowledgeProposal) => Effect.Effect<void>;
     readonly seed: (seed: EnterpriseSeed) => Effect.Effect<void>;
     readonly verifyToken: (token: string) => Effect.Effect<boolean>;
     readonly listTeams: Effect.Effect<ReadonlyArray<EnterpriseTeam>>;
@@ -176,6 +178,7 @@ const toGrant = (row: GrantRow): EnterpriseAreaGrant => ({
 });
 
 const decodeSeed = Schema.decodeUnknownEffect(Schema.fromJsonString(EnterpriseSeed));
+const decodeProposal = Schema.decodeEffect(Schema.fromJsonString(KnowledgeProposal));
 
 export const loadSeedFile = Effect.fn("EnterpriseStore.loadSeedFile")(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
@@ -394,7 +397,20 @@ const make = Effect.gen(function* () {
       Effect.orDie,
     );
 
+  const listProposals = sql<{
+    payload: string;
+  }>`SELECT payload FROM enterprise_knowledge_proposals ORDER BY rowid DESC`.pipe(
+    Effect.flatMap((rows) => Effect.forEach(rows, (row) => decodeProposal(row.payload))),
+    Effect.orDie,
+  );
+  const saveProposal: EnterpriseStore["Service"]["saveProposal"] = (proposal) =>
+    sql`INSERT INTO enterprise_knowledge_proposals (id, payload)
+      VALUES (${proposal.id}, ${JSON.stringify(proposal)})
+      ON CONFLICT (id) DO UPDATE SET payload = excluded.payload`.pipe(Effect.asVoid, Effect.orDie);
+
   return EnterpriseStore.of({
+    listProposals,
+    saveProposal,
     seed,
     verifyToken,
     listTeams,

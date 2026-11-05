@@ -79,6 +79,10 @@ export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("Ente
     "unknown_team",
     "document_not_found",
     "access_denied",
+    "invalid_proposal",
+    "proposal_not_found",
+    "conflict",
+    "knowledge_write_failed",
   ]),
   message: Schema.String,
 }) {}
