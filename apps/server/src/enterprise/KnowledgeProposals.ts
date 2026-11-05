@@ -111,12 +111,7 @@ export const layer = Layer.effect(
             )
         )
           return yield* invalid;
-        if (
-          member.role !== "admin" &&
-          input.scope !== "global" &&
-          member.teamId !== input.scope &&
-          !(yield* store.listGrants(member.email)).some((g) => g.areaId === input.scope)
-        )
+        if (member.role !== "admin" && input.scope !== "global" && member.teamId !== input.scope)
           return yield* denied;
         const docs = yield* repo.documents;
         const doc = docs.find((d) => d.id === input.path);
@@ -155,6 +150,8 @@ export const layer = Layer.effect(
         proposedBy: member.email,
         createdAt: yield* now,
         status: "pending",
+        baseContentHash:
+          input.kind === "area-access" ? "absent" : yield* repo.contentHash(input.path),
         baseVersion: input.kind === "area-access" ? "" : yield* repo.version(input.path),
         targetVersion: target === null ? "" : yield* repo.version(target),
       };

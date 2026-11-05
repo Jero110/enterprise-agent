@@ -2,6 +2,7 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -46,6 +47,7 @@ describe("KnowledgeProposals", () => {
       const proposals = yield* KnowledgeProposals.KnowledgeProposals;
       const repo = yield* KnowledgeRepo.KnowledgeRepo;
       const p = yield* proposals.propose(BRUNO, create);
+      expect(p).toMatchObject({ baseContentHash: "absent" });
       expect((yield* proposals.inbox(ANA)).proposals.map((p) => p.id)).toContain(p.id);
       expect((yield* proposals.inbox(GERRY)).proposals).toEqual([]);
       expect(yield* codeOf(proposals.decide(GERRY, { id: p.id, action: "approve" }))).toBe(
@@ -114,6 +116,22 @@ describe("KnowledgeProposals", () => {
         expect((yield* repo.documents).find((d) => d.id === create.path)?.content).toBe(
           create.content,
         );
+        const crossArea = yield* proposals.propose(BRUNO, {
+          ...create,
+          kind: "move-scope",
+          targetScope: "frontend",
+        });
+        expect(yield* codeOf(proposals.decide(ANA, { id: crossArea.id, action: "approve" }))).toBe(
+          "access_denied",
+        );
+        expect(
+          yield* codeOf(proposals.decide(GERRY, { id: crossArea.id, action: "approve" })),
+        ).toBe("access_denied");
+        yield* proposals.decide(ADMIN, {
+          id: crossArea.id,
+          action: "reject",
+          reason: "Keep in Ledger",
+        });
         const move = yield* proposals.propose(BRUNO, {
           ...create,
           kind: "move-scope",
@@ -132,7 +150,47 @@ describe("KnowledgeProposals", () => {
         expect((yield* knowledge.searchDocuments(gerry, "Original")).map((d) => d.id)).toContain(
           "global/x.md",
         );
+        const backToArea = yield* proposals.propose(ANA, {
+          kind: "move-scope",
+          scope: "global",
+          path: "global/x.md",
+          targetScope: "ledger",
+          reason: "Return area-specific context",
+          evidence: [],
+        });
+        expect(yield* codeOf(proposals.decide(ANA, { id: backToArea.id, action: "approve" }))).toBe(
+          "access_denied",
+        );
+        yield* proposals.decide(ADMIN, { id: backToArea.id, action: "approve" });
       }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("checks the persisted content snapshot even when git history has not changed", () =>
+    Effect.gen(function* () {
+      const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+      const fs = yield* FileSystem.FileSystem;
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      const config = yield* ServerConfig.ServerConfig;
+      const file = `${config.baseDir}/enterprise/knowledge/${create.path}`;
+      const created = yield* proposals.propose(BRUNO, create);
+      yield* proposals.decide(ANA, { id: created.id, action: "approve" });
+      const snapshot = "# Uncommitted source";
+      yield* fs.writeFileString(file, snapshot);
+      const update = yield* proposals.propose(BRUNO, {
+        ...create,
+        kind: "update",
+        content: "# Proposed replacement",
+      });
+      expect(update).toMatchObject({
+        baseContentHash: "60f2230529c281ee1587c1e9503896b380968823ed02f982aa211f9b63c3f948",
+      });
+      yield* fs.writeFileString(file, create.content);
+      expect(yield* codeOf(proposals.decide(ANA, { id: update.id, action: "approve" }))).toBe(
+        "conflict",
+      );
+      expect((yield* store.listProposals).find((p) => p.id === update.id)?.status).toBe("pending");
+      expect(yield* fs.readFileString(file)).toBe(create.content);
+    }).pipe(Effect.provide(layer)),
   );
 
   it.effect("serializes concurrent approvals and refuses stale same-file snapshots", () =>
@@ -178,6 +236,18 @@ describe("KnowledgeProposals", () => {
         );
         yield* proposals.decide(ADMIN, { id: p.id, action: "approve" });
         expect((yield* store.listGrants(GERRY)).map((g) => g.areaId)).toContain("ledger");
+        for (const input of [
+          { ...create, path: "areas/ledger/grant.md" },
+          { ...create, kind: "update" as const, path: "areas/ledger/README.md" },
+          { ...create, kind: "delete" as const, path: "areas/ledger/README.md" },
+          {
+            ...create,
+            kind: "move-scope" as const,
+            path: "areas/ledger/README.md",
+            targetScope: "frontend",
+          },
+        ])
+          expect(yield* codeOf(proposals.propose(GERRY, input))).toBe("access_denied");
         yield* proposals.decide(ADMIN, { id: p.id, action: "revert" });
         expect(yield* store.listGrants(GERRY)).toEqual([]);
       }).pipe(Effect.provide(layer)),

@@ -4,6 +4,8 @@ import {
   type KnowledgeProposal,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
+import * as Digest from "effect/crypto/Digest";
+import * as Hex from "effect/encoding/Hex";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -26,6 +28,7 @@ export class KnowledgeRepo extends Context.Service<
   {
     /** Every document, read from the working tree on each call; no scope filtering here. */
     readonly documents: Effect.Effect<ReadonlyArray<KnowledgeDocument>>;
+    readonly contentHash: (path: string) => Effect.Effect<string, EnterpriseError>;
     readonly version: (path: string) => Effect.Effect<string, EnterpriseError>;
     readonly apply: (
       proposal: KnowledgeProposal,
@@ -48,6 +51,7 @@ export const layer = Layer.effect(
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const runner = yield* ProcessRunner.ProcessRunner;
+    const digest = yield* Digest.Digest;
     const store = yield* EnterpriseStore.EnterpriseStore;
     const root = path.join(config.baseDir, "enterprise", "knowledge");
 
@@ -127,6 +131,20 @@ export const layer = Layer.effect(
         });
       return result.stdout.trim();
     });
+    const contentHash = Effect.fn("KnowledgeRepo.contentHash")(
+      function* (file: string) {
+        const fullPath = path.join(root, file);
+        if (!(yield* fs.exists(fullPath))) return "absent";
+        return Hex.encode(yield* digest.digest(Digest.sha256, yield* fs.readFile(fullPath)));
+      },
+      Effect.mapError(
+        () =>
+          new EnterpriseError({
+            code: "knowledge_write_failed",
+            message: "Could not read the knowledge snapshot.",
+          }),
+      ),
+    );
     const version = Effect.fn("KnowledgeRepo.version")((file: string) =>
       checkedGit("log", "-1", "--format=%H", "--", file),
     );
@@ -151,7 +169,8 @@ export const layer = Layer.effect(
       const target = proposal.kind === "move-scope" ? destination(proposal) : null;
       if (
         proposal.kind !== "area-access" &&
-        ((yield* version(proposal.path)) !== proposal.baseVersion ||
+        ((yield* contentHash(proposal.path)) !== proposal.baseContentHash ||
+          (yield* version(proposal.path)) !== proposal.baseVersion ||
           (target !== null && (yield* version(target)) !== proposal.targetVersion))
       ) {
         return yield* new EnterpriseError({
@@ -253,6 +272,6 @@ export const layer = Layer.effect(
       }
       return yield* checkedGit("rev-parse", "HEAD");
     });
-    return KnowledgeRepo.of({ documents, version, apply, revert });
+    return KnowledgeRepo.of({ documents, contentHash, version, apply, revert });
   }),
 );

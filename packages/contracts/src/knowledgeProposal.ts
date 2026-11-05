@@ -18,6 +18,7 @@ export const KnowledgeProposal = Schema.Struct({
   proposedBy: Schema.String,
   createdAt: Schema.String,
   status: Schema.Literals(["pending", "applied", "rejected", "reverted"]),
+  baseContentHash: Schema.String,
   baseVersion: Schema.String,
   targetVersion: Schema.String,
   resolvedBy: Schema.optional(Schema.String),
