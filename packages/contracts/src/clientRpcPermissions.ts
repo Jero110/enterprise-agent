@@ -79,6 +79,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.enterpriseMembersRevoke]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseKnowledgePropose]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseProposalDecide]: AuthAccessWriteScope,
+  [WS_METHODS.enterpriseIngestStart]: AuthAccessWriteScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 

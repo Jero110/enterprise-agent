@@ -32,6 +32,8 @@ import {
   EnterpriseDisconnectResult,
   EnterpriseError,
   EnterpriseIdentity,
+  EnterpriseIngestStartInput,
+  EnterpriseIngestStartResult,
   EnterpriseMembers,
   EnterpriseRevokeMemberInput,
   EnterpriseStatus,
@@ -551,6 +553,7 @@ export const WS_METHODS = {
   enterpriseKnowledgePropose: "enterprise.knowledge.propose",
   enterpriseProposalInbox: "enterprise.proposals.inbox",
   enterpriseProposalDecide: "enterprise.proposals.decide",
+  enterpriseIngestStart: "enterprise.ingest.start",
   serverUpdateSettings: "server.updateSettings",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverSearchAcpRegistry: "server.searchAcpRegistry",
@@ -861,6 +864,11 @@ const WsPeerLinksAnswerRequestRpc = Rpc.make(WS_METHODS.peerLinksAnswerRequest, 
 
 const enterpriseError = Schema.Union([EnterpriseError, EnvironmentAuthorizationError]);
 
+const WsEnterpriseIngestStartRpc = Rpc.make(WS_METHODS.enterpriseIngestStart, {
+  payload: EnterpriseIngestStartInput,
+  success: EnterpriseIngestStartResult,
+  error: enterpriseError,
+});
 const WsEnterpriseKnowledgeProposeRpc = Rpc.make(WS_METHODS.enterpriseKnowledgePropose, {
   payload: KnowledgeProposeInput,
   success: KnowledgeProposal,
@@ -2152,6 +2160,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseMembersRevokeRpc,
   WsEnterpriseKnowledgeListRpc,
   WsEnterpriseKnowledgeGetRpc,
+  WsEnterpriseIngestStartRpc,
   WsEnterpriseKnowledgeProposeRpc,
   WsEnterpriseProposalInboxRpc,
   WsEnterpriseProposalDecideRpc,

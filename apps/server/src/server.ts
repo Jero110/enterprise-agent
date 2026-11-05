@@ -75,6 +75,7 @@ import * as TerminalManager from "./terminal/Manager.ts";
 import * as McpHttpServer from "./mcp/McpHttpServer.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
+import * as EnterpriseIngestion from "./enterprise/EnterpriseIngestion.ts";
 import * as EnterpriseStore from "./enterprise/EnterpriseStore.ts";
 import * as EnterpriseToolkit from "./enterprise/EnterpriseToolkit.ts";
 import * as KnowledgeToolkit from "./enterprise/KnowledgeToolkit.ts";
@@ -778,6 +779,7 @@ const layerHubMcp = McpHttpServer.layerMcpTransport(
     KnowledgeToolkit.layerHubRegistration,
   ),
 ).pipe(
+  Layer.provide(EnterpriseIngestion.layer),
   Layer.provide(EnterpriseHub.layer),
   Layer.provide(TeamPublication.layer),
   Layer.provide(AreaKnowledge.layer),

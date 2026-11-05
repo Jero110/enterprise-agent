@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 import { EnvironmentId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { PeerLinkCreateInput } from "./peerLink.ts";
 import { TeamMemberRole } from "./teamIdentity.ts";
+import { ModelSelection } from "./modelSelection.ts";
 
 /** Who the hub says a session is: its member, team and role. */
 export const EnterpriseHubIdentity = Schema.Struct({
@@ -20,6 +21,18 @@ export const EnterpriseIdentity = Schema.Struct({
   hubEnvironmentId: EnvironmentId,
 });
 export type EnterpriseIdentity = typeof EnterpriseIdentity.Type;
+
+export const EnterpriseIngestStartInput = Schema.Struct({
+  folder: TrimmedNonEmptyString,
+  modelSelection: ModelSelection,
+});
+export type EnterpriseIngestStartInput = typeof EnterpriseIngestStartInput.Type;
+
+export const EnterpriseIngestStartResult = Schema.Struct({
+  runId: Schema.String,
+  threadId: Schema.String,
+});
+export type EnterpriseIngestStartResult = typeof EnterpriseIngestStartResult.Type;
 
 export const EnterpriseStatus = Schema.Struct({ identity: Schema.NullOr(EnterpriseIdentity) });
 export type EnterpriseStatus = typeof EnterpriseStatus.Type;
@@ -80,6 +93,7 @@ export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("Ente
     "document_not_found",
     "access_denied",
     "invalid_proposal",
+    "ingestion_failed",
     "proposal_not_found",
     "conflict",
     "knowledge_write_failed",

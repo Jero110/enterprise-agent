@@ -99,19 +99,37 @@ const layerHub = McpToolAccess.toLayer(
         ),
       ),
       knowledge_proposals: McpToolAccess.reads((input) =>
-        asResult(Effect.flatMap(sessionId, (id) => hub.proposalInbox(id, input))),
+        asResult(
+          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
+            scope.client === undefined && scope.thread !== undefined
+              ? hub.ingestionInbox(scope.thread.threadId, input)
+              : Effect.flatMap(sessionId, (id) => hub.proposalInbox(id, input)),
+          ),
+        ),
       ),
       knowledge_proposal_decide: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => hub.proposalDecide(id, input))),
       ),
       knowledge_list: McpToolAccess.reads(() =>
-        asResult(Effect.flatMap(sessionId, hub.knowledgeList)),
+        asResult(
+          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
+            scope.client === undefined && scope.thread !== undefined
+              ? hub.ingestionList(scope.thread.threadId)
+              : Effect.flatMap(sessionId, hub.knowledgeList),
+          ),
+        ),
       ),
       knowledge_search: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => hub.knowledgeSearch(id, input))),
       ),
       knowledge_get: McpToolAccess.reads((input) =>
-        asResult(Effect.flatMap(sessionId, (id) => hub.knowledgeGet(id, input))),
+        asResult(
+          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
+            scope.client === undefined && scope.thread !== undefined
+              ? hub.ingestionGet(scope.thread.threadId, input)
+              : Effect.flatMap(sessionId, (id) => hub.knowledgeGet(id, input)),
+          ),
+        ),
       ),
     };
   }),

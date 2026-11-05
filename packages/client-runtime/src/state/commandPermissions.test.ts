@@ -15,6 +15,7 @@ import {
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
   EnterpriseError,
+  ProviderInstanceId,
   ThreadId,
   EnvironmentId,
   ORCHESTRATION_V2_WS_METHODS,
@@ -580,6 +581,18 @@ it.effect("connecting shows the identity and disconnecting clears it with the me
       expect(client[WS_METHODS.enterpriseConnect]).not.toHaveBeenCalled();
       expect(registry.get(enterprise.knowledgePropose.permissionAtom(env))).toBe(false);
       expect(registry.get(enterprise.proposalDecide.permissionAtom(env))).toBe(false);
+      expect(registry.get(enterprise.ingestStart.permissionAtom(env))).toBe(false);
+      expect(
+        (yield* Effect.promise(() =>
+          enterprise.ingestStart.run(registry, {
+            environmentId: env,
+            input: {
+              folder: "/hub/source",
+              modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "model" },
+            },
+          }),
+        ))._tag,
+      ).toBe("Failure");
       expect(
         (yield* Effect.promise(() =>
           enterprise.knowledgePropose.run(registry, {
@@ -606,6 +619,7 @@ it.effect("connecting shows the identity and disconnecting clears it with the me
       setAccess(true);
       expect(registry.get(enterprise.knowledgePropose.permissionAtom(env))).toBe(true);
       expect(registry.get(enterprise.proposalDecide.permissionAtom(env))).toBe(true);
+      expect(registry.get(enterprise.ingestStart.permissionAtom(env))).toBe(true);
       expect((yield* connect)._tag).toBe("Success");
       expect(yield* readStatus).toEqual({ identity });
       expect((yield* readMembers).teams).toHaveLength(1);

@@ -2,6 +2,8 @@ import {
   EnterpriseAuthorizeMemberInput,
   EnterpriseError,
   EnterpriseHubIdentity,
+  EnterpriseIngestStartInput,
+  EnterpriseIngestStartResult,
   EnterpriseMembers,
   OrchestratorMcpFailure,
   TeamThreadReport,
@@ -19,6 +21,7 @@ import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import { EnterpriseHub } from "./EnterpriseHub.ts";
+import { EnterpriseIngestion } from "./EnterpriseIngestion.ts";
 import { TeamPublication } from "../team/TeamPublication.ts";
 
 /**
@@ -82,6 +85,14 @@ const RevokeTool = Tool.make("enterprise_member_revoke", {
   success: hubResult(EnterpriseMembers),
 }).annotate(Tool.Destructive, true);
 
+const IngestStartTool = Tool.make("enterprise_ingest_start", {
+  ...shared,
+  dependencies: [McpInvocationContext.McpInvocationContext, EnterpriseIngestion],
+  description: "Admin only: start an enterprise knowledge ingestion thread on the hub.",
+  parameters: EnterpriseIngestStartInput,
+  success: hubResult(EnterpriseIngestStartResult),
+});
+
 const teamShared = {
   ...shared,
   dependencies: [McpInvocationContext.McpInvocationContext, TeamPublication],
@@ -116,6 +127,7 @@ const TeamPublishTool = Tool.make("enterprise_team_publish", {
 });
 
 export const EnterpriseToolkit = Toolkit.make(
+  IngestStartTool,
   TeamReportTool,
   TeamListTool,
   TeamGetTool,
@@ -153,8 +165,12 @@ export const layer = McpToolAccess.toLayer(
   EnterpriseToolkit,
   Effect.gen(function* () {
     const hub = yield* EnterpriseHub;
+    const ingestion = yield* EnterpriseIngestion;
     const team = yield* TeamPublication;
     return {
+      enterprise_ingest_start: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => ingestion.start(id, input))),
+      ),
       enterprise_team_report: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => team.report(id, input))),
       ),

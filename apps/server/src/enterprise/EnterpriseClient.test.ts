@@ -19,6 +19,7 @@ import {
 } from "../peer/PeerLinks.testkit.ts";
 import * as EnterpriseClient from "./EnterpriseClient.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
+import * as EnterpriseIngestion from "./EnterpriseIngestion.ts";
 import * as TeamPublication from "../team/TeamPublication.ts";
 import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as EnterpriseToolkit from "./EnterpriseToolkit.ts";
@@ -33,6 +34,11 @@ const serveHub = Effect.gen(function* () {
     McpHttpServer.toolkitRegistration(EnterpriseToolkit.EnterpriseToolkit, EnterpriseToolkit.layer),
     KnowledgeToolkit.layerHubRegistration,
   ).pipe(
+    Layer.provide(
+      Layer.succeed(EnterpriseIngestion.EnterpriseIngestion, {
+        start: () => Effect.die("unused"),
+      }),
+    ),
     Layer.provide(EnterpriseHub.layer),
     Layer.provide(layerKnowledge),
     Layer.provide(TeamPublication.layer),

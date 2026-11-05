@@ -48,6 +48,7 @@ describe("EnterpriseHub", () => {
         evidence: [],
       } as const;
       expect(yield* codeOf(hub.ingestionPropose("unknown", proposal))).toBe("access_denied");
+      expect(yield* codeOf(hub.ingestionList("unknown"))).toBe("access_denied");
       yield* store.saveIngestionRun({
         id: "run-1",
         threadId: "thread-1",
@@ -55,6 +56,7 @@ describe("EnterpriseHub", () => {
         folder: "/source",
         status: "running",
       });
+      expect(yield* hub.ingestionList("thread-1")).toHaveProperty("documents");
       const first = yield* hub.ingestionPropose("thread-1", proposal);
       expect(first).toMatchObject({
         proposedBy: JERO,
@@ -80,6 +82,7 @@ describe("EnterpriseHub", () => {
         status: "running",
       });
       expect(yield* codeOf(hub.ingestionPropose("thread-2", proposal))).toBe("access_denied");
+      expect(yield* codeOf(hub.ingestionList("thread-2"))).toBe("access_denied");
     }).pipe(Effect.provide(layer)),
   );
 

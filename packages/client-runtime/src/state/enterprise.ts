@@ -62,6 +62,10 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     knowledgeList,
     knowledgeGet,
     proposalInbox,
+    ingestStart: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:ingest-start",
+      tag: WS_METHODS.enterpriseIngestStart,
+    }),
     knowledgePropose: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:knowledge-propose",
       tag: WS_METHODS.enterpriseKnowledgePropose,

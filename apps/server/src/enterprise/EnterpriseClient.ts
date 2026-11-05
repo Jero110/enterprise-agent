@@ -1,5 +1,7 @@
 import {
   EnterpriseError,
+  type EnterpriseIngestStartInput,
+  EnterpriseIngestStartResult,
   type KnowledgeProposeInput,
   KnowledgeProposal,
   KnowledgeProposalInbox,
@@ -49,6 +51,9 @@ import { hubResult } from "./EnterpriseToolkit.ts";
 export class EnterpriseClient extends Context.Service<
   EnterpriseClient,
   {
+    readonly ingestStart: (
+      input: EnterpriseIngestStartInput,
+    ) => Effect.Effect<EnterpriseIngestStartResult, EnterpriseError>;
     readonly knowledgePropose: (
       input: KnowledgeProposeInput,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
@@ -222,6 +227,11 @@ const make = Effect.gen(function* () {
   }).pipe(Effect.withSpan("EnterpriseClient.disconnect"));
 
   return EnterpriseClient.of({
+    ingestStart: Effect.fn("EnterpriseClient.ingestStart")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "enterprise_ingest_start", input, EnterpriseIngestStartResult),
+      ),
+    ),
     knowledgePropose: Effect.fn("EnterpriseClient.knowledgePropose")((input) =>
       withConnection((hub) => callResult(hub, "knowledge_propose", input, KnowledgeProposal)),
     ),

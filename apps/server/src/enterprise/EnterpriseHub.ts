@@ -31,6 +31,17 @@ import * as KnowledgeProposals from "./KnowledgeProposals.ts";
 export class EnterpriseHub extends Context.Service<
   EnterpriseHub,
   {
+    readonly ingestionInbox: (
+      threadId: string,
+      input: KnowledgeProposalInboxInput,
+    ) => Effect.Effect<KnowledgeProposalInbox, EnterpriseError>;
+    readonly ingestionList: (
+      threadId: string,
+    ) => Effect.Effect<KnowledgeDocumentList, EnterpriseError>;
+    readonly ingestionGet: (
+      threadId: string,
+      input: KnowledgeGetInput,
+    ) => Effect.Effect<KnowledgeDocument, EnterpriseError>;
     readonly ingestionPropose: (
       threadId: string,
       input: KnowledgeProposeInput,
@@ -223,20 +234,50 @@ const make = Effect.gen(function* () {
     );
   });
 
+  const ingestionIdentity = Effect.fn("EnterpriseHub.ingestionIdentity")(function* (
+    threadId: string,
+  ) {
+    const run = yield* store.getIngestionRun(threadId);
+    if (run === null || run.status !== "running")
+      return yield* new EnterpriseError({
+        code: "access_denied",
+        message: "Only ingestion threads can propose as an admin.",
+      });
+    const member = yield* store.getMember(run.adminEmail);
+    if (member?.role !== "admin" || !(yield* store.canEnter(run.adminEmail)))
+      return yield* new EnterpriseError({
+        code: "access_denied",
+        message: "The ingestion admin no longer has access.",
+      });
+    return { run, member };
+  });
   return EnterpriseHub.of({
+    ingestionInbox: Effect.fn("EnterpriseHub.ingestionInbox")(function* (threadId, input) {
+      const { member } = yield* ingestionIdentity(threadId);
+      return yield* proposals.inbox(member.email, input);
+    }),
+    ingestionList: Effect.fn("EnterpriseHub.ingestionList")(function* (threadId) {
+      const { member } = yield* ingestionIdentity(threadId);
+      const principal = yield* knowledge.getMemberPrincipal(member.email);
+      if (principal === null) return yield* notAuthorized;
+      return { documents: yield* knowledge.listDocuments(principal) };
+    }),
+    ingestionGet: Effect.fn("EnterpriseHub.ingestionGet")(function* (threadId, input) {
+      const { member } = yield* ingestionIdentity(threadId);
+      const principal = yield* knowledge.getMemberPrincipal(member.email);
+      if (principal === null) return yield* notAuthorized;
+      return yield* knowledge.readDocument(principal, input.path).pipe(
+        Effect.mapError(
+          ({ code, message }) =>
+            new EnterpriseError({
+              code: code === "access_denied" ? "access_denied" : "document_not_found",
+              message,
+            }),
+        ),
+      );
+    }),
     ingestionPropose: Effect.fn("EnterpriseHub.ingestionPropose")(function* (threadId, input) {
-      const run = yield* store.getIngestionRun(threadId);
-      if (run === null)
-        return yield* new EnterpriseError({
-          code: "access_denied",
-          message: "Only ingestion threads can propose as an admin.",
-        });
-      const member = yield* store.getMember(run.adminEmail);
-      if (member?.role !== "admin" || !(yield* store.canEnter(run.adminEmail)))
-        return yield* new EnterpriseError({
-          code: "access_denied",
-          message: "The ingestion admin no longer has access.",
-        });
+      const { run, member } = yield* ingestionIdentity(threadId);
       return yield* proposals.propose(
         member.email,
         {

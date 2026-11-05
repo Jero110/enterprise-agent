@@ -77,6 +77,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.enterpriseKnowledgePropose]: "enterprise",
   [WS_METHODS.enterpriseProposalInbox]: "enterprise",
   [WS_METHODS.enterpriseProposalDecide]: "enterprise",
+  [WS_METHODS.enterpriseIngestStart]: "enterprise",
   [WS_METHODS.serverUpdateSettings]: "server",
   [WS_METHODS.serverSearchAcpRegistry]: "server",
   [WS_METHODS.serverPrepareAcpRegistryAgent]: "server",
