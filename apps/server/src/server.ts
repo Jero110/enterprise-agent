@@ -764,30 +764,39 @@ const layerCommandReadiness = HttpRouter.middleware(
   { global: true },
 );
 
-/** The enterprise tools and their store exist only on a hub; any other server serves the plain `/mcp`. */
+const layerMemberMcp = McpHttpServer.layerMcpTransport(
+  Layer.mergeAll(McpHttpServer.layerTools, KnowledgeToolkit.layerMemberRegistration),
+);
+
+const layerHubMcp = McpHttpServer.layerMcpTransport(
+  Layer.mergeAll(
+    McpHttpServer.layerTools,
+    EnterpriseToolkit.layerRegistration,
+    KnowledgeToolkit.layerHubRegistration,
+  ),
+).pipe(
+  Layer.provide(EnterpriseHub.layer),
+  Layer.provide(AreaKnowledge.layer),
+  Layer.provide(KnowledgeRepo.layer),
+  Layer.provide(ProcessRunner.layer),
+  Layer.provide(EnterpriseStore.layerHub),
+);
+
+/** `Layer.unwrap` needs one type; a layer may need less than it declares. */
+type McpLayer = Layer.Layer<
+  Layer.Success<typeof layerHubMcp>,
+  Layer.Error<typeof layerHubMcp> | Layer.Error<typeof layerMemberMcp>,
+  Layer.Services<typeof layerHubMcp> | Layer.Services<typeof layerMemberMcp>
+>;
+
+/**
+ * The enterprise tools and their store exist only on a hub. A member IDE's
+ * agent reaches the hub's knowledge through its enterprise connection.
+ */
 const layerMcp = Layer.unwrap(
-  Effect.gen(function* () {
-    const config = yield* ServerConfig.ServerConfig;
-    // A member IDE's agent reaches the hub's knowledge through its enterprise connection.
-    if (config.enterpriseHub !== true) {
-      return McpHttpServer.layerMcpTransport(
-        Layer.mergeAll(McpHttpServer.layerTools, KnowledgeToolkit.layerMemberRegistration),
-      );
-    }
-    return McpHttpServer.layerMcpTransport(
-      Layer.mergeAll(
-        McpHttpServer.layerTools,
-        EnterpriseToolkit.layerRegistration,
-        KnowledgeToolkit.layerHubRegistration,
-      ),
-    ).pipe(
-      Layer.provide(EnterpriseHub.layer),
-      Layer.provide(AreaKnowledge.layer),
-      Layer.provide(KnowledgeRepo.layer),
-      Layer.provide(ProcessRunner.layer),
-      Layer.provide(EnterpriseStore.layerHub),
-    );
-  }),
+  Effect.map(ServerConfig.ServerConfig, (config): McpLayer =>
+    config.enterpriseHub === true ? layerHubMcp : layerMemberMcp,
+  ),
 );
 
 const layerMakeRoutes = Layer.mergeAll(
