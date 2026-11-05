@@ -238,6 +238,18 @@ thread** from its long-press menu on mobile.
 **Thread ID** copies the bare ID for scripts and the `t3` CLI. See
 [keybindings](./keybindings.md) for custom configuration.
 
+## Share work with your team
+
+After connecting in **Settings → Enterprise**, web and desktop list your team's threads
+under **Team Agents**. Administrators can see threads across teams. Unpublished threads
+share only their title, owner, and status.
+
+In your thread's menu, choose **Team publication → Read-only** to share its conversation
+and subagents. Teammates open a read-only snapshot; they cannot send messages or control
+your agent. Snapshots update after turns finish. Choose **Unpublished** on the parent
+thread to remove access to it and its subagents. Use **Reload team agents** to refresh
+the list after someone shares new work.
+
 ## Inspect agent work
 
 **Limited** means the provider stopped on a usage or rate limit. The conversation

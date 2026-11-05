@@ -39,6 +39,9 @@ vi.mock("react", () => ({
   useCallback: (callback: unknown) => callback,
   useMemo: (factory: () => unknown) => factory(),
 }));
+vi.mock("@effect/atom-react", () => ({
+  useAtomValue: () => true,
+}));
 vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({ navigate: async () => recordEffect("project-settings") }),
 }));
@@ -60,6 +63,22 @@ vi.mock("../state/entities", () => ({
     latestRun: null,
   }),
   useProjects: () => [{ id: "project", environmentId: "secondary" }],
+}));
+vi.mock("../state/enterprise", () => ({
+  enterpriseEnvironment: {
+    teamThreads: () => ({}),
+    publishTeamThread: { permissionAtom: () => ({}) },
+  },
+}));
+vi.mock("../state/query", () => ({
+  useEnvironmentQuery: () => ({
+    data: null,
+    error: null,
+    failure: null,
+    isPending: false,
+    isSuccess: false,
+    refresh: () => {},
+  }),
 }));
 vi.mock("../state/environments", () => ({ usePrimaryEnvironmentId: () => "primary" }));
 vi.mock("../state/threads", () => ({ threadEnvironment: { updateMetadata: "metadata" } }));

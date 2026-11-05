@@ -19,14 +19,34 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     tag: WS_METHODS.enterpriseMembersList,
     staleTimeMs: 10_000,
   });
+  const teamThreads = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:team-threads",
+    tag: WS_METHODS.teamThreadsList,
+    staleTimeMs: 0,
+  });
+  const teamThread = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:team-thread",
+    tag: WS_METHODS.teamThreadGet,
+    staleTimeMs: 0,
+    idleTtlMs: 0,
+  });
   // Re-asks the hub rather than patching: identity and member list change on its word alone.
   const refreshAll = (registry: AtomRegistry.AtomRegistry, environmentId: EnvironmentId) => {
     registry.refresh(status({ environmentId, input: {} }));
     registry.refresh(members({ environmentId, input: {} }));
+    registry.refresh(teamThreads({ environmentId, input: {} }));
   };
   return {
     status,
     members,
+    teamThreads,
+    teamThread,
+    publishTeamThread: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:team-thread-publish",
+      tag: WS_METHODS.teamThreadPublish,
+      onSuccess: ({ environmentId }, registry) =>
+        Effect.sync(() => registry.refresh(teamThreads({ environmentId, input: {} }))),
+    }),
     connect: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:connect",
       tag: WS_METHODS.enterpriseConnect,

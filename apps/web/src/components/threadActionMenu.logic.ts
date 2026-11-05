@@ -21,6 +21,8 @@ export type ThreadActionMenuId =
   | "regenerate-title"
   | "mark-unread"
   | "share-guest"
+  | "publish"
+  | `publish:${"unpublished" | "read-only"}`
   | "copy"
   | "copy-path"
   | "copy-branch"
@@ -93,8 +95,11 @@ export interface ThreadActionMenuState {
   readonly snoozePresets: ReadonlyArray<SnoozePreset>;
   /** Guest links need their own grant, so the caller checks it instead of `canOperate`. */
   readonly canShareWithGuest?: boolean;
+  /** Publication uses the access-write grant, independently of thread operation access. */
+  readonly canPublish?: boolean;
   /** A No project thread with its own folder, on a server that can promote it. */
   readonly canTurnIntoProject?: boolean;
+  readonly publicationStatus?: "unpublished" | "read-only";
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */
@@ -105,6 +110,9 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
     "project-settings",
     "mark-unread",
     "share-guest",
+    "publish",
+    "publish:unpublished",
+    "publish:read-only",
     "copy",
     "copy-path",
     "copy-branch",
@@ -180,6 +188,27 @@ export function buildThreadActionMenuItems(
     { id: "mark-unread", label: "Mark unread", icon: "mail-open" },
     ...(state.canShareWithGuest
       ? [{ id: "share-guest" as const, label: "Share with guest", icon: "user-plus" }]
+      : []),
+    ...(state.canPublish && state.publicationStatus
+      ? [
+          {
+            id: "publish" as const,
+            label: "Team publication",
+            icon: "users",
+            children: [
+              {
+                id: "publish:unpublished" as const,
+                label: "Unpublished",
+                checked: state.publicationStatus === "unpublished",
+              },
+              {
+                id: "publish:read-only" as const,
+                label: "Read-only",
+                checked: state.publicationStatus === "read-only",
+              },
+            ],
+          },
+        ]
       : []),
     ...(state.projectFilter
       ? [
