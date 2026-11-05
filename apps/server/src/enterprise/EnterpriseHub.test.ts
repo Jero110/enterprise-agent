@@ -35,6 +35,41 @@ const codeOf = <A>(effect: Effect.Effect<A, { readonly code: string }>) =>
   );
 
 describe("EnterpriseHub", () => {
+  it.effect("attributes ingestion proposals only to registered admin threads", () =>
+    Effect.gen(function* () {
+      const hub = yield* EnterpriseHub.EnterpriseHub;
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      const proposal = {
+        kind: "create",
+        scope: "global",
+        path: "global/ingestion-test.md",
+        content: "# Sources",
+        reason: "Map sources",
+        evidence: [],
+      } as const;
+      expect(yield* codeOf(hub.ingestionPropose("unknown", proposal))).toBe("access_denied");
+      yield* store.saveIngestionRun({
+        id: "run-1",
+        threadId: "thread-1",
+        adminEmail: JERO,
+        folder: "/source",
+        status: "running",
+      });
+      expect(yield* hub.ingestionPropose("thread-1", proposal)).toMatchObject({
+        proposedBy: JERO,
+        evidence: ["ingestion:run-1"],
+      });
+      yield* store.saveIngestionRun({
+        id: "run-2",
+        threadId: "thread-2",
+        adminEmail: ANA,
+        folder: "/source",
+        status: "running",
+      });
+      expect(yield* codeOf(hub.ingestionPropose("thread-2", proposal))).toBe("access_denied");
+    }).pipe(Effect.provide(layer)),
+  );
+
   it.effect("an authorized email with the token binds the session to its member", () =>
     Effect.gen(function* () {
       const hub = yield* EnterpriseHub.EnterpriseHub;

@@ -88,7 +88,15 @@ const layerHub = McpToolAccess.toLayer(
     const hub = yield* EnterpriseHub;
     return {
       knowledge_propose: McpToolAccess.reads((input) =>
-        asResult(Effect.flatMap(sessionId, (id) => hub.knowledgePropose(id, input))),
+        asResult(
+          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
+            scope.client !== undefined
+              ? hub.knowledgePropose(scope.client.sessionId, input)
+              : scope.thread !== undefined
+                ? hub.ingestionPropose(scope.thread.threadId, input)
+                : Effect.flatMap(sessionId, (id) => hub.knowledgePropose(id, input)),
+          ),
+        ),
       ),
       knowledge_proposals: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => hub.proposalInbox(id, input))),

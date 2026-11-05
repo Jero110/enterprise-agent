@@ -31,6 +31,10 @@ import * as KnowledgeProposals from "./KnowledgeProposals.ts";
 export class EnterpriseHub extends Context.Service<
   EnterpriseHub,
   {
+    readonly ingestionPropose: (
+      threadId: string,
+      input: KnowledgeProposeInput,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
     readonly knowledgePropose: (
       sessionId: string,
       input: KnowledgeProposeInput,
@@ -220,6 +224,24 @@ const make = Effect.gen(function* () {
   });
 
   return EnterpriseHub.of({
+    ingestionPropose: Effect.fn("EnterpriseHub.ingestionPropose")(function* (threadId, input) {
+      const run = yield* store.getIngestionRun(threadId);
+      if (run === null)
+        return yield* new EnterpriseError({
+          code: "access_denied",
+          message: "Only ingestion threads can propose as an admin.",
+        });
+      const member = yield* store.getMember(run.adminEmail);
+      if (member?.role !== "admin" || !(yield* store.canEnter(run.adminEmail)))
+        return yield* new EnterpriseError({
+          code: "access_denied",
+          message: "The ingestion admin no longer has access.",
+        });
+      return yield* proposals.propose(member.email, {
+        ...input,
+        evidence: [...new Set([...input.evidence, `ingestion:${run.id}`])],
+      });
+    }),
     knowledgePropose: Effect.fn("EnterpriseHub.knowledgePropose")(function* (sessionId, input) {
       return yield* proposals.propose((yield* whoami(sessionId)).email, input);
     }),
