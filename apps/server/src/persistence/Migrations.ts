@@ -84,7 +84,7 @@ import Migration0078 from "./Migrations/078_DropOrchestrationEventCorrelationInd
 
 import Migration0079 from "./Migrations/079_DelegatedRecoveryIndexes.ts";
 import Migration0080 from "./Migrations/080_EnterpriseStore.ts";
-import Migration0081 from "./Migrations/081_TeamPublication.ts";
+import Migration0082 from "./Migrations/082_TeamPublication.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -168,7 +168,7 @@ const migrationEntries = [
   [78, "DropOrchestrationEventCorrelationIndex", Migration0078],
   [79, "DelegatedRecoveryIndexes", Migration0079],
   [80, "EnterpriseStore", Migration0080],
-  [81, "TeamPublication", Migration0081],
+  [82, "TeamPublication", Migration0082],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
