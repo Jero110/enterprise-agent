@@ -77,6 +77,9 @@ export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("Ente
     "not_connected",
     "hub_unreachable",
     "unknown_team",
+    "access_denied",
+    "thread_not_found",
+    "snapshot_unavailable",
   ]),
   message: Schema.String,
 }) {}

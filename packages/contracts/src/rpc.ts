@@ -37,6 +37,13 @@ import {
   EnterpriseStatus,
 } from "./enterprise.ts";
 import {
+  TeamThreadSummary,
+  TeamThreadSnapshot,
+  TeamThreadReference,
+  TeamThreadPublishInput,
+  TeamPublicationResult,
+} from "./teamActivity.ts";
+import {
   ChatGptReconnectProfileInput,
   ChatGptReconnectProfile,
   ChatGptImportProfileInput,
@@ -522,6 +529,9 @@ export const WS_METHODS = {
   peerLinksLink: "peerLinks.link",
   peerLinksUnlink: "peerLinks.unlink",
   peerLinksAnswerRequest: "peerLinks.answerRequest",
+  teamThreadsList: "team.threads.list",
+  teamThreadGet: "team.thread.get",
+  teamThreadPublish: "team.thread.publish",
   enterpriseStatus: "enterprise.status",
   enterpriseConnect: "enterprise.connect",
   enterpriseDisconnect: "enterprise.disconnect",
@@ -837,6 +847,22 @@ const WsPeerLinksAnswerRequestRpc = Rpc.make(WS_METHODS.peerLinksAnswerRequest, 
 });
 
 const enterpriseError = Schema.Union([EnterpriseError, EnvironmentAuthorizationError]);
+
+const WsTeamThreadsListRpc = Rpc.make(WS_METHODS.teamThreadsList, {
+  payload: Schema.Struct({}),
+  success: Schema.Array(TeamThreadSummary),
+  error: enterpriseError,
+});
+const WsTeamThreadGetRpc = Rpc.make(WS_METHODS.teamThreadGet, {
+  payload: TeamThreadReference,
+  success: TeamThreadSnapshot,
+  error: enterpriseError,
+});
+const WsTeamThreadPublishRpc = Rpc.make(WS_METHODS.teamThreadPublish, {
+  payload: TeamThreadPublishInput,
+  success: TeamPublicationResult,
+  error: enterpriseError,
+});
 
 const WsEnterpriseStatusRpc = Rpc.make(WS_METHODS.enterpriseStatus, {
   payload: Schema.Struct({}),
@@ -2075,6 +2101,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsPeerLinksLinkRpc,
   WsPeerLinksUnlinkRpc,
   WsPeerLinksAnswerRequestRpc,
+  WsTeamThreadsListRpc,
+  WsTeamThreadGetRpc,
+  WsTeamThreadPublishRpc,
   WsEnterpriseStatusRpc,
   WsEnterpriseConnectRpc,
   WsEnterpriseDisconnectRpc,

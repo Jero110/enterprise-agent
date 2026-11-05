@@ -19,6 +19,7 @@ import {
 } from "../peer/PeerLinks.testkit.ts";
 import * as EnterpriseClient from "./EnterpriseClient.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
+import * as TeamPublication from "../team/TeamPublication.ts";
 import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as EnterpriseToolkit from "./EnterpriseToolkit.ts";
 
@@ -30,7 +31,7 @@ const serveHub = Effect.gen(function* () {
     EnterpriseToolkit.EnterpriseToolkit,
     EnterpriseToolkit.layer,
   ).pipe(
-    Layer.provide(EnterpriseHub.layer),
+    Layer.provide(Layer.merge(EnterpriseHub.layer, TeamPublication.layer)),
     Layer.provide(layerSeededStore),
     Layer.provide(
       Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto),
@@ -66,7 +67,7 @@ const connectInput = (hub: ServedPeer, email: string, token = TOKEN) =>
 const failureOf = <A, E>(effect: Effect.Effect<A, E>) =>
   Effect.map(Effect.result(effect), (result) => (Result.isFailure(result) ? result.failure : null));
 
-it.effect("logs in over a peer link and shows name, team and role", () =>
+it.live("logs in over a peer link and shows name, team and role", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const hub = yield* serveHub;
@@ -84,11 +85,41 @@ it.effect("logs in over a peer link and shows name, team and role", () =>
         hubEnvironmentId: hubDescriptor.environmentId,
       });
       expect((yield* ana.client.status).identity).toEqual(identity);
+      yield* ana.client.teamReport({
+        summaries: [
+          {
+            threadId: "thread-a",
+            parentThreadId: null,
+            title: "Ledger work",
+            status: "idle",
+            updatedAt: "2026-11-05T00:00:00Z",
+          },
+        ],
+        snapshots: [],
+      });
+      expect(yield* ana.client.teamList).toMatchObject([
+        { ownerEmail: identity.email, publicationStatus: "unpublished" },
+      ]);
+      yield* ana.client.teamPublish({ threadId: "thread-a", status: "read-only" });
+      const messages = [
+        {
+          role: "assistant" as const,
+          text: "A compact message",
+          createdAt: "2026-11-05T00:00:00Z",
+        },
+      ];
+      yield* ana.client.teamReport({
+        summaries: [],
+        snapshots: [{ threadId: "thread-a", messages }],
+      });
+      expect(
+        (yield* ana.client.teamGet({ ownerEmail: identity.email, threadId: "thread-a" })).messages,
+      ).toEqual(messages);
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it.effect("rejects an unauthorized email and a wrong token, leaving no link behind", () =>
+it.live("rejects an unauthorized email and a wrong token, leaving no link behind", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const hub = yield* serveHub;
@@ -108,7 +139,7 @@ it.effect("rejects an unauthorized email and a wrong token, leaving no link behi
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it.effect("admin authorizes then revokes a member whose next hub call then fails", () =>
+it.live("admin authorizes then revokes a member whose next hub call then fails", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const hub = yield* serveHub;
@@ -136,7 +167,7 @@ it.effect("admin authorizes then revokes a member whose next hub call then fails
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it.effect("a member cannot reach admin methods through the hub", () =>
+it.live("a member cannot reach admin methods through the hub", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const hub = yield* serveHub;
@@ -150,7 +181,7 @@ it.effect("a member cannot reach admin methods through the hub", () =>
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it.effect("disconnect forgets the identity and the link, and admin calls need a connection", () =>
+it.live("disconnect forgets the identity and the link, and admin calls need a connection", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const hub = yield* serveHub;

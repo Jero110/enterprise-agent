@@ -10,6 +10,12 @@ import {
   type EnterpriseStatus,
   type OrchestratorMcpFailure,
   type PeerLinkError,
+  TeamThreadSummary,
+  TeamThreadSnapshot,
+  TeamPublicationResult,
+  type TeamThreadPublishInput,
+  type TeamThreadReference,
+  type TeamThreadReport,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -17,6 +23,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as PubSub from "effect/PubSub";
+import * as Stream from "effect/Stream";
 
 import * as ServerConfig from "../config.ts";
 import * as PeerLinks from "../peer/PeerLinks.ts";
@@ -32,6 +40,17 @@ export class EnterpriseClient extends Context.Service<
   EnterpriseClient,
   {
     readonly status: Effect.Effect<EnterpriseStatus, EnterpriseError>;
+    readonly connectionChanges: Stream.Stream<void>;
+    readonly teamList: Effect.Effect<ReadonlyArray<TeamThreadSummary>, EnterpriseError>;
+    readonly teamGet: (
+      input: TeamThreadReference,
+    ) => Effect.Effect<TeamThreadSnapshot, EnterpriseError>;
+    readonly teamReport: (
+      input: TeamThreadReport,
+    ) => Effect.Effect<TeamPublicationResult, EnterpriseError>;
+    readonly teamPublish: (
+      input: TeamThreadPublishInput,
+    ) => Effect.Effect<TeamPublicationResult, EnterpriseError>;
     readonly connect: (
       input: EnterpriseConnectInput,
     ) => Effect.Effect<EnterpriseIdentity, EnterpriseError | PeerLinkError>;
@@ -72,6 +91,7 @@ const make = Effect.gen(function* () {
   const links = yield* PeerLinks.PeerLinks;
   const peer = yield* PeerMcpClient.PeerMcpClient;
   const connectionPath = path.join(config.stateDir, CONNECTION_FILE);
+  const changes = yield* PubSub.unbounded<void>();
 
   const readConnection = fs.readFileString(connectionPath).pipe(
     Effect.flatMap(decodeConnection),
@@ -148,6 +168,7 @@ const make = Effect.gen(function* () {
         EnterpriseHubIdentity,
       ).pipe(
         Effect.tap(() => writeConnection(hub)),
+        Effect.tap(() => PubSub.publish(changes, undefined)),
         Effect.map((identity) => ({ ...identity, hubEnvironmentId: hub })),
         // A refused login leaves no link behind, unless the hub was already linked for other work.
         Effect.tapError(() =>
@@ -169,11 +190,29 @@ const make = Effect.gen(function* () {
     ).pipe(Effect.ignore);
     yield* links.unlink(hub).pipe(Effect.ignore);
     yield* clearConnection;
+    yield* PubSub.publish(changes, undefined);
     return { disconnected: true };
   }).pipe(Effect.withSpan("EnterpriseClient.disconnect"));
 
   return EnterpriseClient.of({
     status,
+    connectionChanges: Stream.fromPubSub(changes),
+    teamList: withConnection((hub) =>
+      callResult(hub, "enterprise_team_list", {}, Schema.Array(TeamThreadSummary)),
+    ),
+    teamGet: Effect.fn("EnterpriseClient.teamGet")((input) =>
+      withConnection((hub) => callResult(hub, "enterprise_team_get", input, TeamThreadSnapshot)),
+    ),
+    teamReport: Effect.fn("EnterpriseClient.teamReport")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "enterprise_team_report", input, TeamPublicationResult),
+      ),
+    ),
+    teamPublish: Effect.fn("EnterpriseClient.teamPublish")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "enterprise_team_publish", input, TeamPublicationResult),
+      ),
+    ),
     connect,
     disconnect,
     listMembers: withConnection((hub) =>

@@ -77,6 +77,8 @@ import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
 import * as EnterpriseStore from "./enterprise/EnterpriseStore.ts";
 import * as EnterpriseToolkit from "./enterprise/EnterpriseToolkit.ts";
+import * as TeamPublication from "./team/TeamPublication.ts";
+import * as TeamReporter from "./team/TeamReporter.ts";
 import * as PeerForwarding from "./peer/PeerForwarding.ts";
 import * as RemoteDelegation from "./peer/RemoteDelegation.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
@@ -768,7 +770,10 @@ const layerMcp = Layer.unwrap(
     if (config.enterpriseHub !== true) return McpHttpServer.layer;
     return McpHttpServer.layerMcpTransport(
       Layer.mergeAll(McpHttpServer.layerTools, EnterpriseToolkit.layerRegistration),
-    ).pipe(Layer.provide(EnterpriseHub.layer), Layer.provide(EnterpriseStore.layerHub));
+    ).pipe(
+      Layer.provide(Layer.merge(EnterpriseHub.layer, TeamPublication.layer)),
+      Layer.provide(EnterpriseStore.layerHub),
+    );
   }),
 );
 
@@ -798,11 +803,13 @@ const layerMakeRoutes = Layer.mergeAll(
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
     Layer.provide(McpOAuth.layerMcpClientAuthenticator),
   ),
+  Layer.effectDiscard(TeamReporter.TeamReporter.pipe(Effect.flatMap((reporter) => reporter.start))),
   // Follows delegated tasks running in linked environments, including after a restart.
   Layer.effectDiscard(
     RemoteDelegation.RemoteDelegation.pipe(Effect.flatMap((remote) => remote.start())),
   ),
 ).pipe(
+  Layer.provide(TeamReporter.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provide(
     PullRequestReviewGuideService.layer.pipe(Layer.provide(PullRequestReviewGuides.layer)),
   ),
