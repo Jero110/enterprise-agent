@@ -8,6 +8,7 @@ import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as KnowledgeRepo from "../knowledge/KnowledgeRepo.ts";
+import * as AreaKnowledge from "../knowledge/AreaKnowledge.ts";
 import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
 import * as KnowledgeProposals from "./KnowledgeProposals.ts";
@@ -16,7 +17,8 @@ const ANA = "ent.test.ana@gmail.com";
 const BRUNO = "ent.test.bruno@gmail.com";
 const GERRY = "ent.test.gerry@gmail.com";
 const ADMIN = "jeronimo.deli@gmail.com";
-const layer = KnowledgeProposals.layer.pipe(
+const layer = AreaKnowledge.layer.pipe(
+  Layer.provideMerge(KnowledgeProposals.layer),
   Layer.provideMerge(KnowledgeRepo.layer),
   Layer.provideMerge(ProcessRunner.layer),
   Layer.provideMerge(layerSeededStore),
@@ -105,6 +107,13 @@ describe("KnowledgeProposals", () => {
         expect((yield* repo.documents).find((d) => d.id === create.path)?.content).toBe(
           create.content,
         );
+        const deletion = yield* proposals.propose(BRUNO, { ...create, kind: "delete" });
+        yield* proposals.decide(ANA, { id: deletion.id, action: "approve" });
+        expect((yield* repo.documents).find((d) => d.id === create.path)).toBeUndefined();
+        yield* proposals.decide(ANA, { id: deletion.id, action: "revert" });
+        expect((yield* repo.documents).find((d) => d.id === create.path)?.content).toBe(
+          create.content,
+        );
         const move = yield* proposals.propose(BRUNO, {
           ...create,
           kind: "move-scope",
@@ -118,6 +127,11 @@ describe("KnowledgeProposals", () => {
           create.content,
         );
         expect((yield* repo.documents).find((d) => d.id === create.path)).toBeUndefined();
+        const knowledge = yield* AreaKnowledge.AreaKnowledge;
+        const gerry = (yield* knowledge.getMemberPrincipal(GERRY))!;
+        expect((yield* knowledge.searchDocuments(gerry, "Original")).map((d) => d.id)).toContain(
+          "global/x.md",
+        );
       }).pipe(Effect.provide(layer)),
   );
 
@@ -134,6 +148,14 @@ describe("KnowledgeProposals", () => {
         { concurrency: "unbounded" },
       );
       expect(outcomes.toSorted()).toEqual(["conflict", "ok"]);
+      expect(yield* codeOf(proposals.decide(ANA, { id: p.id, action: "revert" }))).toBe("conflict");
+      const unrelated = yield* proposals.propose(BRUNO, {
+        ...create,
+        path: "areas/ledger/unrelated.md",
+      });
+      expect(yield* codeOf(proposals.decide(ANA, { id: unrelated.id, action: "approve" }))).toBe(
+        "ok",
+      );
     }).pipe(Effect.provide(layer)),
   );
 

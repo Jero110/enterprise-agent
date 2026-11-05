@@ -14,6 +14,7 @@ import { layerSeededStore } from "../enterprise/EnterpriseStore.testkit.ts";
 import * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as KnowledgeRepo from "./KnowledgeRepo.ts";
+import * as KnowledgeProposals from "../enterprise/KnowledgeProposals.ts";
 
 const baseLayer = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto);
 
@@ -34,6 +35,7 @@ const layerServerConfig = (overrides?: Partial<ServerConfig.ServerConfig["Servic
 
 const layerAreaKnowledge = (overrides?: Partial<ServerConfig.ServerConfig["Service"]>) =>
   AreaKnowledge.layer.pipe(
+    Layer.provideMerge(KnowledgeProposals.layer),
     Layer.provideMerge(KnowledgeRepo.layer),
     Layer.provideMerge(ProcessRunner.layer),
     Layer.provideMerge(TeamIdentity.layer),

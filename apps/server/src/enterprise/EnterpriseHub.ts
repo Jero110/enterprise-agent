@@ -1,5 +1,10 @@
 import {
   EnterpriseError,
+  type KnowledgeProposeInput,
+  type KnowledgeProposal,
+  type KnowledgeProposalInbox,
+  type KnowledgeProposalDecision,
+  type KnowledgeProposalInboxInput,
   type EnterpriseAuthorizeMemberInput,
   type EnterpriseHubIdentity,
   type EnterpriseMembers,
@@ -16,6 +21,7 @@ import * as Layer from "effect/Layer";
 
 import * as AreaKnowledge from "../knowledge/AreaKnowledge.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
+import * as KnowledgeProposals from "./KnowledgeProposals.ts";
 
 /**
  * The hub never sees a member's environment id, so calls are keyed by the MCP
@@ -25,6 +31,18 @@ import * as EnterpriseStore from "./EnterpriseStore.ts";
 export class EnterpriseHub extends Context.Service<
   EnterpriseHub,
   {
+    readonly knowledgePropose: (
+      sessionId: string,
+      input: KnowledgeProposeInput,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly proposalInbox: (
+      sessionId: string,
+      input: KnowledgeProposalInboxInput,
+    ) => Effect.Effect<KnowledgeProposalInbox, EnterpriseError>;
+    readonly proposalDecide: (
+      sessionId: string,
+      input: KnowledgeProposalDecision,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
     readonly enroll: (
       sessionId: string,
       input: { readonly email: string; readonly token: string },
@@ -63,6 +81,7 @@ const notAuthorized = new EnterpriseError({
 const make = Effect.gen(function* () {
   const store = yield* EnterpriseStore.EnterpriseStore;
   const knowledge = yield* AreaKnowledge.AreaKnowledge;
+  const proposals = yield* KnowledgeProposals.KnowledgeProposals;
 
   const identityOf = Effect.fn("EnterpriseHub.identityOf")(function* (email: string) {
     const member = yield* store.getMember(email);
@@ -201,6 +220,15 @@ const make = Effect.gen(function* () {
   });
 
   return EnterpriseHub.of({
+    knowledgePropose: Effect.fn("EnterpriseHub.knowledgePropose")(function* (sessionId, input) {
+      return yield* proposals.propose((yield* whoami(sessionId)).email, input);
+    }),
+    proposalInbox: Effect.fn("EnterpriseHub.proposalInbox")(function* (sessionId, input) {
+      return yield* proposals.inbox((yield* whoami(sessionId)).email, input);
+    }),
+    proposalDecide: Effect.fn("EnterpriseHub.proposalDecide")(function* (sessionId, input) {
+      return yield* proposals.decide((yield* whoami(sessionId)).email, input);
+    }),
     enroll,
     whoami,
     disconnect,

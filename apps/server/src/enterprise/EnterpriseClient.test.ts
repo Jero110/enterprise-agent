@@ -196,7 +196,35 @@ it.effect(
         ).toMatchObject({ _tag: "EnterpriseError", code: "access_denied" });
 
         yield* jero.client.connect(yield* connectInput(hub, "jeronimo.deli@gmail.com"));
-        expect((yield* jero.client.knowledgeList).documents).toHaveLength(6);
+        const proposal = yield* ana.client.knowledgePropose({
+          kind: "create",
+          scope: "ledger",
+          path: "areas/ledger/peer.md",
+          content: "# Peer knowledge",
+          reason: "Share peer evidence",
+          evidence: ["thread:ana/1"],
+        });
+        expect(yield* ana.client.proposalInbox({ countOnly: true })).toEqual({
+          proposals: [],
+          pendingCount: 1,
+        });
+        yield* ana.client.proposalDecide({ id: proposal.id, action: "approve" });
+        expect((yield* ana.client.knowledgeGet({ path: proposal.path })).content).toBe(
+          "# Peer knowledge",
+        );
+        const global = yield* ana.client.knowledgePropose({
+          kind: "create",
+          scope: "global",
+          path: "global/peer.md",
+          content: "# Global peer knowledge",
+          reason: "Share global evidence",
+          evidence: [],
+        });
+        expect(
+          yield* failureOf(ana.client.proposalDecide({ id: global.id, action: "approve" })),
+        ).toMatchObject({ code: "access_denied" });
+        yield* jero.client.proposalDecide({ id: global.id, action: "approve" });
+        expect((yield* jero.client.knowledgeList).documents).toHaveLength(8);
         expect((yield* jero.client.knowledgeGet({ path: "areas/frontend/README.md" })).areaId).toBe(
           "frontend",
         );

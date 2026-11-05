@@ -578,8 +578,34 @@ it.effect("connecting shows the identity and disconnecting clears it with the me
       expect(yield* readStatus).toEqual({ identity: null });
       expect((yield* connect)._tag).toBe("Failure");
       expect(client[WS_METHODS.enterpriseConnect]).not.toHaveBeenCalled();
+      expect(registry.get(enterprise.knowledgePropose.permissionAtom(env))).toBe(false);
+      expect(registry.get(enterprise.proposalDecide.permissionAtom(env))).toBe(false);
+      expect(
+        (yield* Effect.promise(() =>
+          enterprise.knowledgePropose.run(registry, {
+            environmentId: env,
+            input: {
+              kind: "area-access",
+              scope: "ledger",
+              path: "",
+              reason: "Need access",
+              evidence: [],
+            },
+          }),
+        ))._tag,
+      ).toBe("Failure");
+      expect(
+        (yield* Effect.promise(() =>
+          enterprise.proposalDecide.run(registry, {
+            environmentId: env,
+            input: { id: "proposal", action: "approve" },
+          }),
+        ))._tag,
+      ).toBe("Failure");
 
       setAccess(true);
+      expect(registry.get(enterprise.knowledgePropose.permissionAtom(env))).toBe(true);
+      expect(registry.get(enterprise.proposalDecide.permissionAtom(env))).toBe(true);
       expect((yield* connect)._tag).toBe("Success");
       expect(yield* readStatus).toEqual({ identity });
       expect((yield* readMembers).teams).toHaveLength(1);

@@ -27,7 +27,14 @@ export const KnowledgeProposal = Schema.Struct({
   revertCommit: Schema.optional(Schema.String),
 });
 export type KnowledgeProposal = typeof KnowledgeProposal.Type;
-export const KnowledgeProposalInbox = Schema.Struct({ proposals: Schema.Array(KnowledgeProposal) });
+export const KnowledgeProposalInboxInput = Schema.Struct({
+  countOnly: Schema.optional(Schema.Boolean),
+});
+export type KnowledgeProposalInboxInput = typeof KnowledgeProposalInboxInput.Type;
+export const KnowledgeProposalInbox = Schema.Struct({
+  proposals: Schema.Array(KnowledgeProposal),
+  pendingCount: Schema.Number,
+});
 export type KnowledgeProposalInbox = typeof KnowledgeProposalInbox.Type;
 export const KnowledgeProposalDecision = Schema.Struct({
   id: TrimmedNonEmptyString,

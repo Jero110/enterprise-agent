@@ -78,6 +78,7 @@ import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
 import * as EnterpriseStore from "./enterprise/EnterpriseStore.ts";
 import * as EnterpriseToolkit from "./enterprise/EnterpriseToolkit.ts";
 import * as KnowledgeToolkit from "./enterprise/KnowledgeToolkit.ts";
+import * as KnowledgeProposals from "./enterprise/KnowledgeProposals.ts";
 import * as AreaKnowledge from "./knowledge/AreaKnowledge.ts";
 import * as KnowledgeRepo from "./knowledge/KnowledgeRepo.ts";
 import * as PeerForwarding from "./peer/PeerForwarding.ts";
@@ -777,6 +778,7 @@ const layerHubMcp = McpHttpServer.layerMcpTransport(
 ).pipe(
   Layer.provide(EnterpriseHub.layer),
   Layer.provide(AreaKnowledge.layer),
+  Layer.provide(KnowledgeProposals.layer),
   Layer.provide(KnowledgeRepo.layer),
   Layer.provide(ProcessRunner.layer),
   Layer.provide(EnterpriseStore.layerHub),

@@ -1,5 +1,10 @@
 import {
   EnterpriseError,
+  type KnowledgeProposeInput,
+  KnowledgeProposal,
+  KnowledgeProposalInbox,
+  type KnowledgeProposalDecision,
+  type KnowledgeProposalInboxInput,
   EnvironmentId,
   type EnterpriseAuthorizeMemberInput,
   type EnterpriseConnectInput,
@@ -36,6 +41,15 @@ import { hubResult } from "./EnterpriseToolkit.ts";
 export class EnterpriseClient extends Context.Service<
   EnterpriseClient,
   {
+    readonly knowledgePropose: (
+      input: KnowledgeProposeInput,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly proposalInbox: (
+      input: KnowledgeProposalInboxInput,
+    ) => Effect.Effect<KnowledgeProposalInbox, EnterpriseError>;
+    readonly proposalDecide: (
+      input: KnowledgeProposalDecision,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
     readonly status: Effect.Effect<EnterpriseStatus, EnterpriseError>;
     readonly connect: (
       input: EnterpriseConnectInput,
@@ -186,6 +200,19 @@ const make = Effect.gen(function* () {
   }).pipe(Effect.withSpan("EnterpriseClient.disconnect"));
 
   return EnterpriseClient.of({
+    knowledgePropose: Effect.fn("EnterpriseClient.knowledgePropose")((input) =>
+      withConnection((hub) => callResult(hub, "knowledge_propose", input, KnowledgeProposal)),
+    ),
+    proposalInbox: Effect.fn("EnterpriseClient.proposalInbox")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "knowledge_proposals", input, KnowledgeProposalInbox),
+      ),
+    ),
+    proposalDecide: Effect.fn("EnterpriseClient.proposalDecide")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "knowledge_proposal_decide", input, KnowledgeProposal),
+      ),
+    ),
     status,
     connect,
     disconnect,

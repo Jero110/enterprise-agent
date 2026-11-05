@@ -12,14 +12,10 @@ import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as HashMap from "effect/HashMap";
-import * as Ref from "effect/Ref";
-import * as SecureRandom from "effect/crypto/SecureRandom";
+import * as KnowledgeProposals from "../enterprise/KnowledgeProposals.ts";
 
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 import { GENERAL_AREA, KnowledgeRepo } from "./KnowledgeRepo.ts";
-
-const normalizeEmail = EnterpriseStore.normalizeEmail;
 
 export interface AreaKnowledgeService {
   readonly getPrincipal: (identity: VerifiedIdentity) => Effect.Effect<TeamPrincipal>;
@@ -93,8 +89,7 @@ export const layer = Layer.effect(
   AreaKnowledge,
   Effect.gen(function* () {
     const store = yield* EnterpriseStore.EnterpriseStore;
-    const secureRandom = yield* SecureRandom.SecureRandom;
-    const requestsRef = yield* Ref.make<HashMap.HashMap<string, AreaRequest>>(HashMap.empty());
+    const proposals = yield* KnowledgeProposals.KnowledgeProposals;
 
     const repo = yield* KnowledgeRepo;
 
@@ -194,80 +189,73 @@ export const layer = Layer.effect(
     const requestAreaAccess: AreaKnowledgeService["requestAreaAccess"] = Effect.fn(
       "AreaKnowledge.requestAreaAccess",
     )(function* (principal, areaId) {
-      if (principal.areaIds.includes(areaId)) {
+      const current = yield* getMemberPrincipal(principal.email);
+      if (current?.areaIds.includes(areaId))
         return yield* new AreaKnowledgeError({
           code: "already_has_access",
           message: "You already have access to this area.",
         });
-      }
-
-      for (const [, request] of HashMap.entries(yield* Ref.get(requestsRef))) {
-        if (
-          normalizeEmail(request.email) === normalizeEmail(principal.email) &&
-          request.areaId === areaId &&
-          request.status === "pending"
-        ) {
-          return yield* new AreaKnowledgeError({
-            code: "request_already_exists",
-            message: "You already have a pending request for this area.",
-          });
-        }
-      }
-
-      const now = yield* DateTime.now;
-      const id = yield* secureRandom.uuidV4();
-
-      const request: AreaRequest = {
-        id,
-        email: principal.email,
-        areaId,
+      const proposal = yield* proposals
+        .propose(principal.email, {
+          kind: "area-access",
+          scope: areaId,
+          path: "",
+          reason: "Request area knowledge access",
+          evidence: [],
+        })
+        .pipe(
+          Effect.mapError(
+            (error) =>
+              new AreaKnowledgeError({
+                code: error.code === "conflict" ? "request_already_exists" : "access_denied",
+                message: error.message,
+              }),
+          ),
+        );
+      return {
+        id: proposal.id,
+        email: proposal.proposedBy,
+        areaId: proposal.scope,
         status: "pending",
-        requestedAt: now,
+        requestedAt: DateTime.makeUnsafe(proposal.createdAt),
       };
-
-      yield* Ref.update(requestsRef, HashMap.set(id, request));
-
-      return request;
     });
 
     const resolveRequest: AreaKnowledgeService["resolveRequest"] = Effect.fn(
       "AreaKnowledge.resolveRequest",
-    )(function* (adminPrincipal, requestId, status) {
-      if (!adminPrincipal.isAdmin) {
-        return yield* new AreaKnowledgeError({
-          code: "admin_required",
-          message: "Only administrators can resolve area requests.",
-        });
-      }
-
-      const request = HashMap.get(yield* Ref.get(requestsRef), requestId);
-
-      if (request._tag === "None") {
+    )(function* (principal, requestId, status) {
+      const request = (yield* store.listProposals).find(
+        (p) => p.id === requestId && p.kind === "area-access",
+      );
+      if (!request)
         return yield* new AreaKnowledgeError({
           code: "request_not_found",
           message: "Request not found.",
         });
-      }
-
-      const now = yield* DateTime.now;
-      const updatedRequest: AreaRequest = {
-        ...request.value,
+      const proposal = yield* proposals
+        .decide(principal.email, {
+          id: requestId,
+          action: status === "approved" ? "approve" : "reject",
+          reason: "Area access request denied",
+        })
+        .pipe(
+          Effect.mapError(
+            (error) =>
+              new AreaKnowledgeError({
+                code: error.code === "access_denied" ? "admin_required" : "request_not_found",
+                message: error.message,
+              }),
+          ),
+        );
+      return {
+        id: proposal.id,
+        email: proposal.proposedBy,
+        areaId: proposal.scope,
         status,
-        resolvedAt: now,
-        resolvedBy: adminPrincipal.email,
+        requestedAt: DateTime.makeUnsafe(proposal.createdAt),
+        resolvedAt: DateTime.makeUnsafe(proposal.resolvedAt!),
+        resolvedBy: proposal.resolvedBy!,
       };
-
-      if (status === "approved") {
-        yield* store.grantArea({
-          email: request.value.email,
-          areaId: request.value.areaId,
-          grantedBy: adminPrincipal.email,
-        });
-      }
-
-      yield* Ref.update(requestsRef, HashMap.set(requestId, updatedRequest));
-
-      return updatedRequest;
     });
 
     const revokeAreaAccess: AreaKnowledgeService["revokeAreaAccess"] = Effect.fn(

@@ -1,5 +1,10 @@
 import {
   KnowledgeDocument,
+  KnowledgeProposeInput,
+  KnowledgeProposal,
+  KnowledgeProposalInbox,
+  KnowledgeProposalDecision,
+  KnowledgeProposalInboxInput,
   KnowledgeDocumentList,
   KnowledgeGetInput,
   KnowledgeSearchInput,
@@ -44,7 +49,36 @@ const GetTool = Tool.make("knowledge_get", {
 }).annotate(Tool.Readonly, true);
 
 /** One declaration, two handlers: the hub answers from its repo, a member IDE asks the hub. */
-export const KnowledgeToolkit = Toolkit.make(ListTool, SearchTool, GetTool);
+const ProposeTool = Tool.make("knowledge_propose", {
+  ...shared,
+  description:
+    "Propose create, update, move-scope, delete or area-access. Scope is global or team id; path is a full markdown repo path (empty for area-access). Moves retain relative path. Approval is required; evidence names sources.",
+  parameters: KnowledgeProposeInput,
+  success: hubResult(KnowledgeProposal),
+}).annotate(Tool.Destructive, false);
+const InboxTool = Tool.make("knowledge_proposals", {
+  ...shared,
+  description:
+    "List knowledge proposals you may approve or revert. Leads act in their own area; admins act in any scope and on area-access.",
+  parameters: KnowledgeProposalInboxInput,
+  success: hubResult(KnowledgeProposalInbox),
+}).annotate(Tool.Readonly, true);
+const DecideTool = Tool.make("knowledge_proposal_decide", {
+  ...shared,
+  description:
+    "Approve or reject a pending proposal, or revert an applied one. Reject requires a reason. Approval writes a git commit; stale documents fail with conflict.",
+  parameters: KnowledgeProposalDecision,
+  success: hubResult(KnowledgeProposal),
+}).annotate(Tool.Destructive, true);
+
+export const KnowledgeToolkit = Toolkit.make(
+  ListTool,
+  SearchTool,
+  GetTool,
+  ProposeTool,
+  InboxTool,
+  DecideTool,
+);
 
 /** On the hub, scope comes from the member the caller's session is enrolled as. */
 const layerHub = McpToolAccess.toLayer(
@@ -52,6 +86,15 @@ const layerHub = McpToolAccess.toLayer(
   Effect.gen(function* () {
     const hub = yield* EnterpriseHub;
     return {
+      knowledge_propose: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.knowledgePropose(id, input))),
+      ),
+      knowledge_proposals: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.proposalInbox(id, input))),
+      ),
+      knowledge_proposal_decide: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.proposalDecide(id, input))),
+      ),
       knowledge_list: McpToolAccess.reads(() =>
         asResult(Effect.flatMap(sessionId, hub.knowledgeList)),
       ),
@@ -71,6 +114,11 @@ const layerMember = McpToolAccess.toLayer(
   Effect.gen(function* () {
     const client = yield* EnterpriseClient;
     return {
+      knowledge_propose: McpToolAccess.reads((input) => asResult(client.knowledgePropose(input))),
+      knowledge_proposals: McpToolAccess.reads((input) => asResult(client.proposalInbox(input))),
+      knowledge_proposal_decide: McpToolAccess.reads((input) =>
+        asResult(client.proposalDecide(input)),
+      ),
       knowledge_list: McpToolAccess.reads(() => asResult(client.knowledgeList)),
       knowledge_search: McpToolAccess.reads((input) => asResult(client.knowledgeSearch(input))),
       knowledge_get: McpToolAccess.reads((input) => asResult(client.knowledgeGet(input))),

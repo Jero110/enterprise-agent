@@ -4,6 +4,7 @@ import {
   type KnowledgeProposal,
   type KnowledgeProposalInbox,
   type KnowledgeProposalDecision,
+  type KnowledgeProposalInboxInput,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -21,7 +22,10 @@ export class KnowledgeProposals extends Context.Service<
       email: string,
       input: KnowledgeProposeInput,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
-    readonly inbox: (email: string) => Effect.Effect<KnowledgeProposalInbox, EnterpriseError>;
+    readonly inbox: (
+      email: string,
+      input?: KnowledgeProposalInboxInput,
+    ) => Effect.Effect<KnowledgeProposalInbox, EnterpriseError>;
     readonly decide: (
       email: string,
       input: KnowledgeProposalDecision,
@@ -157,9 +161,16 @@ export const layer = Layer.effect(
       yield* store.saveProposal(proposal);
       return proposal;
     }, mutex.withPermits(1));
-    const inbox = Effect.fn("KnowledgeProposals.inbox")(function* (email: string) {
+    const inbox = Effect.fn("KnowledgeProposals.inbox")(function* (
+      email: string,
+      input: KnowledgeProposalInboxInput = {},
+    ) {
       const member = yield* memberOf(email);
-      return { proposals: (yield* store.listProposals).filter((p) => canApprove(member, p)) };
+      const proposals = (yield* store.listProposals).filter((p) => canApprove(member, p));
+      return {
+        proposals: input.countOnly ? [] : proposals,
+        pendingCount: proposals.filter((p) => p.status === "pending").length,
+      };
     });
     const decide = Effect.fn("KnowledgeProposals.decide")(
       function* (email: string, input: KnowledgeProposalDecision) {

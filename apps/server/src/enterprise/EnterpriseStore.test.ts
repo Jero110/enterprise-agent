@@ -78,6 +78,19 @@ describe("EnterpriseStore", () => {
       yield* Effect.gen(function* () {
         const store = yield* seedAcme;
         yield* store.moveMember("ent.test.bruno@gmail.com", "frontend");
+        yield* store.saveProposal({
+          id: "durable-request",
+          kind: "area-access",
+          scope: "ledger",
+          path: "",
+          reason: "Need Ledger context",
+          evidence: ["thread:gerry/1"],
+          proposedBy: "ent.test.gerry@gmail.com",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          status: "pending",
+          baseVersion: "",
+          targetVersion: "",
+        });
         yield* store.enroll({ environmentId: "env-ana", email: "ent.test.ana@gmail.com" });
         yield* store.grantArea({
           email: "ent.test.gerry@gmail.com",
@@ -92,6 +105,9 @@ describe("EnterpriseStore", () => {
         expect((yield* store.getMember("ent.test.bruno@gmail.com"))?.teamId).toBe("frontend");
         expect((yield* store.getEnrollment("env-ana"))?.email).toBe("ent.test.ana@gmail.com");
         expect(yield* store.listGrants("ent.test.gerry@gmail.com")).toHaveLength(1);
+        expect(yield* store.listProposals).toMatchObject([
+          { id: "durable-request", status: "pending", evidence: ["thread:gerry/1"] },
+        ]);
         expect(yield* store.verifyToken("ACME-BANK-DEV-2026")).toBe(true);
       }).pipe(Effect.provide(layerStoreAt(dbPath)), Effect.scoped);
     }).pipe(Effect.scoped, Effect.provide(baseLayer)),

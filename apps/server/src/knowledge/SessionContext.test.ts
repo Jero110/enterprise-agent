@@ -11,6 +11,7 @@ import { layerSeededStore } from "../enterprise/EnterpriseStore.testkit.ts";
 import * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as KnowledgeRepo from "./KnowledgeRepo.ts";
+import * as KnowledgeProposals from "../enterprise/KnowledgeProposals.ts";
 import * as TeamIdentity from "../auth/TeamIdentity.ts";
 import * as AreaKnowledge from "./AreaKnowledge.ts";
 import * as SessionContext from "./SessionContext.ts";
@@ -18,6 +19,7 @@ import * as SessionContext from "./SessionContext.ts";
 const base = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto);
 const layer = SessionContext.layer.pipe(
   Layer.provideMerge(AreaKnowledge.layer),
+  Layer.provideMerge(KnowledgeProposals.layer),
   Layer.provideMerge(KnowledgeRepo.layer),
   Layer.provideMerge(ProcessRunner.layer),
   Layer.provideMerge(TeamIdentity.layer),

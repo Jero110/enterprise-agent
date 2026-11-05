@@ -30,17 +30,41 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     tag: WS_METHODS.enterpriseKnowledgeGet,
     staleTimeMs: 10_000,
   });
+  const proposalInbox = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:proposal-inbox",
+    tag: WS_METHODS.enterpriseProposalInbox,
+    staleTimeMs: 10_000,
+    refreshIntervalMs: 30_000,
+  });
   // Re-asks the hub rather than patching: identity and member list change on its word alone.
   const refreshAll = (registry: AtomRegistry.AtomRegistry, environmentId: EnvironmentId) => {
     registry.refresh(status({ environmentId, input: {} }));
     registry.refresh(members({ environmentId, input: {} }));
     registry.refresh(knowledgeList({ environmentId, input: {} }));
+    registry.refresh(proposalInbox({ environmentId, input: {} }));
+    registry.refresh(proposalInbox({ environmentId, input: { countOnly: true } }));
   };
   return {
     status,
     members,
     knowledgeList,
     knowledgeGet,
+    proposalInbox,
+    knowledgePropose: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:knowledge-propose",
+      tag: WS_METHODS.enterpriseKnowledgePropose,
+      onSuccess: ({ environmentId }, registry) =>
+        Effect.sync(() => refreshAll(registry, environmentId)),
+    }),
+    proposalDecide: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:proposal-decide",
+      tag: WS_METHODS.enterpriseProposalDecide,
+      onSuccess: ({ environmentId }, registry, result) =>
+        Effect.sync(() => {
+          refreshAll(registry, environmentId);
+          registry.refresh(knowledgeGet({ environmentId, input: { path: result.path } }));
+        }),
+    }),
     connect: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:connect",
       tag: WS_METHODS.enterpriseConnect,

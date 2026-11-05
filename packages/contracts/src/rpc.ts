@@ -38,6 +38,13 @@ import {
 } from "./enterprise.ts";
 import { KnowledgeDocument, KnowledgeDocumentList, KnowledgeGetInput } from "./areaKnowledge.ts";
 import {
+  KnowledgeProposeInput,
+  KnowledgeProposal,
+  KnowledgeProposalInbox,
+  KnowledgeProposalInboxInput,
+  KnowledgeProposalDecision,
+} from "./knowledgeProposal.ts";
+import {
   ChatGptReconnectProfileInput,
   ChatGptReconnectProfile,
   ChatGptImportProfileInput,
@@ -531,6 +538,9 @@ export const WS_METHODS = {
   enterpriseMembersRevoke: "enterprise.members.revoke",
   enterpriseKnowledgeList: "enterprise.knowledge.list",
   enterpriseKnowledgeGet: "enterprise.knowledge.get",
+  enterpriseKnowledgePropose: "enterprise.knowledge.propose",
+  enterpriseProposalInbox: "enterprise.proposals.inbox",
+  enterpriseProposalDecide: "enterprise.proposals.decide",
   serverUpdateSettings: "server.updateSettings",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverSearchAcpRegistry: "server.searchAcpRegistry",
@@ -840,6 +850,22 @@ const WsPeerLinksAnswerRequestRpc = Rpc.make(WS_METHODS.peerLinksAnswerRequest, 
 });
 
 const enterpriseError = Schema.Union([EnterpriseError, EnvironmentAuthorizationError]);
+
+const WsEnterpriseKnowledgeProposeRpc = Rpc.make(WS_METHODS.enterpriseKnowledgePropose, {
+  payload: KnowledgeProposeInput,
+  success: KnowledgeProposal,
+  error: enterpriseError,
+});
+const WsEnterpriseProposalInboxRpc = Rpc.make(WS_METHODS.enterpriseProposalInbox, {
+  payload: KnowledgeProposalInboxInput,
+  success: KnowledgeProposalInbox,
+  error: enterpriseError,
+});
+const WsEnterpriseProposalDecideRpc = Rpc.make(WS_METHODS.enterpriseProposalDecide, {
+  payload: KnowledgeProposalDecision,
+  success: KnowledgeProposal,
+  error: enterpriseError,
+});
 
 const WsEnterpriseStatusRpc = Rpc.make(WS_METHODS.enterpriseStatus, {
   payload: Schema.Struct({}),
@@ -2098,6 +2124,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseMembersRevokeRpc,
   WsEnterpriseKnowledgeListRpc,
   WsEnterpriseKnowledgeGetRpc,
+  WsEnterpriseKnowledgeProposeRpc,
+  WsEnterpriseProposalInboxRpc,
+  WsEnterpriseProposalDecideRpc,
   WsServerDiscoverSourceControlRpc,
   WsServerSearchAcpRegistryRpc,
   WsServerPrepareAcpRegistryAgentRpc,

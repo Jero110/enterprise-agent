@@ -2636,6 +2636,9 @@ export const layerWsRpc = (
         [WS_METHODS.enterpriseMembersRevoke]: (input) => enterprise.revoke(input),
         [WS_METHODS.enterpriseKnowledgeList]: () => enterprise.knowledgeList,
         [WS_METHODS.enterpriseKnowledgeGet]: (input) => enterprise.knowledgeGet(input),
+        [WS_METHODS.enterpriseKnowledgePropose]: (input) => enterprise.knowledgePropose(input),
+        [WS_METHODS.enterpriseProposalInbox]: (input) => enterprise.proposalInbox(input),
+        [WS_METHODS.enterpriseProposalDecide]: (input) => enterprise.proposalDecide(input),
         [WS_METHODS.serverUpdateSettings]:
           /* Request instrumentation already owns the span; keep this helper in that context. */
           Effect.fnUntraced(function* ({ patch, providerInstanceMutation }) {
