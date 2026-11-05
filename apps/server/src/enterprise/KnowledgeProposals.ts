@@ -140,7 +140,8 @@ export const layer = Layer.effect(
         } else if (input.targetScope !== undefined) return yield* invalid;
       }
       if (input.kind === "create") {
-        const existing = (yield* store.listProposals).find(
+        const pending = yield* store.listProposals;
+        const existing = pending.find(
           (proposal) =>
             proposal.status === "pending" &&
             proposal.kind === "create" &&
@@ -154,6 +155,19 @@ export const layer = Layer.effect(
                 JSON.stringify(proposal.evidence) === JSON.stringify(input.evidence)),
         );
         if (existing !== undefined) return existing;
+        if (
+          ingestion &&
+          pending.some(
+            (proposal) =>
+              proposal.status === "pending" &&
+              proposal.kind === "create" &&
+              proposal.path === input.path,
+          )
+        )
+          return yield* new EnterpriseError({
+            code: "conflict",
+            message: "A create proposal for this document is already pending.",
+          });
       }
       const target =
         input.kind === "move-scope"

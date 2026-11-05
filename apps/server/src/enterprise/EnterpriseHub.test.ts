@@ -69,6 +69,9 @@ describe("EnterpriseHub", () => {
       });
       const repeated = yield* hub.ingestionPropose("thread-repeat", proposal);
       expect(repeated.id).toBe(first.id);
+      expect(
+        yield* codeOf(hub.ingestionPropose("thread-repeat", { ...proposal, content: "# Changed" })),
+      ).toBe("conflict");
       yield* store.saveIngestionRun({
         id: "run-2",
         threadId: "thread-2",
