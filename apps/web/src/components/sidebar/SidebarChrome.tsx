@@ -20,6 +20,7 @@ import {
   SidebarStageBackdrop,
   useEnvironmentStageLabel,
 } from "../SidebarStageBackdrop";
+import { EnterpriseHeaderButton } from "../enterprise/EnterpriseHeaderButton";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -79,6 +80,9 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
               <HistoryNavigationButton direction="forward" onBackdrop={backdropVariant !== null} />
             </div>
           ) : null}
+          <div className="hidden md:block">
+            <EnterpriseHeaderButton />
+          </div>
         </div>
         {pillLabel ? (
           <div className="ml-1 flex h-7 items-center">
