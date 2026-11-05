@@ -3259,7 +3259,11 @@ export default function ChatView(props: ChatViewProps) {
       {...panelToggleControlProps}
       showThreadPanelControl={!inlineRightPanelOwnsTitleBar}
       leadingControls={
-        <EnterpriseHeaderControls threadId={activeThread.id} isServerThread={isServerThread} />
+        <EnterpriseHeaderControls
+          threadId={activeThread.id}
+          isServerThread={isServerThread}
+          skills={timelineSkills}
+        />
       }
     />
   );

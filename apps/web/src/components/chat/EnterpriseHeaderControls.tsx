@@ -3,14 +3,23 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
+import { dedupeProviderSkillsByName } from "@t3tools/client-runtime/providerSkills";
 import type {
   EnterpriseOrgTeam,
   EnvironmentId,
+  ServerProviderSkill,
   ThreadContextCard,
   ThreadId,
   ThreadKnowledgeScope,
 } from "@t3tools/contracts";
-import { BookOpenIcon, GlobeIcon, LayersIcon, NetworkIcon, UsersIcon } from "lucide-react";
+import {
+  BookOpenIcon,
+  GlobeIcon,
+  LayersIcon,
+  NetworkIcon,
+  UserIcon,
+  UsersIcon,
+} from "lucide-react";
 import { memo, type ComponentType, type ReactNode } from "react";
 
 import {
@@ -167,9 +176,39 @@ function ContextCard(props: {
   );
 }
 
+/** The person's own skills and the tools wired to this IDE; read-only, nothing here is hub knowledge. */
+function IndividualCard({ skills }: { readonly skills: ReadonlyArray<ServerProviderSkill> }) {
+  const enabled = dedupeProviderSkillsByName(skills.filter((skill) => skill.enabled));
+  if (enabled.length === 0) return null;
+  return (
+    <section className="rounded-lg border border-border/60 p-3" data-scope="individual">
+      <div className="flex items-center gap-2">
+        <UserIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-medium">Individual</h3>
+          <p className="text-xs text-muted-foreground">Your skills and connected tools</p>
+        </div>
+      </div>
+      <ul className="mt-2 space-y-1">
+        <li className="flex items-center gap-2 text-xs">
+          <span className="min-w-0 flex-1 truncate">Enterprise hub knowledge tools</span>
+          <Badge variant="success">connected</Badge>
+        </li>
+        {enabled.map((skill) => (
+          <li className="flex items-center gap-2 text-xs" key={skill.name}>
+            <span className="min-w-0 flex-1 truncate">{skill.displayName ?? skill.name}</span>
+            <Badge variant="outline">skill</Badge>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ContextPanel(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
+  readonly skills: ReadonlyArray<ServerProviderSkill>;
 }) {
   const input = { threadId: props.threadId };
   const context = useEnvironmentQuery(
@@ -218,6 +257,7 @@ function ContextPanel(props: {
           />
         ))
       )}
+      <IndividualCard skills={props.skills} />
     </div>
   );
 }
@@ -290,6 +330,7 @@ function SharePanel(props: { readonly environmentId: EnvironmentId; readonly thr
 export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(props: {
   readonly threadId: ThreadId;
   readonly isServerThread: boolean;
+  readonly skills: ReadonlyArray<ServerProviderSkill>;
 }) {
   const { environmentId, identity } = useEnterpriseStatus();
   if (environmentId === null || identity === null) return null;
@@ -301,7 +342,11 @@ export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(p
       {props.isServerThread ? (
         <>
           <HeaderPopover icon={BookOpenIcon} label="Conversation context">
-            <ContextPanel environmentId={environmentId} threadId={props.threadId} />
+            <ContextPanel
+              environmentId={environmentId}
+              threadId={props.threadId}
+              skills={props.skills}
+            />
           </HeaderPopover>
           <HeaderPopover icon={UsersIcon} label="Share with team">
             <SharePanel environmentId={environmentId} threadId={props.threadId} />
