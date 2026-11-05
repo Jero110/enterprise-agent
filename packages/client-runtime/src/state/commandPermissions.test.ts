@@ -641,6 +641,29 @@ it.effect("requires access management to answer a link request", () =>
   ),
 );
 
+it.effect("guards team thread publication with the command permission", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const registry = yield* setup;
+      const publish = createCommandPermissions(runtime, WS_METHODS.teamThreadPublish);
+      registry.set(sessions(env), AsyncResult.success(grant(true)));
+      expect(registry.get(publish.permissionAtom(env))).toBe(false);
+      const denied = yield* publish.authorize(registry, env).pipe(Effect.flip);
+      expect(denied.requiredPermission).toBe(AuthAccessWriteScope);
+      registry.set(
+        sessions(env),
+        AsyncResult.success({
+          ...grant(false),
+          scopes: [AuthAccessWriteScope],
+          permissions: [AuthAccessWriteScope],
+        }),
+      );
+      expect(registry.get(publish.permissionAtom(env))).toBe(true);
+      yield* publish.authorize(registry, env);
+    }),
+  ),
+);
+
 it.effect("honors exact empty permissions and preserves legacy parent grants", () =>
   Effect.scoped(
     Effect.gen(function* () {

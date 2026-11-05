@@ -49,7 +49,7 @@ export const TeamActivity = Schema.Struct({
 });
 export type TeamActivity = typeof TeamActivity.Type;
 
-export const PublicationStatus = Schema.Literals(["unpublished", "published"]);
+export const PublicationStatus = Schema.Literals(["unpublished", "read-only"]);
 export type PublicationStatus = typeof PublicationStatus.Type;
 
 export const ThreadPublication = Schema.Struct({
@@ -71,16 +71,60 @@ export const ThreadMetadata = Schema.Struct({
 });
 export type ThreadMetadata = typeof ThreadMetadata.Type;
 
-export const CrossEnvironmentGrant = Schema.Struct({
-  id: TrimmedNonEmptyString,
-  grantorEnvironmentId: TrimmedNonEmptyString,
-  grantorEmail: TrimmedNonEmptyString,
-  granteeEmail: TrimmedNonEmptyString,
-  scopes: Schema.Array(Schema.Literals(["message", "start-agent"])),
-  grantedAt: Schema.DateTimeUtc,
-  revokedAt: Schema.optionalKey(Schema.DateTimeUtc),
+export const TeamThreadReference = Schema.Struct({
+  ownerEmail: TrimmedNonEmptyString,
+  threadId: TrimmedNonEmptyString,
 });
-export type CrossEnvironmentGrant = typeof CrossEnvironmentGrant.Type;
+export type TeamThreadReference = typeof TeamThreadReference.Type;
+
+export const TeamThreadReportSummary = Schema.Struct({
+  threadId: TrimmedNonEmptyString,
+  parentThreadId: Schema.NullOr(TrimmedNonEmptyString),
+  title: TrimmedNonEmptyString,
+  status: ThreadMetadata.fields.status,
+  updatedAt: Schema.String,
+});
+export type TeamThreadReportSummary = typeof TeamThreadReportSummary.Type;
+
+export const TeamThreadSummary = Schema.Struct({
+  ...TeamThreadReportSummary.fields,
+  ownerEmail: TrimmedNonEmptyString,
+  ownerDisplayName: TrimmedNonEmptyString,
+  publicationStatus: PublicationStatus,
+});
+export type TeamThreadSummary = typeof TeamThreadSummary.Type;
+
+export const TeamThreadMessage = Schema.Struct({
+  role: Schema.Literals(["user", "assistant", "system"]),
+  text: Schema.String,
+  createdAt: Schema.String,
+});
+export type TeamThreadMessage = typeof TeamThreadMessage.Type;
+
+export const TeamThreadSnapshot = Schema.Struct({
+  summary: TeamThreadSummary,
+  messages: Schema.Array(TeamThreadMessage),
+});
+export type TeamThreadSnapshot = typeof TeamThreadSnapshot.Type;
+
+export const TeamThreadReport = Schema.Struct({
+  summaries: Schema.Array(TeamThreadReportSummary),
+  snapshots: Schema.Array(
+    Schema.Struct({
+      threadId: TrimmedNonEmptyString,
+      messages: Schema.Array(TeamThreadMessage),
+    }),
+  ),
+});
+export type TeamThreadReport = typeof TeamThreadReport.Type;
+
+export const TeamThreadPublishInput = Schema.Struct({
+  threadId: TrimmedNonEmptyString,
+  status: PublicationStatus,
+});
+export type TeamThreadPublishInput = typeof TeamThreadPublishInput.Type;
+export const TeamPublicationResult = Schema.Struct({ updated: Schema.Boolean });
+export type TeamPublicationResult = typeof TeamPublicationResult.Type;
 
 export class TeamActivityError extends Schema.TaggedError<TeamActivityError>()(
   "TeamActivityError",

@@ -47,6 +47,10 @@ import { useCopyToClipboard } from "./useCopyToClipboard";
 import { useNewThreadHandler } from "./useHandleNewThread";
 import { useClientSettings } from "./useSettings";
 import { canTurnThreadIntoProject, useThreadActions } from "./useThreadActions";
+import { enterpriseEnvironment } from "../state/enterprise";
+import { useEnvironmentQuery } from "../state/query";
+import { useAtomCommand } from "../state/use-atom-command";
+import { useAtomValue } from "@effect/atom-react";
 
 function failureToast(title: string, error: unknown) {
   toastManager.add(
@@ -69,6 +73,15 @@ export function useThreadActionMenu(input: {
   const router = useRouter();
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const teamThreads = useEnvironmentQuery(
+    threadRef === null
+      ? null
+      : enterpriseEnvironment.teamThreads({ environmentId: threadRef.environmentId, input: {} }),
+  );
+  const publishTeamThread = useAtomCommand(enterpriseEnvironment.publishTeamThread);
+  const canPublish = useAtomValue(
+    enterpriseEnvironment.publishTeamThread.permissionAtom(threadRef?.environmentId ?? null),
+  );
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
   const logicalProjectKeyByPhysicalKey = buildPhysicalToLogicalProjectKeyMap({
     projects,
@@ -133,6 +146,11 @@ export function useThreadActionMenu(input: {
       };
       const isRegeneratingTitle = thread.titleRegeneration != null;
       const snoozePresets = resolveSnoozePresets(now, timestampFormat, threadRef.environmentId);
+      const publicationSummary = teamThreads.isSuccess
+        ? teamThreads.data?.find(
+            (summary) => summary.threadId === threadRef.threadId && summary.parentThreadId === null,
+          )
+        : undefined;
       const items = buildThreadActionMenuItems({
         canOperate: readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope),
         canFind: onFind !== undefined,
@@ -148,7 +166,11 @@ export function useThreadActionMenu(input: {
         supports,
         snoozePresets,
         canShareWithGuest,
+        canPublish,
         canTurnIntoProject: canTurnThreadIntoProject(threadRef),
+        ...(publicationSummary === undefined
+          ? {}
+          : { publicationStatus: publicationSummary.publicationStatus }),
       });
       const clicked = await settlePromise(() => api.contextMenu.show(items, position));
       if (clicked._tag === "Failure" || clicked.value === null) return;
@@ -177,6 +199,19 @@ export function useThreadActionMenu(input: {
         const result = await snoozeThread(threadRef, preset.snoozedUntil);
         if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
           failureToast("Failed to snooze thread", squashAtomCommandFailure(result));
+        }
+        return;
+      }
+      if (action === "publish:unpublished" || action === "publish:read-only") {
+        const result = await publishTeamThread({
+          environmentId: threadRef.environmentId,
+          input: {
+            threadId: threadRef.threadId,
+            status: action.slice("publish:".length) as "unpublished" | "read-only",
+          },
+        });
+        if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+          failureToast("Failed to update team publication", squashAtomCommandFailure(result));
         }
         return;
       }

@@ -83,6 +83,8 @@ export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("Ente
     "proposal_not_found",
     "conflict",
     "knowledge_write_failed",
+    "thread_not_found",
+    "snapshot_unavailable",
   ]),
   message: Schema.String,
 }) {}

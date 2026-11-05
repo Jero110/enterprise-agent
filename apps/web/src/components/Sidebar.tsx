@@ -264,6 +264,7 @@ import {
   type SidebarSweepAction,
 } from "./sidebar/SidebarThreadRow";
 import { SidebarDraftBlock } from "./sidebar/SidebarDraftBlock";
+import { TeamAgentsSection } from "./TeamAgentsSection";
 import {
   SidebarProjectFolderHeader,
   sidebarFolderRowId,
@@ -3641,6 +3642,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             </div>
           ) : null}
         </SidebarGroup>
+        <TeamAgentsSection />
       </SidebarContent>
       <SidebarChromeFooter />
     </>

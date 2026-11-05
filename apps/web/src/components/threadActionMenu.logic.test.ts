@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { buildThreadActionMenuItems, type ThreadActionMenuState } from "./threadActionMenu.logic";
+import {
+  buildThreadActionMenuItems,
+  threadActionRequiresOperate,
+  type ThreadActionMenuState,
+} from "./threadActionMenu.logic";
 
 const baseState: ThreadActionMenuState = {
   canOperate: true,
@@ -73,5 +77,24 @@ describe("buildThreadActionMenuItems", () => {
     });
     expect(items.find((item) => item.id === "archive")?.disabled).toBe(true);
     expect(items.find((item) => item.id === "turn-into-project")?.disabled).toBe(true);
+  });
+
+  it("uses access-write permission for root publication controls", () => {
+    const unpublished = buildThreadActionMenuItems({
+      ...baseState,
+      publicationStatus: "unpublished",
+      canPublish: false,
+    });
+    expect(unpublished.find((item) => item.id === "publish")).toBeUndefined();
+
+    const publishable = buildThreadActionMenuItems({
+      ...baseState,
+      publicationStatus: "unpublished",
+      canPublish: true,
+    });
+    expect(publishable.find((item) => item.id === "publish")).toMatchObject({
+      id: "publish",
+    });
+    expect(threadActionRequiresOperate("publish:read-only")).toBe(false);
   });
 });

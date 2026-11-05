@@ -71,6 +71,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   // A link lets every agent here reach the other environment: Settings' bar.
   [WS_METHODS.peerLinksAnswerRequest]: AuthAccessWriteScope,
   // Connecting links this environment to the hub and replaces its enterprise identity.
+  [WS_METHODS.teamThreadPublish]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseConnect]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseDisconnect]: AuthAccessWriteScope,
   // The hub decides on the member's role; this scope only lets the client ask.

@@ -81,6 +81,8 @@ import * as KnowledgeToolkit from "./enterprise/KnowledgeToolkit.ts";
 import * as KnowledgeProposals from "./enterprise/KnowledgeProposals.ts";
 import * as AreaKnowledge from "./knowledge/AreaKnowledge.ts";
 import * as KnowledgeRepo from "./knowledge/KnowledgeRepo.ts";
+import * as TeamPublication from "./team/TeamPublication.ts";
+import * as TeamReporter from "./team/TeamReporter.ts";
 import * as PeerForwarding from "./peer/PeerForwarding.ts";
 import * as RemoteDelegation from "./peer/RemoteDelegation.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
@@ -777,6 +779,7 @@ const layerHubMcp = McpHttpServer.layerMcpTransport(
   ),
 ).pipe(
   Layer.provide(EnterpriseHub.layer),
+  Layer.provide(TeamPublication.layer),
   Layer.provide(AreaKnowledge.layer),
   Layer.provide(KnowledgeProposals.layer),
   Layer.provide(KnowledgeRepo.layer),
@@ -827,11 +830,13 @@ const layerMakeRoutes = Layer.mergeAll(
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
     Layer.provide(McpOAuth.layerMcpClientAuthenticator),
   ),
+  Layer.effectDiscard(TeamReporter.TeamReporter.pipe(Effect.flatMap((reporter) => reporter.start))),
   // Follows delegated tasks running in linked environments, including after a restart.
   Layer.effectDiscard(
     RemoteDelegation.RemoteDelegation.pipe(Effect.flatMap((remote) => remote.start())),
   ),
 ).pipe(
+  Layer.provide(TeamReporter.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provide(
     PullRequestReviewGuideService.layer.pipe(Layer.provide(PullRequestReviewGuides.layer)),
   ),
