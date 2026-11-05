@@ -27,6 +27,16 @@ import {
   PeerLinkSummary,
 } from "./peerLink.ts";
 import {
+  EnterpriseAuthorizeMemberInput,
+  EnterpriseConnectInput,
+  EnterpriseDisconnectResult,
+  EnterpriseError,
+  EnterpriseIdentity,
+  EnterpriseMembers,
+  EnterpriseRevokeMemberInput,
+  EnterpriseStatus,
+} from "./enterprise.ts";
+import {
   ChatGptReconnectProfileInput,
   ChatGptReconnectProfile,
   ChatGptImportProfileInput,
@@ -512,6 +522,12 @@ export const WS_METHODS = {
   peerLinksLink: "peerLinks.link",
   peerLinksUnlink: "peerLinks.unlink",
   peerLinksAnswerRequest: "peerLinks.answerRequest",
+  enterpriseStatus: "enterprise.status",
+  enterpriseConnect: "enterprise.connect",
+  enterpriseDisconnect: "enterprise.disconnect",
+  enterpriseMembersList: "enterprise.members.list",
+  enterpriseMembersAuthorize: "enterprise.members.authorize",
+  enterpriseMembersRevoke: "enterprise.members.revoke",
   serverUpdateSettings: "server.updateSettings",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverSearchAcpRegistry: "server.searchAcpRegistry",
@@ -818,6 +834,44 @@ const WsPeerLinksUnlinkRpc = Rpc.make(WS_METHODS.peerLinksUnlink, {
 const WsPeerLinksAnswerRequestRpc = Rpc.make(WS_METHODS.peerLinksAnswerRequest, {
   payload: PeerLinkRequestAnswerInput,
   error: Schema.Union([PeerLinkRequestError, EnvironmentAuthorizationError]),
+});
+
+const enterpriseError = Schema.Union([EnterpriseError, EnvironmentAuthorizationError]);
+
+const WsEnterpriseStatusRpc = Rpc.make(WS_METHODS.enterpriseStatus, {
+  payload: Schema.Struct({}),
+  success: EnterpriseStatus,
+  error: enterpriseError,
+});
+
+const WsEnterpriseConnectRpc = Rpc.make(WS_METHODS.enterpriseConnect, {
+  payload: EnterpriseConnectInput,
+  success: EnterpriseIdentity,
+  error: Schema.Union([EnterpriseError, PeerLinkError, EnvironmentAuthorizationError]),
+});
+
+const WsEnterpriseDisconnectRpc = Rpc.make(WS_METHODS.enterpriseDisconnect, {
+  payload: Schema.Struct({}),
+  success: EnterpriseDisconnectResult,
+  error: enterpriseError,
+});
+
+const WsEnterpriseMembersListRpc = Rpc.make(WS_METHODS.enterpriseMembersList, {
+  payload: Schema.Struct({}),
+  success: EnterpriseMembers,
+  error: enterpriseError,
+});
+
+const WsEnterpriseMembersAuthorizeRpc = Rpc.make(WS_METHODS.enterpriseMembersAuthorize, {
+  payload: EnterpriseAuthorizeMemberInput,
+  success: EnterpriseMembers,
+  error: enterpriseError,
+});
+
+const WsEnterpriseMembersRevokeRpc = Rpc.make(WS_METHODS.enterpriseMembersRevoke, {
+  payload: EnterpriseRevokeMemberInput,
+  success: EnterpriseMembers,
+  error: enterpriseError,
 });
 
 const WsServerUpdateSettingsRpc = Rpc.make(WS_METHODS.serverUpdateSettings, {
@@ -2021,6 +2075,12 @@ export const WsRpcGroup = RpcGroup.make(
   WsPeerLinksLinkRpc,
   WsPeerLinksUnlinkRpc,
   WsPeerLinksAnswerRequestRpc,
+  WsEnterpriseStatusRpc,
+  WsEnterpriseConnectRpc,
+  WsEnterpriseDisconnectRpc,
+  WsEnterpriseMembersListRpc,
+  WsEnterpriseMembersAuthorizeRpc,
+  WsEnterpriseMembersRevokeRpc,
   WsServerDiscoverSourceControlRpc,
   WsServerSearchAcpRegistryRpc,
   WsServerPrepareAcpRegistryAgentRpc,

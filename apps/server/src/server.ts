@@ -73,6 +73,10 @@ import * as ProviderInstanceRegistryHydration from "./provider/ProviderInstanceR
 import * as ProjectSettingsOverrideSweep from "./provider/ProjectSettingsOverrideSweep.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as McpHttpServer from "./mcp/McpHttpServer.ts";
+import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
+import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
+import * as EnterpriseStore from "./enterprise/EnterpriseStore.ts";
+import * as EnterpriseToolkit from "./enterprise/EnterpriseToolkit.ts";
 import * as PeerForwarding from "./peer/PeerForwarding.ts";
 import * as RemoteDelegation from "./peer/RemoteDelegation.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
@@ -757,6 +761,17 @@ const layerCommandReadiness = HttpRouter.middleware(
   { global: true },
 );
 
+/** The enterprise tools and their store exist only on a hub; any other server serves the plain `/mcp`. */
+const layerMcp = Layer.unwrap(
+  Effect.gen(function* () {
+    const config = yield* ServerConfig.ServerConfig;
+    if (config.enterpriseHub !== true) return McpHttpServer.layer;
+    return McpHttpServer.layerMcpTransport(
+      Layer.mergeAll(McpHttpServer.layerTools, EnterpriseToolkit.layerRegistration),
+    ).pipe(Layer.provide(EnterpriseHub.layer), Layer.provide(EnterpriseStore.layerHub));
+  }),
+);
+
 const layerMakeRoutes = Layer.mergeAll(
   Layer.mergeAll(
     HttpApiBuilder.layer(EnvironmentHttpApi).pipe(
@@ -779,7 +794,7 @@ const layerMakeRoutes = Layer.mergeAll(
     ServerHttp.layerStaticAndDevRoute,
     Ws.layer,
   ),
-  McpHttpServer.layer.pipe(
+  layerMcp.pipe(
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
     Layer.provide(McpOAuth.layerMcpClientAuthenticator),
   ),
@@ -807,6 +822,7 @@ const layerMakeRoutes = Layer.mergeAll(
   // Links to other environments, shared by Settings (WebSocket) and agents (/mcp).
   Layer.provide(
     PeerForwarding.layer.pipe(
+      Layer.provideMerge(EnterpriseClient.layer),
       Layer.provideMerge(PeerMcpClient.layer),
       Layer.provideMerge(PeerLinks.layer),
     ),

@@ -70,6 +70,12 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.peerLinksUnlink]: AuthAccessWriteScope,
   // A link lets every agent here reach the other environment: Settings' bar.
   [WS_METHODS.peerLinksAnswerRequest]: AuthAccessWriteScope,
+  // Connecting links this environment to the hub and replaces its enterprise identity.
+  [WS_METHODS.enterpriseConnect]: AuthAccessWriteScope,
+  [WS_METHODS.enterpriseDisconnect]: AuthAccessWriteScope,
+  // The hub decides on the member's role; this scope only lets the client ask.
+  [WS_METHODS.enterpriseMembersAuthorize]: AuthAccessWriteScope,
+  [WS_METHODS.enterpriseMembersRevoke]: AuthAccessWriteScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 
