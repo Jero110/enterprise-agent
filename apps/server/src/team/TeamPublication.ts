@@ -46,15 +46,13 @@ interface ThreadRow {
   readonly updated_at: string;
   readonly publication_status: TeamThreadSummary["publicationStatus"];
   readonly publication_team_id: string | null;
-  readonly snapshot_json: string | null;
 }
 const denied = new EnterpriseError({ code: "access_denied", message: "Thread access denied." });
 const MessagesJson = Schema.fromJsonString(Schema.Array(TeamThreadMessage));
 const decodeMessages = Schema.decodeUnknownEffect(MessagesJson);
 const encodeMessages = Schema.encodeEffect(MessagesJson);
 
-const ancestors = (rows: ReadonlyArray<ThreadRow>, row: ThreadRow) => {
-  const byId = new Map(rows.map((thread) => [thread.thread_id, thread]));
+const ancestors = (rows: ReadonlyMap<string, ThreadRow>, row: ThreadRow) => {
   const chain: ThreadRow[] = [];
   const visited = new Set<string>();
   let current: ThreadRow | undefined = row;
@@ -63,18 +61,18 @@ const ancestors = (rows: ReadonlyArray<ThreadRow>, row: ThreadRow) => {
     visited.add(current.thread_id);
     chain.push(current);
     if (current.parent_thread_id === null) return chain;
-    current = byId.get(current.parent_thread_id);
+    current = rows.get(current.parent_thread_id);
   }
   return undefined;
 };
-const isPublished = (rows: ReadonlyArray<ThreadRow>, row: ThreadRow, teamId: string | null) =>
+const isPublished = (rows: ReadonlyMap<string, ThreadRow>, row: ThreadRow, teamId: string | null) =>
   teamId !== null &&
   ancestors(rows, row)?.some(
     (ancestor) =>
       ancestor.publication_status === "read-only" && ancestor.publication_team_id === teamId,
   ) === true;
 const toSummary = (
-  rows: ReadonlyArray<ThreadRow>,
+  rows: ReadonlyMap<string, ThreadRow>,
   row: ThreadRow,
   owner: { readonly displayName: string; readonly teamId: string | null },
 ): TeamThreadSummary => ({
@@ -105,7 +103,8 @@ export const layer = Layer.effect(
       return member;
     });
     const ownerRows = (email: string) =>
-      sql<ThreadRow>`SELECT owner_email, thread_id, parent_thread_id, title, status, updated_at, publication_status, publication_team_id, NULL AS snapshot_json FROM enterprise_team_threads WHERE owner_email = ${email}`.pipe(
+      sql<ThreadRow>`SELECT owner_email, thread_id, parent_thread_id, title, status, updated_at, publication_status, publication_team_id FROM enterprise_team_threads WHERE owner_email = ${email}`.pipe(
+        Effect.map((rows) => new Map(rows.map((row) => [row.thread_id, row]))),
         Effect.orDie,
       );
     const report: TeamPublication["Service"]["report"] = Effect.fn("TeamPublication.report")(
@@ -121,9 +120,10 @@ export const layer = Layer.effect(
             status = excluded.status, updated_at = excluded.updated_at`;
               }
               const rows = yield* ownerRows(owner.email);
-              if (rows.some((row) => ancestors(rows, row) === undefined)) return yield* denied;
+              if (Array.from(rows.values()).some((row) => ancestors(rows, row) === undefined))
+                return yield* denied;
               for (const snapshot of input.snapshots) {
-                const row = rows.find((thread) => thread.thread_id === snapshot.threadId);
+                const row = rows.get(snapshot.threadId);
                 // A delayed turn upload must never resurrect an unpublished snapshot.
                 if (row === undefined || !isPublished(rows, row, owner.teamId)) continue;
                 yield* sql`UPDATE enterprise_team_threads SET snapshot_json = ${yield* encodeMessages(snapshot.messages).pipe(Effect.orDie)}
@@ -143,7 +143,7 @@ export const layer = Layer.effect(
           .withTransaction(
             Effect.gen(function* () {
               const rows = yield* ownerRows(owner.email);
-              const target = rows.find((row) => row.thread_id === input.threadId);
+              const target = rows.get(input.threadId);
               if (target === undefined) return yield* denied;
               if (input.status === "unpublished") {
                 if (
@@ -156,7 +156,7 @@ export const layer = Layer.effect(
                     message: "Unpublish the parent thread first.",
                   });
                 }
-                for (const row of rows) {
+                for (const row of rows.values()) {
                   if (
                     ancestors(rows, row)?.some((ancestor) => ancestor.thread_id === input.threadId)
                   ) {
@@ -190,7 +190,7 @@ export const layer = Layer.effect(
         const summaries: TeamThreadSummary[] = [];
         for (const owner of owners) {
           const rows = yield* ownerRows(owner.email);
-          summaries.push(...rows.map((row) => toSummary(rows, row, owner)));
+          summaries.push(...Array.from(rows.values(), (row) => toSummary(rows, row, owner)));
         }
         return summaries.sort(
           (a, b) =>
@@ -206,7 +206,7 @@ export const layer = Layer.effect(
         const owner = yield* store.getMember(input.ownerEmail);
         if (owner === null || !visibleOwner(viewer, owner)) return yield* denied;
         const rows = yield* ownerRows(owner.email);
-        const row = rows.find((thread) => thread.thread_id === input.threadId);
+        const row = rows.get(input.threadId);
         if (row === undefined || !isPublished(rows, row, owner.teamId)) return yield* denied;
         const snapshot = yield* sql<{
           readonly snapshot_json: string | null;

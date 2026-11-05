@@ -1,5 +1,6 @@
 import {
   AuthEnvironmentMaintainScope,
+  AuthAccessWriteScope,
   AuthDiagnosticsReadScope,
   AuthFilesystemReadScope,
   AuthProvidersManageScope,
@@ -92,7 +93,12 @@ it("requires operate permission for tool updates even alongside a read-only chec
 });
 
 describe("RPC scope middleware", () => {
-  const tested = [WS_METHODS.serverProbe, WS_METHODS.serverRetryResourceTelemetry] as const;
+  const tested = [
+    WS_METHODS.serverProbe,
+    WS_METHODS.serverRetryResourceTelemetry,
+    WS_METHODS.teamThreadsList,
+    WS_METHODS.teamThreadPublish,
+  ] as const;
   const group = WsRpcGroup.omit(
     ...[...WsRpcGroup.requests.keys()].filter(
       (tag): tag is Exclude<keyof typeof RPC_REQUIRED_SCOPES, (typeof tested)[number]> =>
@@ -106,30 +112,49 @@ describe("RPC scope middleware", () => {
       scopes: [AuthOrchestrationReadScope, AuthEnvironmentMaintainScope],
       missing: AuthDiagnosticsReadScope,
     },
-  ])("rejects telemetry retry without $missing before its handler runs", ({ scopes, missing }) =>
-    Effect.gen(function* () {
-      const handled: Array<string> = [];
-      const client = yield* RpcTest.makeClient(group).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            group.toLayerHandler(WS_METHODS.serverProbe, () => Effect.succeed({})),
-            group.toLayerHandler(WS_METHODS.serverRetryResourceTelemetry, () =>
-              Effect.sync(() => handled.push("retry")).pipe(Effect.andThen(Effect.never)),
+  ])(
+    "rejects telemetry retry without $missing and publication without access permission",
+    ({ scopes, missing }) =>
+      Effect.gen(function* () {
+        const handled: Array<string> = [];
+        const client = yield* RpcTest.makeClient(group).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              group.toLayerHandler(WS_METHODS.serverProbe, () => Effect.succeed({})),
+              group.toLayerHandler(WS_METHODS.teamThreadsList, () => Effect.succeed([])),
+              group.toLayerHandler(WS_METHODS.teamThreadPublish, () =>
+                Effect.sync(() => {
+                  handled.push("publish");
+                  return { updated: true };
+                }),
+              ),
+              group.toLayerHandler(WS_METHODS.serverRetryResourceTelemetry, () =>
+                Effect.sync(() => handled.push("retry")).pipe(Effect.andThen(Effect.never)),
+              ),
+              RpcAuthorization.layer(scopes),
             ),
-            RpcAuthorization.layer(scopes),
           ),
-        ),
-      );
+        );
 
-      expect(yield* client[WS_METHODS.serverProbe]({})).toEqual({});
-      expect(
-        yield* client[WS_METHODS.serverRetryResourceTelemetry]({}).pipe(Effect.flip),
-      ).toMatchObject({
-        _tag: "EnvironmentAuthorizationError",
-        requiredPermission: missing,
-      });
-      expect(handled).toEqual([]);
-    }).pipe(Effect.scoped),
+        expect(yield* client[WS_METHODS.serverProbe]({})).toEqual({});
+        expect(yield* client[WS_METHODS.teamThreadsList]({})).toEqual([]);
+        expect(
+          yield* client[WS_METHODS.teamThreadPublish]({
+            threadId: "thread",
+            status: "read-only",
+          }).pipe(Effect.flip),
+        ).toMatchObject({
+          _tag: "EnvironmentAuthorizationError",
+          requiredPermission: AuthAccessWriteScope,
+        });
+        expect(
+          yield* client[WS_METHODS.serverRetryResourceTelemetry]({}).pipe(Effect.flip),
+        ).toMatchObject({
+          _tag: "EnvironmentAuthorizationError",
+          requiredPermission: missing,
+        });
+        expect(handled).toEqual([]);
+      }).pipe(Effect.scoped),
   );
 });
 
