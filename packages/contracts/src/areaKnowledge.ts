@@ -17,6 +17,34 @@ export const KnowledgeDocument = Schema.Struct({
 });
 export type KnowledgeDocument = typeof KnowledgeDocument.Type;
 
+/** What a list shows: no body. `id` is the document's path in the knowledge repo. */
+export const KnowledgeDocumentSummary = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  areaId: AreaId,
+  title: TrimmedNonEmptyString,
+});
+export type KnowledgeDocumentSummary = typeof KnowledgeDocumentSummary.Type;
+
+export const KnowledgeDocumentList = Schema.Struct({
+  documents: Schema.Array(KnowledgeDocumentSummary),
+});
+export type KnowledgeDocumentList = typeof KnowledgeDocumentList.Type;
+
+export const KnowledgeSearchInput = Schema.Struct({ query: TrimmedNonEmptyString });
+export type KnowledgeSearchInput = typeof KnowledgeSearchInput.Type;
+
+export const KnowledgeSearchHit = Schema.Struct({
+  ...KnowledgeDocumentSummary.fields,
+  snippet: Schema.String,
+});
+export type KnowledgeSearchHit = typeof KnowledgeSearchHit.Type;
+
+export const KnowledgeSearchResult = Schema.Struct({ hits: Schema.Array(KnowledgeSearchHit) });
+export type KnowledgeSearchResult = typeof KnowledgeSearchResult.Type;
+
+export const KnowledgeGetInput = Schema.Struct({ path: TrimmedNonEmptyString });
+export type KnowledgeGetInput = typeof KnowledgeGetInput.Type;
+
 export const AreaMembership = Schema.Struct({
   email: TrimmedNonEmptyString,
   areaId: AreaId,

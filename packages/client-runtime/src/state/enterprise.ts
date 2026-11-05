@@ -19,14 +19,28 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     tag: WS_METHODS.enterpriseMembersList,
     staleTimeMs: 10_000,
   });
+  // The hub filters by the member's scope on every read; revoked grants vanish on refresh.
+  const knowledgeList = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:knowledge-list",
+    tag: WS_METHODS.enterpriseKnowledgeList,
+    staleTimeMs: 10_000,
+  });
+  const knowledgeGet = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:knowledge-get",
+    tag: WS_METHODS.enterpriseKnowledgeGet,
+    staleTimeMs: 10_000,
+  });
   // Re-asks the hub rather than patching: identity and member list change on its word alone.
   const refreshAll = (registry: AtomRegistry.AtomRegistry, environmentId: EnvironmentId) => {
     registry.refresh(status({ environmentId, input: {} }));
     registry.refresh(members({ environmentId, input: {} }));
+    registry.refresh(knowledgeList({ environmentId, input: {} }));
   };
   return {
     status,
     members,
+    knowledgeList,
+    knowledgeGet,
     connect: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:connect",
       tag: WS_METHODS.enterpriseConnect,

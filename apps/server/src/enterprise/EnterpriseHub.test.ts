@@ -8,6 +8,8 @@ import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 
+import * as ServerConfig from "../config.ts";
+import { layerKnowledge } from "../knowledge/KnowledgeRepo.testkit.ts";
 import * as Sqlite from "../persistence/Sqlite.ts";
 import { acmeSeedPath, layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
@@ -19,7 +21,9 @@ const JERO = "jeronimo.deli@gmail.com";
 const EX = "ent.test.ex@gmail.com";
 
 const layer = EnterpriseHub.layer.pipe(
+  Layer.provideMerge(layerKnowledge),
   Layer.provideMerge(layerSeededStore),
+  Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-enterprise-hub-" })),
   Layer.provideMerge(
     Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto),
   ),
@@ -155,7 +159,11 @@ describe("EnterpriseHub", () => {
       const path = yield* Path.Path;
       const dir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-enterprise-hub-" });
       const hubAt = EnterpriseHub.layer.pipe(
+        Layer.provideMerge(layerKnowledge),
         Layer.provideMerge(EnterpriseStore.layer),
+        Layer.provideMerge(
+          ServerConfig.layerTest(process.cwd(), { prefix: "t3-enterprise-hub-restart-" }),
+        ),
         Layer.provideMerge(Sqlite.layerFromPath(path.join(dir, "state.sqlite"))),
       );
 

@@ -36,6 +36,7 @@ import {
   EnterpriseRevokeMemberInput,
   EnterpriseStatus,
 } from "./enterprise.ts";
+import { KnowledgeDocument, KnowledgeDocumentList, KnowledgeGetInput } from "./areaKnowledge.ts";
 import {
   ChatGptReconnectProfileInput,
   ChatGptReconnectProfile,
@@ -528,6 +529,8 @@ export const WS_METHODS = {
   enterpriseMembersList: "enterprise.members.list",
   enterpriseMembersAuthorize: "enterprise.members.authorize",
   enterpriseMembersRevoke: "enterprise.members.revoke",
+  enterpriseKnowledgeList: "enterprise.knowledge.list",
+  enterpriseKnowledgeGet: "enterprise.knowledge.get",
   serverUpdateSettings: "server.updateSettings",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverSearchAcpRegistry: "server.searchAcpRegistry",
@@ -871,6 +874,18 @@ const WsEnterpriseMembersAuthorizeRpc = Rpc.make(WS_METHODS.enterpriseMembersAut
 const WsEnterpriseMembersRevokeRpc = Rpc.make(WS_METHODS.enterpriseMembersRevoke, {
   payload: EnterpriseRevokeMemberInput,
   success: EnterpriseMembers,
+  error: enterpriseError,
+});
+
+const WsEnterpriseKnowledgeListRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeList, {
+  payload: Schema.Struct({}),
+  success: KnowledgeDocumentList,
+  error: enterpriseError,
+});
+
+const WsEnterpriseKnowledgeGetRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeGet, {
+  payload: KnowledgeGetInput,
+  success: KnowledgeDocument,
   error: enterpriseError,
 });
 
@@ -2081,6 +2096,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseMembersListRpc,
   WsEnterpriseMembersAuthorizeRpc,
   WsEnterpriseMembersRevokeRpc,
+  WsEnterpriseKnowledgeListRpc,
+  WsEnterpriseKnowledgeGetRpc,
   WsServerDiscoverSourceControlRpc,
   WsServerSearchAcpRegistryRpc,
   WsServerPrepareAcpRegistryAgentRpc,

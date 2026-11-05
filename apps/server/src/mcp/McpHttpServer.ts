@@ -1206,5 +1206,3 @@ export const layerTools = Layer.mergeAll(
   layerDeviceToolkit,
   layerHtmlToolkit,
 );
-
-export const layer = layerMcpTransport(layerTools);

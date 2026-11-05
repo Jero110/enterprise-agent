@@ -4,11 +4,17 @@ import {
   type EnterpriseHubIdentity,
   type EnterpriseMembers,
   type EnterpriseRevokeMemberInput,
+  type KnowledgeDocument,
+  type KnowledgeDocumentList,
+  type KnowledgeGetInput,
+  type KnowledgeSearchInput,
+  type KnowledgeSearchResult,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import * as AreaKnowledge from "../knowledge/AreaKnowledge.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
 
 /**
@@ -34,6 +40,18 @@ export class EnterpriseHub extends Context.Service<
       sessionId: string,
       input: EnterpriseRevokeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
+    /** Knowledge calls are scoped by the enrolled member's team and grants, re-read each call. */
+    readonly knowledgeList: (
+      sessionId: string,
+    ) => Effect.Effect<KnowledgeDocumentList, EnterpriseError>;
+    readonly knowledgeSearch: (
+      sessionId: string,
+      input: KnowledgeSearchInput,
+    ) => Effect.Effect<KnowledgeSearchResult, EnterpriseError>;
+    readonly knowledgeGet: (
+      sessionId: string,
+      input: KnowledgeGetInput,
+    ) => Effect.Effect<KnowledgeDocument, EnterpriseError>;
   }
 >()("t3/enterprise/EnterpriseHub") {}
 
@@ -44,6 +62,7 @@ const notAuthorized = new EnterpriseError({
 
 const make = Effect.gen(function* () {
   const store = yield* EnterpriseStore.EnterpriseStore;
+  const knowledge = yield* AreaKnowledge.AreaKnowledge;
 
   const identityOf = Effect.fn("EnterpriseHub.identityOf")(function* (email: string) {
     const member = yield* store.getMember(email);
@@ -149,7 +168,49 @@ const make = Effect.gen(function* () {
     },
   );
 
-  return EnterpriseHub.of({ enroll, whoami, disconnect, listMembers, authorize, revoke });
+  const principalOf = Effect.fn("EnterpriseHub.principalOf")(function* (sessionId: string) {
+    const identity = yield* whoami(sessionId);
+    const principal = yield* knowledge.getMemberPrincipal(identity.email);
+    return principal === null ? yield* notAuthorized : principal;
+  });
+
+  const knowledgeList: EnterpriseHub["Service"]["knowledgeList"] = Effect.fn(
+    "EnterpriseHub.knowledgeList",
+  )(function* (sessionId) {
+    return { documents: yield* knowledge.listDocuments(yield* principalOf(sessionId)) };
+  });
+
+  const knowledgeSearch: EnterpriseHub["Service"]["knowledgeSearch"] = Effect.fn(
+    "EnterpriseHub.knowledgeSearch",
+  )(function* (sessionId, input) {
+    return { hits: yield* knowledge.searchDocuments(yield* principalOf(sessionId), input.query) };
+  });
+
+  const knowledgeGet: EnterpriseHub["Service"]["knowledgeGet"] = Effect.fn(
+    "EnterpriseHub.knowledgeGet",
+  )(function* (sessionId, input) {
+    return yield* knowledge.readDocument(yield* principalOf(sessionId), input.path).pipe(
+      Effect.mapError(
+        ({ code, message }) =>
+          new EnterpriseError({
+            code: code === "access_denied" ? "access_denied" : "document_not_found",
+            message,
+          }),
+      ),
+    );
+  });
+
+  return EnterpriseHub.of({
+    enroll,
+    whoami,
+    disconnect,
+    listMembers,
+    authorize,
+    revoke,
+    knowledgeList,
+    knowledgeSearch,
+    knowledgeGet,
+  });
 });
 
 export const layer = Layer.effect(EnterpriseHub, make);

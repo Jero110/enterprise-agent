@@ -37,10 +37,67 @@ export function EnterpriseSettingsPanel() {
           <IdentityRows environmentId={environmentId} identity={identity} error={error} />
         )}
       </SettingsSection>
+      {environmentId !== null && identity ? (
+        <YourContextSection environmentId={environmentId} />
+      ) : null}
       {environmentId !== null && identity?.role === "admin" ? (
         <MembersSection environmentId={environmentId} />
       ) : null}
     </SettingsPageContainer>
+  );
+}
+
+function YourContextSection({ environmentId }: { readonly environmentId: EnvironmentId }) {
+  const documents = useEnvironmentQuery(
+    enterpriseEnvironment.knowledgeList({ environmentId, input: {} }),
+  );
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <SettingsSection title="Your context">
+      {documents.error ? (
+        <SettingsRow title="Could not load your context" description={documents.error} />
+      ) : !documents.data ? (
+        <SettingsRow title="Loading…" role="status" />
+      ) : documents.data.documents.length === 0 ? (
+        <SettingsRow title="No documents you can read yet" />
+      ) : (
+        documents.data.documents.map((doc) => (
+          <SettingsRow
+            key={doc.id}
+            title={doc.title}
+            description={`${doc.id} · ${doc.areaId}`}
+            control={
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setOpen(open === doc.id ? null : doc.id)}
+              >
+                {open === doc.id ? "Hide" : "View"}
+              </Button>
+            }
+          >
+            {open === doc.id ? <DocumentBody environmentId={environmentId} path={doc.id} /> : null}
+          </SettingsRow>
+        ))
+      )}
+    </SettingsSection>
+  );
+}
+
+function DocumentBody({
+  environmentId,
+  path,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly path: string;
+}) {
+  const document = useEnvironmentQuery(
+    enterpriseEnvironment.knowledgeGet({ environmentId, input: { path } }),
+  );
+  return (
+    <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
+      {document.error ?? document.data?.content ?? "Loading…"}
+    </pre>
   );
 }
 

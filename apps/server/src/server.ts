@@ -77,6 +77,9 @@ import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
 import * as EnterpriseStore from "./enterprise/EnterpriseStore.ts";
 import * as EnterpriseToolkit from "./enterprise/EnterpriseToolkit.ts";
+import * as KnowledgeToolkit from "./enterprise/KnowledgeToolkit.ts";
+import * as AreaKnowledge from "./knowledge/AreaKnowledge.ts";
+import * as KnowledgeRepo from "./knowledge/KnowledgeRepo.ts";
 import * as PeerForwarding from "./peer/PeerForwarding.ts";
 import * as RemoteDelegation from "./peer/RemoteDelegation.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
@@ -765,10 +768,25 @@ const layerCommandReadiness = HttpRouter.middleware(
 const layerMcp = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig.ServerConfig;
-    if (config.enterpriseHub !== true) return McpHttpServer.layer;
+    // A member IDE's agent reaches the hub's knowledge through its enterprise connection.
+    if (config.enterpriseHub !== true) {
+      return McpHttpServer.layerMcpTransport(
+        Layer.mergeAll(McpHttpServer.layerTools, KnowledgeToolkit.layerMemberRegistration),
+      );
+    }
     return McpHttpServer.layerMcpTransport(
-      Layer.mergeAll(McpHttpServer.layerTools, EnterpriseToolkit.layerRegistration),
-    ).pipe(Layer.provide(EnterpriseHub.layer), Layer.provide(EnterpriseStore.layerHub));
+      Layer.mergeAll(
+        McpHttpServer.layerTools,
+        EnterpriseToolkit.layerRegistration,
+        KnowledgeToolkit.layerHubRegistration,
+      ),
+    ).pipe(
+      Layer.provide(EnterpriseHub.layer),
+      Layer.provide(AreaKnowledge.layer),
+      Layer.provide(KnowledgeRepo.layer),
+      Layer.provide(ProcessRunner.layer),
+      Layer.provide(EnterpriseStore.layerHub),
+    );
   }),
 );
 

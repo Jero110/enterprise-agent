@@ -69,6 +69,8 @@ const RPC_AGGREGATES = {
   [WS_METHODS.enterpriseMembersList]: "enterprise",
   [WS_METHODS.enterpriseMembersAuthorize]: "enterprise",
   [WS_METHODS.enterpriseMembersRevoke]: "enterprise",
+  [WS_METHODS.enterpriseKnowledgeList]: "enterprise",
+  [WS_METHODS.enterpriseKnowledgeGet]: "enterprise",
   [WS_METHODS.serverUpdateSettings]: "server",
   [WS_METHODS.serverSearchAcpRegistry]: "server",
   [WS_METHODS.serverPrepareAcpRegistryAgent]: "server",
