@@ -77,6 +77,13 @@ describe("EnterpriseStore", () => {
 
       yield* Effect.gen(function* () {
         const store = yield* seedAcme;
+        yield* store.saveIngestionRun({
+          id: "run-1",
+          threadId: "thread-1",
+          adminEmail: "jeronimo.deli@gmail.com",
+          folder: "/source",
+          status: "running",
+        });
         yield* store.moveMember("ent.test.bruno@gmail.com", "frontend");
         yield* store.saveProposal({
           id: "durable-request",
@@ -102,6 +109,14 @@ describe("EnterpriseStore", () => {
 
       yield* Effect.gen(function* () {
         const store = yield* EnterpriseStore.EnterpriseStore;
+        expect(yield* store.getIngestionRun("thread-1")).toEqual({
+          id: "run-1",
+          threadId: "thread-1",
+          adminEmail: "jeronimo.deli@gmail.com",
+          folder: "/source",
+          status: "running",
+        });
+        expect(yield* store.getIngestionRun("not-an-ingestion")).toBeNull();
         expect(yield* store.listMembers).toHaveLength(20);
         expect((yield* store.getMember("ent.test.bruno@gmail.com"))?.teamId).toBe("frontend");
         expect((yield* store.getEnrollment("env-ana"))?.email).toBe("ent.test.ana@gmail.com");

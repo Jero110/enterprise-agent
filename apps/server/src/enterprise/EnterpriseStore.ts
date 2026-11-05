@@ -14,6 +14,14 @@ import * as ServerConfig from "../config.ts";
 
 export const normalizeEmail = (email: string): string => email.toLowerCase().trim();
 
+export interface IngestionRun {
+  readonly id: string;
+  readonly threadId: string;
+  readonly adminEmail: string;
+  readonly folder: string;
+  readonly status: "running" | "completed" | "failed";
+}
+
 export interface EnterpriseTeam {
   readonly id: string;
   readonly name: string;
@@ -79,6 +87,8 @@ export class EnterpriseStore extends Context.Service<
   EnterpriseStore,
   {
     /** Inserts what is missing; never overwrites what an admin changed. */
+    readonly saveIngestionRun: (run: IngestionRun) => Effect.Effect<void>;
+    readonly getIngestionRun: (threadId: string) => Effect.Effect<IngestionRun | null>;
     readonly listProposals: Effect.Effect<ReadonlyArray<KnowledgeProposal>>;
     readonly saveProposal: (proposal: KnowledgeProposal) => Effect.Effect<void>;
     readonly seed: (seed: EnterpriseSeed) => Effect.Effect<void>;
@@ -397,6 +407,34 @@ const make = Effect.gen(function* () {
       Effect.orDie,
     );
 
+  const saveIngestionRun: EnterpriseStore["Service"]["saveIngestionRun"] = (run) =>
+    sql`INSERT INTO enterprise_ingestion_runs (id, thread_id, admin_email, folder, status)
+      VALUES (${run.id}, ${run.threadId}, ${normalizeEmail(run.adminEmail)}, ${run.folder}, ${run.status})
+      ON CONFLICT (id) DO UPDATE SET status = excluded.status`.pipe(Effect.asVoid, Effect.orDie);
+  const getIngestionRun: EnterpriseStore["Service"]["getIngestionRun"] = (threadId) =>
+    sql<{
+      id: string;
+      thread_id: string;
+      admin_email: string;
+      folder: string;
+      status: IngestionRun["status"];
+    }>`
+      SELECT * FROM enterprise_ingestion_runs WHERE thread_id = ${threadId}
+    `.pipe(
+      Effect.map((rows) =>
+        rows[0] === undefined
+          ? null
+          : {
+              id: rows[0].id,
+              threadId: rows[0].thread_id,
+              adminEmail: rows[0].admin_email,
+              folder: rows[0].folder,
+              status: rows[0].status,
+            },
+      ),
+      Effect.orDie,
+    );
+
   const listProposals = sql<{
     payload: string;
   }>`SELECT payload FROM enterprise_knowledge_proposals ORDER BY rowid DESC`.pipe(
@@ -409,6 +447,8 @@ const make = Effect.gen(function* () {
       ON CONFLICT (id) DO UPDATE SET payload = excluded.payload`.pipe(Effect.asVoid, Effect.orDie);
 
   return EnterpriseStore.of({
+    saveIngestionRun,
+    getIngestionRun,
     listProposals,
     saveProposal,
     seed,
