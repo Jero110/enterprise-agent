@@ -83,6 +83,15 @@ describe("EnterpriseHub", () => {
       });
       expect(yield* codeOf(hub.ingestionPropose("thread-2", proposal))).toBe("access_denied");
       expect(yield* codeOf(hub.ingestionList("thread-2"))).toBe("access_denied");
+      yield* store.saveIngestionRun({
+        id: "run-1",
+        threadId: "thread-1",
+        adminEmail: JERO,
+        folder: "/source",
+        status: "failed",
+      });
+      expect(yield* codeOf(hub.ingestionList("thread-1"))).toBe("access_denied");
+      expect(yield* codeOf(hub.ingestionPropose("thread-1", proposal))).toBe("access_denied");
     }).pipe(Effect.provide(layer)),
   );
 
