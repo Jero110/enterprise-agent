@@ -18,8 +18,10 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Checkbox } from "../ui/checkbox";
 import { toastManager } from "../ui/toast";
 import { SettingsRow, SettingsSection } from "../settings/settingsLayout";
+import { approveBatch } from "./approveBatch";
 
 export function ApprovalCount() {
   const { environmentId, identity } = useEnterpriseStatus();
@@ -36,13 +38,53 @@ export function ApprovalsInbox({ environmentId }: { readonly environmentId: Envi
   const inbox = useEnvironmentQuery(
     enterpriseEnvironment.proposalInbox({ environmentId, input: {} }),
   );
+  const canDecide = useAtomValue(
+    enterpriseEnvironment.proposalDecide.permissionAtom(environmentId),
+  );
+  const decide = useAtomCommand(enterpriseEnvironment.proposalDecide, {
+    label: "approve knowledge proposal",
+    reportFailure: false,
+  });
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const pending = inbox.data?.proposals.filter((proposal) => proposal.status === "pending") ?? [];
+  const selectedPending = pending.filter((proposal) => selected.has(proposal.id));
+  const runBatch = async () => {
+    if (busy || !canDecide) return;
+    setBusy(true);
+    const result = await approveBatch(
+      selectedPending.map((proposal) => proposal.id),
+      async (id) => {
+        const outcome = await decide({ environmentId, input: { id, action: "approve" } });
+        if (outcome._tag === "Success") return true;
+        if (!isAtomCommandInterrupted(outcome))
+          toastManager.add({
+            type: "error",
+            title: "Batch approval stopped",
+            description: enterpriseFailureMessage(squashAtomCommandFailure(outcome)),
+          });
+        return false;
+      },
+    );
+    setSelected((current) => new Set([...current].filter((id) => !result.approved.includes(id))));
+    setBusy(false);
+  };
   return (
     <SettingsSection
       title="Approvals inbox"
       headerAction={
-        <Button size="xs" variant="outline" onClick={inbox.refresh}>
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="xs"
+            disabled={!canDecide || busy || selectedPending.length === 0}
+            onClick={() => void runBatch()}
+          >
+            Approve selected ({selectedPending.length})
+          </Button>
+          <Button size="xs" variant="outline" onClick={inbox.refresh}>
+            Refresh
+          </Button>
+        </div>
       }
     >
       {inbox.error ? (
@@ -56,7 +98,21 @@ export function ApprovalsInbox({ environmentId }: { readonly environmentId: Envi
         />
       ) : (
         inbox.data.proposals.map((proposal) => (
-          <ProposalRow key={proposal.id} environmentId={environmentId} proposal={proposal} />
+          <ProposalRow
+            key={proposal.id}
+            environmentId={environmentId}
+            proposal={proposal}
+            selected={selected.has(proposal.id)}
+            batchBusy={busy}
+            onSelect={(checked) =>
+              setSelected((current) => {
+                const next = new Set(current);
+                if (checked) next.add(proposal.id);
+                else next.delete(proposal.id);
+                return next;
+              })
+            }
+          />
         ))
       )}
     </SettingsSection>
@@ -86,9 +142,15 @@ function CurrentDocument({
 function ProposalRow({
   environmentId,
   proposal,
+  selected,
+  batchBusy,
+  onSelect,
 }: {
   readonly environmentId: EnvironmentId;
   readonly proposal: KnowledgeProposal;
+  readonly selected: boolean;
+  readonly batchBusy: boolean;
+  readonly onSelect: (checked: boolean) => void;
 }) {
   const canDecide = useAtomValue(
     enterpriseEnvironment.proposalDecide.permissionAtom(environmentId),
@@ -120,9 +182,19 @@ function ProposalRow({
       title={`${proposal.kind} · ${proposal.path || proposal.scope}`}
       description={`${proposal.proposedBy} · ${proposal.status}${proposal.targetScope ? ` → ${proposal.targetScope}` : ""}`}
       control={
-        <Button size="xs" variant="outline" onClick={() => setExpanded(!expanded)}>
-          {expanded ? "Hide" : "Review"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {proposal.status === "pending" ? (
+            <Checkbox
+              aria-label={`Select ${proposal.path || proposal.scope}`}
+              checked={selected}
+              disabled={batchBusy || !canDecide}
+              onCheckedChange={onSelect}
+            />
+          ) : null}
+          <Button size="xs" variant="outline" onClick={() => setExpanded(!expanded)}>
+            {expanded ? "Hide" : "Review"}
+          </Button>
+        </div>
       }
     >
       {expanded ? (
@@ -149,7 +221,11 @@ function ProposalRow({
           ) : null}
           {proposal.status === "pending" ? (
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="xs" disabled={busy || !canDecide} onClick={() => void run("approve")}>
+              <Button
+                size="xs"
+                disabled={busy || batchBusy || !canDecide}
+                onClick={() => void run("approve")}
+              >
                 Approve
               </Button>
               <Input
@@ -158,12 +234,12 @@ function ProposalRow({
                 placeholder="Reason for rejection"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
-                disabled={busy || !canDecide}
+                disabled={busy || batchBusy || !canDecide}
               />
               <Button
                 size="xs"
                 variant="destructive-outline"
-                disabled={busy || !canDecide || !reason.trim()}
+                disabled={busy || batchBusy || !canDecide || !reason.trim()}
                 onClick={() => void run("reject")}
               >
                 Reject
@@ -173,7 +249,7 @@ function ProposalRow({
             <Button
               size="xs"
               variant="destructive-outline"
-              disabled={busy || !canDecide}
+              disabled={busy || batchBusy || !canDecide}
               onClick={() => void run("revert")}
             >
               Revert

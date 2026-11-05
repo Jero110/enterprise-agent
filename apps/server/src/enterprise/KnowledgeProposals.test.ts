@@ -57,6 +57,10 @@ describe("KnowledgeProposals", () => {
       const proposals = yield* KnowledgeProposals.KnowledgeProposals;
       const repo = yield* KnowledgeRepo.KnowledgeRepo;
       const p = yield* proposals.propose(BRUNO, create);
+      const second = yield* proposals.propose(BRUNO, {
+        ...create,
+        path: "areas/ledger/second.md",
+      });
       expect(p).toMatchObject({ baseContentHash: "absent" });
       expect((yield* proposals.inbox(ANA)).proposals.map((p) => p.id)).toContain(p.id);
       expect((yield* proposals.inbox(GERRY)).proposals).toEqual([]);
@@ -65,6 +69,9 @@ describe("KnowledgeProposals", () => {
       );
       const applied = yield* proposals.decide(ANA, { id: p.id, action: "approve" });
       expect(applied.status).toBe("applied");
+      const secondApplied = yield* proposals.decide(ANA, { id: second.id, action: "approve" });
+      expect(secondApplied.commit).toBeDefined();
+      expect(secondApplied.commit).not.toBe(applied.commit);
       expect((yield* repo.documents).find((d) => d.id === create.path)?.content).toBe(
         create.content,
       );
@@ -72,7 +79,7 @@ describe("KnowledgeProposals", () => {
       const runner = yield* ProcessRunner.ProcessRunner;
       const log = yield* runner.run({
         command: "git",
-        args: ["log", "-1", "--format=%B"],
+        args: ["log", "-2", "--format=%B"],
         cwd: `${config.baseDir}/enterprise/knowledge`,
       });
       for (const trailer of [
