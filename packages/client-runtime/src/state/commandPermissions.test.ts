@@ -14,12 +14,14 @@ import {
   AuthPreviewOperateScope,
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
+  EnterpriseError,
   ThreadId,
   EnvironmentId,
   ORCHESTRATION_V2_WS_METHODS,
   ScheduledTaskId,
   WS_METHODS,
   type AuthSessionState,
+  type EnterpriseIdentity,
   type PeerLinkSummary,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -32,6 +34,7 @@ import { EnvironmentRegistry } from "../connection/registry.ts";
 import { createCommandPermissions } from "./commandPermissions.ts";
 import { createEnvironmentRpcCommand } from "./runtime.ts";
 import { AVAILABLE_CONNECTION_STATE, BearerConnectionTarget } from "../connection/model.ts";
+import { createEnterpriseEnvironmentAtoms } from "./enterprise.ts";
 import { createPeerLinkEnvironmentAtoms } from "./peerLinks.ts";
 
 vi.mock("./session.ts", () => ({
@@ -484,6 +487,108 @@ it.effect(
         expect(yield* readLinks).toEqual({ links: [] });
       }),
     ),
+);
+
+it.effect("connecting shows the identity and disconnecting clears it with the member list", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const registry = yield* setup;
+      const identity: EnterpriseIdentity = {
+        email: "ent.test.ana@gmail.com",
+        displayName: "Ana",
+        teamId: "ledger",
+        teamName: "Ledger",
+        role: "admin",
+        hubEnvironmentId: EnvironmentId.make("hub"),
+      };
+      const notConnected = new EnterpriseError({
+        code: "not_connected",
+        message: "Connect first.",
+      });
+      let connected: EnterpriseIdentity | null = null;
+      const client = {
+        [WS_METHODS.enterpriseStatus]: () => Effect.sync(() => ({ identity: connected })),
+        [WS_METHODS.enterpriseMembersList]: () =>
+          connected === null
+            ? Effect.fail(notConnected)
+            : Effect.succeed({ members: [], teams: [{ id: "ledger", name: "Ledger" }] }),
+        [WS_METHODS.enterpriseConnect]: vi.fn(() =>
+          Effect.sync(() => {
+            connected = identity;
+            return identity;
+          }),
+        ),
+        [WS_METHODS.enterpriseDisconnect]: vi.fn(() =>
+          Effect.sync(() => {
+            connected = null;
+            return { disconnected: true };
+          }),
+        ),
+      };
+      const supervisor = {
+        target: new BearerConnectionTarget({
+          environmentId: env,
+          label: "Test",
+          connectionId: "test",
+        }),
+        session: yield* SubscriptionRef.make(Option.some({ client } as unknown as RpcSession)),
+        state: yield* SubscriptionRef.make({
+          ...AVAILABLE_CONNECTION_STATE,
+          phase: "connected" as const,
+        }),
+      } as EnvironmentSupervisor["Service"];
+      const enterpriseRuntime = Atom.runtime(
+        Layer.succeed(EnvironmentRegistry, {
+          run: (_id, effect) => Effect.provideService(effect, EnvironmentSupervisor, supervisor),
+          followStream: (_id, stream) =>
+            Stream.provideService(stream, EnvironmentSupervisor, supervisor),
+        } as EnvironmentRegistry["Service"]),
+      );
+      const enterprise = createEnterpriseEnvironmentAtoms(enterpriseRuntime);
+      const status = enterprise.status({ environmentId: env, input: {} });
+      const members = enterprise.members({ environmentId: env, input: {} });
+      registry.mount(status);
+      registry.mount(members);
+      const readStatus = AtomRegistry.getResult(registry, status, { suspendOnWaiting: true });
+      const readMembers = AtomRegistry.getResult(registry, members, { suspendOnWaiting: true });
+      const setAccess = (writable: boolean) => {
+        const scopes = [AuthAccessReadScope, ...(writable ? [AuthAccessWriteScope] : [])];
+        registry.set(
+          sessions(env),
+          AsyncResult.success({ ...grant(false), scopes, permissions: scopes }),
+        );
+      };
+      const connectInput = {
+        link: {
+          url: "https://hub.example.test",
+          pairingCode: "code",
+          access: "read-only" as const,
+        },
+        email: identity.email,
+        token: "ACME-BANK-DEV-2026",
+      };
+      const connect = Effect.promise(() =>
+        enterprise.connect.run(registry, { environmentId: env, input: connectInput }),
+      );
+      const disconnect = Effect.promise(() =>
+        enterprise.disconnect.run(registry, { environmentId: env, input: {} }),
+      );
+
+      setAccess(false);
+      expect(yield* readStatus).toEqual({ identity: null });
+      expect((yield* connect)._tag).toBe("Failure");
+      expect(client[WS_METHODS.enterpriseConnect]).not.toHaveBeenCalled();
+
+      setAccess(true);
+      expect((yield* connect)._tag).toBe("Success");
+      expect(yield* readStatus).toEqual({ identity });
+      expect((yield* readMembers).teams).toHaveLength(1);
+
+      expect((yield* disconnect)._tag).toBe("Success");
+      expect(yield* readStatus).toEqual({ identity: null });
+      expect(AsyncResult.isFailure(registry.get(members))).toBe(true);
+    }),
+  ),
 );
 
 it.effect("requires access management to answer a link request", () =>
