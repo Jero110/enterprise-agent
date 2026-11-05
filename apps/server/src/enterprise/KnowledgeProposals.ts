@@ -34,13 +34,22 @@ export class KnowledgeProposals extends Context.Service<
   }
 >()("t3/enterprise/KnowledgeProposals") {}
 
-const canApprove = (member: EnterpriseStore.EnterpriseMember, proposal: KnowledgeProposal) =>
-  member.role === "admin" ||
-  (member.role === "lead" &&
-    proposal.kind !== "area-access" &&
-    proposal.scope !== "global" &&
-    member.teamId === proposal.scope &&
-    (proposal.targetScope === undefined || proposal.targetScope === member.teamId));
+const canApprove = (
+  member: EnterpriseStore.EnterpriseMember,
+  grants: ReadonlyArray<EnterpriseStore.EnterpriseAreaGrant>,
+  proposal: KnowledgeProposal,
+) => {
+  if (proposal.scope === "personal") return proposal.recipient === member.email;
+  if (member.role === "admin") return true;
+  if (proposal.kind === "area-access" || proposal.scope === "global") return false;
+  const lead = (areaId: string) =>
+    (member.teamId === areaId && member.role === "lead") ||
+    grants.some((grant) => grant.areaId === areaId && grant.role === "lead");
+  return (
+    lead(proposal.scope) &&
+    (proposal.targetScope === undefined || proposal.targetScope === proposal.scope)
+  );
+};
 const invalid = new EnterpriseError({
   code: "invalid_proposal",
   message: "Invalid proposal: check scope, markdown path, content, reason and target scope.",
@@ -73,6 +82,7 @@ export const layer = Layer.effect(
         return yield* invalid;
       if (input.scope !== "global" && (yield* store.getTeam(input.scope)) === null)
         return yield* invalid;
+      if (input.kind === "upload" || input.recipient !== undefined) return yield* invalid;
       if (input.kind === "area-access") {
         if (
           input.scope === "global" ||
@@ -113,7 +123,12 @@ export const layer = Layer.effect(
             )
         )
           return yield* invalid;
-        if (member.role !== "admin" && input.scope !== "global" && member.teamId !== input.scope)
+        if (
+          member.role !== "admin" &&
+          input.scope !== "global" &&
+          member.teamId !== input.scope &&
+          !(yield* store.listGrants(member.email)).some((grant) => grant.areaId === input.scope)
+        )
           return yield* denied;
         const docs = yield* repo.documents;
         const doc = docs.find((d) => d.id === input.path);
@@ -195,10 +210,46 @@ export const layer = Layer.effect(
       input: KnowledgeProposalInboxInput = {},
     ) {
       const member = yield* memberOf(email);
-      const proposals = (yield* store.listProposals).filter((p) => canApprove(member, p));
+      const grants = yield* store.listGrants(member.email);
+      const visible = (yield* store.listProposals).filter(
+        (p) =>
+          (p.scope === "global" ||
+            p.scope === "personal" ||
+            (p.kind === "area-access" && p.proposedBy === member.email) ||
+            member.role === "admin" ||
+            member.teamId === p.scope ||
+            grants.some((grant) => grant.areaId === p.scope)) &&
+          (p.proposedBy === member.email || canApprove(member, grants, p)),
+      );
+      const pendingCount = visible.filter(
+        (p) => p.status === "pending" && canApprove(member, grants, p),
+      ).length;
+      if (input.countOnly) return { proposals: [], pendingCount };
+      const members = (yield* store.listMembers).filter((m) => m.authorized && !m.revoked);
+      const allGrants = yield* store.listAreaGrants;
+      const grantsByEmail = Map.groupBy(allGrants, (grant) => grant.email);
+      const reviewers = (p: KnowledgeProposal) =>
+        p.scope === "personal"
+          ? members
+              .filter((m) => m.email === p.recipient)
+              .map((m) => ({ email: m.email, role: "recipient" as const }))
+          : members.flatMap((m) =>
+              canApprove(m, grantsByEmail.get(m.email) ?? [], p)
+                ? [
+                    {
+                      email: m.email,
+                      role: (m.role === "admin" ? "admin" : "lead") as "admin" | "lead",
+                    },
+                  ]
+                : [],
+            );
       return {
-        proposals: input.countOnly ? [] : proposals,
-        pendingCount: proposals.filter((p) => p.status === "pending").length,
+        proposals: visible.map((p) => ({
+          ...p,
+          reviewers: reviewers(p),
+          canDecide: p.status === "pending" && canApprove(member, grants, p),
+        })),
+        pendingCount,
       };
     });
     const decide = Effect.fn("KnowledgeProposals.decide")(
@@ -210,7 +261,14 @@ export const layer = Layer.effect(
             code: "proposal_not_found",
             message: "Proposal not found.",
           });
-        if (!canApprove(member, proposal)) return yield* denied;
+        if (!canApprove(member, yield* store.listGrants(member.email), proposal)) {
+          if (proposal.scope === "personal" && proposal.proposedBy !== member.email)
+            return yield* new EnterpriseError({
+              code: "proposal_not_found",
+              message: "Proposal not found.",
+            });
+          return yield* denied;
+        }
         if (
           input.action === "revert" ? proposal.status !== "applied" : proposal.status !== "pending"
         )
@@ -229,6 +287,16 @@ export const layer = Layer.effect(
             resolvedAt: yield* now,
           };
         } else if (input.action === "approve") {
+          if (proposal.kind === "upload") {
+            updated = {
+              ...proposal,
+              status: "approved-awaiting-processing",
+              resolvedBy: member.email,
+              resolvedAt: yield* now,
+            };
+            yield* store.saveProposal(updated);
+            return updated;
+          }
           const commit = yield* repo.apply(proposal, member.email).pipe(
             Effect.catchIf(
               (error) => error.code === "conflict",

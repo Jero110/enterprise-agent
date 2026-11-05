@@ -177,6 +177,38 @@ describe("EnterpriseHub", () => {
           }),
         ),
       ).toBe("unknown_team");
+      yield* hub.enroll("session-ana", { email: ANA, token: TOKEN });
+      yield* hub.enroll("session-bruno", {
+        email: "ent.test.bruno@gmail.com",
+        token: TOKEN,
+      });
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      yield* store.grantArea({ email: ANA, areaId: "frontend", role: "member", grantedBy: JERO });
+      const proposal = yield* hub.knowledgePropose("session-ana", {
+        kind: "create",
+        scope: "frontend",
+        path: "areas/frontend/hub-review.md",
+        content: "# Review",
+        reason: "Cross-team update",
+        evidence: [],
+      });
+      expect(
+        yield* codeOf(hub.proposalDecide("session-ana", { id: proposal.id, action: "approve" })),
+      ).toBe("access_denied");
+      expect((yield* hub.proposalInbox("session-bruno", {})).pendingCount).toBe(1);
+      yield* hub.authorize("session-jero", {
+        email: "ent.test.bruno@gmail.com",
+        displayName: "Bruno",
+        teamId: "frontend",
+        role: "member",
+      });
+      expect((yield* hub.proposalInbox("session-bruno", {})).pendingCount).toBe(0);
+      expect(
+        yield* codeOf(hub.proposalDecide("session-bruno", { id: proposal.id, action: "approve" })),
+      ).toBe("access_denied");
+      expect(
+        (yield* hub.proposalDecide("session-jero", { id: proposal.id, action: "approve" })).status,
+      ).toBe("applied");
     }).pipe(Effect.provide(layer)),
   );
 

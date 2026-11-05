@@ -63,8 +63,19 @@ describe("KnowledgeProposals", () => {
       });
       expect(p).toMatchObject({ baseContentHash: "absent" });
       expect((yield* proposals.inbox(ANA)).proposals.map((p) => p.id)).toContain(p.id);
+      expect((yield* proposals.inbox(BRUNO)).proposals.map((proposal) => proposal.id)).toContain(
+        p.id,
+      );
+      expect((yield* proposals.inbox(BRUNO)).pendingCount).toBe(0);
+      expect((yield* proposals.inbox(BRUNO)).proposals[0]).toMatchObject({
+        canDecide: false,
+        reviewers: expect.arrayContaining([{ email: ANA, role: "lead" }]),
+      });
       expect((yield* proposals.inbox(GERRY)).proposals).toEqual([]);
       expect(yield* codeOf(proposals.decide(GERRY, { id: p.id, action: "approve" }))).toBe(
+        "access_denied",
+      );
+      expect(yield* codeOf(proposals.decide(BRUNO, { id: p.id, action: "approve" }))).toBe(
         "access_denied",
       );
       const applied = yield* proposals.decide(ANA, { id: p.id, action: "approve" });
@@ -94,6 +105,84 @@ describe("KnowledgeProposals", () => {
           (row) => row.id === p.id,
         )?.status,
       ).toBe("applied");
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect(
+    "shows personal proposals only to their recipient and author, and reserves decisions for recipient",
+    () =>
+      Effect.gen(function* () {
+        const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+        const store = yield* EnterpriseStore.EnterpriseStore;
+        yield* store.saveProposal({
+          ...create,
+          id: "personal-upload",
+          kind: "upload",
+          scope: "personal",
+          recipient: ANA,
+          path: "",
+          proposedBy: BRUNO,
+          createdAt: "2026-01-01T00:00:00Z",
+          status: "pending",
+          baseContentHash: "absent",
+          baseVersion: "",
+          targetVersion: "",
+        });
+        expect((yield* proposals.inbox(BRUNO)).proposals).toMatchObject([
+          {
+            id: "personal-upload",
+            canDecide: false,
+            reviewers: [{ email: ANA, role: "recipient" }],
+          },
+        ]);
+        expect((yield* proposals.inbox(ANA)).pendingCount).toBe(1);
+        expect((yield* proposals.inbox(GERRY)).proposals).toEqual([]);
+        expect(
+          yield* codeOf(proposals.decide(GERRY, { id: "personal-upload", action: "approve" })),
+        ).toBe("proposal_not_found");
+        expect(
+          yield* codeOf(proposals.decide(GERRY, { id: "not-a-proposal", action: "approve" })),
+        ).toBe("proposal_not_found");
+        expect(
+          yield* codeOf(proposals.decide(ADMIN, { id: "personal-upload", action: "approve" })),
+        ).toBe("proposal_not_found");
+        expect(
+          yield* codeOf(proposals.decide(BRUNO, { id: "personal-upload", action: "approve" })),
+        ).toBe("access_denied");
+        expect(
+          (yield* proposals.decide(ANA, { id: "personal-upload", action: "approve" })).status,
+        ).toBe("approved-awaiting-processing");
+        expect((yield* proposals.inbox(BRUNO)).proposals[0]?.status).toBe(
+          "approved-awaiting-processing",
+        );
+      }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("uses independent area roles for review and rechecks grants on every decision", () =>
+    Effect.gen(function* () {
+      const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      yield* store.grantArea({ email: ANA, areaId: "frontend", role: "member", grantedBy: ADMIN });
+      const ledger = yield* proposals.propose(BRUNO, create);
+      const frontend = yield* proposals.propose(ANA, {
+        ...create,
+        scope: "frontend",
+        path: "areas/frontend/context.md",
+      });
+      expect((yield* proposals.inbox(ANA)).proposals.map((p) => p.id)).toContain(frontend.id);
+      expect((yield* proposals.inbox(ANA)).pendingCount).toBe(1);
+      expect(yield* codeOf(proposals.decide(ANA, { id: frontend.id, action: "approve" }))).toBe(
+        "access_denied",
+      );
+      yield* store.grantArea({ email: ANA, areaId: "frontend", role: "lead", grantedBy: ADMIN });
+      expect((yield* proposals.inbox(ANA)).pendingCount).toBe(2);
+      yield* store.revokeArea(ANA, "frontend");
+      expect((yield* proposals.inbox(ANA)).proposals.map((p) => p.id)).not.toContain(frontend.id);
+      expect(yield* codeOf(proposals.decide(ANA, { id: frontend.id, action: "approve" }))).toBe(
+        "access_denied",
+      );
+      yield* proposals.decide(ADMIN, { id: frontend.id, action: "approve" });
+      yield* proposals.decide(ANA, { id: ledger.id, action: "approve" });
     }).pipe(Effect.provide(layer)),
   );
 
@@ -272,24 +361,32 @@ describe("KnowledgeProposals", () => {
           evidence: [],
         });
         expect(yield* store.listGrants(GERRY)).toEqual([]);
+        expect((yield* proposals.inbox(GERRY)).proposals).toMatchObject([
+          { id: p.id, canDecide: false },
+        ]);
         expect(yield* codeOf(proposals.decide(ANA, { id: p.id, action: "approve" }))).toBe(
           "access_denied",
         );
         yield* proposals.decide(ADMIN, { id: p.id, action: "approve" });
         expect((yield* store.listGrants(GERRY)).map((g) => g.areaId)).toContain("ledger");
-        for (const input of [
-          { ...create, path: "areas/ledger/grant.md" },
-          { ...create, kind: "update" as const, path: "areas/ledger/README.md" },
-          { ...create, kind: "delete" as const, path: "areas/ledger/README.md" },
-          {
-            ...create,
-            kind: "move-scope" as const,
-            path: "areas/ledger/README.md",
-            targetScope: "frontend",
-          },
-        ])
-          expect(yield* codeOf(proposals.propose(GERRY, input))).toBe("access_denied");
+        expect(
+          yield* codeOf(proposals.propose(GERRY, { ...create, path: "areas/ledger/grant.md" })),
+        ).toBe("ok");
+        expect(
+          yield* codeOf(
+            proposals.propose(GERRY, {
+              ...create,
+              kind: "update",
+              path: "areas/ledger/missing.md",
+            }),
+          ),
+        ).toBe("invalid_proposal");
         yield* proposals.decide(ADMIN, { id: p.id, action: "revert" });
+        expect(
+          yield* codeOf(
+            proposals.propose(GERRY, { ...create, path: "areas/ledger/after-revert.md" }),
+          ),
+        ).toBe("access_denied");
         expect(yield* store.listGrants(GERRY)).toEqual([]);
       }).pipe(Effect.provide(layer)),
   );

@@ -49,6 +49,7 @@ export interface EnterpriseEnrollment {
 export interface EnterpriseAreaGrant {
   readonly email: string;
   readonly areaId: string;
+  readonly role: "lead" | "member";
   readonly grantedAt: DateTime.Utc;
   readonly grantedBy: string;
 }
@@ -118,10 +119,12 @@ export class EnterpriseStore extends Context.Service<
     readonly grantArea: (input: {
       readonly email: string;
       readonly areaId: string;
+      readonly role?: "lead" | "member";
       readonly grantedBy: string;
     }) => Effect.Effect<void>;
     readonly revokeArea: (email: string, areaId: string) => Effect.Effect<void>;
     readonly listGrants: (email: string) => Effect.Effect<ReadonlyArray<EnterpriseAreaGrant>>;
+    readonly listAreaGrants: Effect.Effect<ReadonlyArray<EnterpriseAreaGrant>>;
   }
 >()("t3/enterprise/EnterpriseStore") {}
 
@@ -152,6 +155,7 @@ interface EnrollmentRow {
 interface GrantRow {
   readonly email: string;
   readonly area_id: string;
+  readonly role: "lead" | "member";
   readonly granted_at: string;
   readonly granted_by: string;
 }
@@ -183,6 +187,7 @@ const toEnrollment = (row: EnrollmentRow): EnterpriseEnrollment => ({
 const toGrant = (row: GrantRow): EnterpriseAreaGrant => ({
   email: row.email,
   areaId: row.area_id,
+  role: row.role,
   grantedAt: DateTime.makeUnsafe(row.granted_at),
   grantedBy: row.granted_by,
 });
@@ -387,8 +392,10 @@ const make = Effect.gen(function* () {
     function* (input) {
       const now = yield* nowIso;
       yield* sql`
-      INSERT OR REPLACE INTO enterprise_area_grants (email, area_id, granted_at, granted_by)
-      VALUES (${normalizeEmail(input.email)}, ${input.areaId}, ${now}, ${input.grantedBy})
+      INSERT INTO enterprise_area_grants (email, area_id, role, granted_at, granted_by)
+      VALUES (${normalizeEmail(input.email)}, ${input.areaId}, ${input.role ?? "member"}, ${now}, ${input.grantedBy})
+      ON CONFLICT (email, area_id) DO UPDATE SET role = excluded.role,
+        granted_at = excluded.granted_at, granted_by = excluded.granted_by
     `.pipe(Effect.orDie);
     },
   );
@@ -406,6 +413,11 @@ const make = Effect.gen(function* () {
       Effect.map((rows) => rows.map(toGrant)),
       Effect.orDie,
     );
+
+  const listAreaGrants = sql<GrantRow>`SELECT * FROM enterprise_area_grants`.pipe(
+    Effect.map((rows) => rows.map(toGrant)),
+    Effect.orDie,
+  );
 
   const saveIngestionRun: EnterpriseStore["Service"]["saveIngestionRun"] = (run) =>
     sql`INSERT INTO enterprise_ingestion_runs (id, thread_id, admin_email, folder, status)
@@ -469,6 +481,7 @@ const make = Effect.gen(function* () {
     grantArea,
     revokeArea,
     listGrants,
+    listAreaGrants,
   });
 });
 

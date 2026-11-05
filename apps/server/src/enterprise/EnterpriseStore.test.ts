@@ -105,6 +105,12 @@ describe("EnterpriseStore", () => {
           areaId: "ledger",
           grantedBy: "jeronimo.deli@gmail.com",
         });
+        yield* store.grantArea({
+          email: "ent.test.ana@gmail.com",
+          areaId: "frontend",
+          role: "member",
+          grantedBy: "jeronimo.deli@gmail.com",
+        });
       }).pipe(Effect.provide(layerStoreAt(dbPath)), Effect.scoped);
 
       yield* Effect.gen(function* () {
@@ -120,7 +126,12 @@ describe("EnterpriseStore", () => {
         expect(yield* store.listMembers).toHaveLength(20);
         expect((yield* store.getMember("ent.test.bruno@gmail.com"))?.teamId).toBe("frontend");
         expect((yield* store.getEnrollment("env-ana"))?.email).toBe("ent.test.ana@gmail.com");
-        expect(yield* store.listGrants("ent.test.gerry@gmail.com")).toHaveLength(1);
+        expect(yield* store.listGrants("ent.test.gerry@gmail.com")).toMatchObject([
+          { areaId: "ledger", role: "member" },
+        ]);
+        expect(yield* store.listGrants("ent.test.ana@gmail.com")).toMatchObject([
+          { areaId: "frontend", role: "member" },
+        ]);
         expect(yield* store.listProposals).toMatchObject([
           { id: "durable-request", status: "pending", evidence: ["thread:gerry/1"] },
         ]);
