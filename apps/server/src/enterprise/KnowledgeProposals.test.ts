@@ -42,6 +42,16 @@ const create = {
 } as const;
 
 describe("KnowledgeProposals", () => {
+  it.effect("does not duplicate identical pending create proposals", () =>
+    Effect.gen(function* () {
+      const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+      const first = yield* proposals.propose(BRUNO, create);
+      const second = yield* proposals.propose(BRUNO, create);
+      expect(second.id).toBe(first.id);
+      expect((yield* proposals.inbox(ANA)).pendingCount).toBe(1);
+    }).pipe(Effect.provide(layer)),
+  );
+
   it.effect("persists a proposal, scopes the inbox and commits approval with provenance", () =>
     Effect.gen(function* () {
       const proposals = yield* KnowledgeProposals.KnowledgeProposals;

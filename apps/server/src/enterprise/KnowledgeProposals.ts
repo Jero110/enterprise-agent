@@ -137,6 +137,20 @@ export const layer = Layer.effect(
             });
         } else if (input.targetScope !== undefined) return yield* invalid;
       }
+      if (input.kind === "create") {
+        const existing = (yield* store.listProposals).find(
+          (proposal) =>
+            proposal.status === "pending" &&
+            proposal.kind === "create" &&
+            proposal.proposedBy === member.email &&
+            proposal.scope === input.scope &&
+            proposal.path === input.path &&
+            proposal.content === input.content &&
+            proposal.reason === input.reason &&
+            JSON.stringify(proposal.evidence) === JSON.stringify(input.evidence),
+        );
+        if (existing !== undefined) return existing;
+      }
       const target =
         input.kind === "move-scope"
           ? (input.targetScope === "global" ? "global/" : `areas/${input.targetScope}/`) +
