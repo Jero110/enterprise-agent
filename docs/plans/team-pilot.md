@@ -1,3 +1,5 @@
+Superseded by docs/plans/enterprise-base.md
+
 # Jero & Gerry Enterprise Team Pilot
 
 **Plan:** docs/plans/team-pilot.md · **Planned:** 2026-11-04 · **Branch:** main
