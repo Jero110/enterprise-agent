@@ -106,6 +106,10 @@ export class ServerConfig extends Context.Service<
     readonly logWebSocketEvents: boolean;
     readonly tailscaleServeEnabled: boolean;
     readonly tailscaleServePort: number;
+    /** Hub mode (`T3CODE_ENTERPRISE_HUB=1`): this server keeps the enterprise store. */
+    readonly enterpriseHub?: boolean | undefined;
+    /** Seed file the hub loads into the store at startup (`T3CODE_ENTERPRISE_SEED`). */
+    readonly enterpriseSeedPath?: string | undefined;
   }
 >()("t3/config/ServerConfig") {
   static readonly layerTest = (

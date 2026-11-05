@@ -2,7 +2,8 @@ import * as Schema from "effect/Schema";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
-export const AreaId = Schema.Literals(["general", "auth", "no-mail"]);
+/** `general` or a team id. */
+export const AreaId = TrimmedNonEmptyString;
 export type AreaId = typeof AreaId.Type;
 
 export const AreaRequestStatus = Schema.Literals(["pending", "approved", "denied"]);

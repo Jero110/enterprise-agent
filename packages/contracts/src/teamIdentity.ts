@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
-export const TeamMemberRole = Schema.Literals(["admin", "member"]);
+export const TeamMemberRole = Schema.Literals(["admin", "lead", "member"]);
 export type TeamMemberRole = typeof TeamMemberRole.Type;
 
 export const VerifiedIdentitySource = Schema.Literals(["google", "anonymous-dev"]);

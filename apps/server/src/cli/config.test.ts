@@ -258,6 +258,46 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
     }),
   );
 
+  it.effect("turns hub mode on only with T3CODE_ENTERPRISE_HUB", () =>
+    Effect.gen(function* () {
+      const baseDir = yield* FileSystem.FileSystem.pipe(
+        Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "t3-cli-enterprise-" })),
+      );
+      const flags = {
+        mode: Option.some("web" as const),
+        port: Option.some(8788),
+        host: Option.none<string>(),
+        baseDir: Option.some(baseDir),
+        cwd: Option.none<string>(),
+        devUrl: Option.none<URL>(),
+        noBrowser: Option.none<boolean>(),
+        bootstrapFd: Option.none<number>(),
+        autoBootstrapProjectFromCwd: Option.none<boolean>(),
+        logWebSocketEvents: Option.none<boolean>(),
+        tailscaleServeEnabled: Option.none<boolean>(),
+        tailscaleServePort: Option.none<number>(),
+        lan: Option.none<boolean>(),
+      };
+      const resolveWith = (env: Record<string, string>) =>
+        resolveServerConfig(flags, Option.none()).pipe(
+          Effect.provide(
+            Layer.mergeAll(ConfigProvider.layer(ConfigProvider.fromEnv({ env })), NetService.layer),
+          ),
+        );
+
+      const off = yield* resolveWith({});
+      const on = yield* resolveWith({
+        T3CODE_ENTERPRISE_HUB: "1",
+        T3CODE_ENTERPRISE_SEED: "/tmp/acme.seed.json",
+      });
+
+      expect(off.enterpriseHub).toBeUndefined();
+      expect(off.enterpriseSeedPath).toBeUndefined();
+      expect(on.enterpriseHub).toBe(true);
+      expect(on.enterpriseSeedPath).toBe("/tmp/acme.seed.json");
+    }),
+  );
+
   it.effect("does not expose an invalid reusable auth token", () =>
     Effect.gen(function* () {
       const secret = "short-secret";

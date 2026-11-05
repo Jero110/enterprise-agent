@@ -42,6 +42,8 @@ export class TeamEnrollmentError extends Schema.TaggedError<TeamEnrollmentError>
       "already_enrolled",
       "admin_required",
       "not_enrolled",
+      "not_authorized",
+      "team_mismatch",
     ]),
     message: Schema.String,
   },

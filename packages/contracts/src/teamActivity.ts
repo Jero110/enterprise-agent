@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { TeamMemberRole } from "./teamIdentity.ts";
 
 export const Team = Schema.Struct({
   id: TrimmedNonEmptyString,
@@ -15,6 +16,7 @@ export const TeamMemberInfo = Schema.Struct({
   displayName: TrimmedNonEmptyString,
   teamId: Schema.optionalKey(TrimmedNonEmptyString),
   teamName: Schema.optionalKey(TrimmedNonEmptyString),
+  role: Schema.optionalKey(TeamMemberRole),
   isAdmin: Schema.Boolean,
   isAnonymousDev: Schema.Boolean,
 });

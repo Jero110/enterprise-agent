@@ -1,0 +1,150 @@
+{
+  "enterprise": {
+    "name": "Acme Bank",
+    "token": "ACME-BANK-DEV-2026"
+  },
+  "teams": [
+    {
+      "id": "platform",
+      "name": "Platform"
+    },
+    {
+      "id": "ledger",
+      "name": "Ledger"
+    },
+    {
+      "id": "frontend",
+      "name": "Frontend"
+    },
+    {
+      "id": "accounts",
+      "name": "Accounts"
+    },
+    {
+      "id": "risk",
+      "name": "Risk"
+    }
+  ],
+  "members": [
+    {
+      "email": "jeronimo.deli@gmail.com",
+      "displayName": "Jero",
+      "teamId": "platform",
+      "role": "admin"
+    },
+    {
+      "email": "ent.test.ana@gmail.com",
+      "displayName": "Ana",
+      "teamId": "ledger",
+      "role": "lead"
+    },
+    {
+      "email": "ent.test.bruno@gmail.com",
+      "displayName": "Bruno",
+      "teamId": "ledger",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.carla@gmail.com",
+      "displayName": "Carla",
+      "teamId": "ledger",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.diego@gmail.com",
+      "displayName": "Diego",
+      "teamId": "ledger",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.elena@gmail.com",
+      "displayName": "Elena",
+      "teamId": "ledger",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.fede@gmail.com",
+      "displayName": "Fede",
+      "teamId": "ledger",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.gerry@gmail.com",
+      "displayName": "Gerry",
+      "teamId": "frontend",
+      "role": "lead"
+    },
+    {
+      "email": "ent.test.hugo@gmail.com",
+      "displayName": "Hugo",
+      "teamId": "frontend",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.ines@gmail.com",
+      "displayName": "Inés",
+      "teamId": "frontend",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.juan@gmail.com",
+      "displayName": "Juan",
+      "teamId": "frontend",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.karla@gmail.com",
+      "displayName": "Karla",
+      "teamId": "frontend",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.luis@gmail.com",
+      "displayName": "Luis",
+      "teamId": "accounts",
+      "role": "lead"
+    },
+    {
+      "email": "ent.test.mara@gmail.com",
+      "displayName": "Mara",
+      "teamId": "accounts",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.nico@gmail.com",
+      "displayName": "Nico",
+      "teamId": "accounts",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.olga@gmail.com",
+      "displayName": "Olga",
+      "teamId": "accounts",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.pablo@gmail.com",
+      "displayName": "Pablo",
+      "teamId": "platform",
+      "role": "lead"
+    },
+    {
+      "email": "ent.test.quique@gmail.com",
+      "displayName": "Quique",
+      "teamId": "platform",
+      "role": "member"
+    },
+    {
+      "email": "ent.test.rosa@gmail.com",
+      "displayName": "Rosa",
+      "teamId": "risk",
+      "role": "lead"
+    },
+    {
+      "email": "ent.test.sofi@gmail.com",
+      "displayName": "Sofi",
+      "teamId": "risk",
+      "role": "member"
+    }
+  ]
+}

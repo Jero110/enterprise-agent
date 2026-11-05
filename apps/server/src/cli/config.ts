@@ -163,6 +163,14 @@ const EnvServerConfig = Config.all({
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
+  enterpriseHub: Config.Boolean("T3CODE_ENTERPRISE_HUB").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
+  enterpriseSeedPath: Config.String("T3CODE_ENTERPRISE_SEED").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
   tailscaleServeEnabled: Config.Boolean("T3CODE_TAILSCALE_SERVE").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
@@ -523,6 +531,8 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     logWebSocketEvents,
     tailscaleServeEnabled,
     tailscaleServePort,
+    ...(env.enterpriseHub === true ? { enterpriseHub: true } : {}),
+    ...(env.enterpriseSeedPath === undefined ? {} : { enterpriseSeedPath: env.enterpriseSeedPath }),
   };
 
   return config;
