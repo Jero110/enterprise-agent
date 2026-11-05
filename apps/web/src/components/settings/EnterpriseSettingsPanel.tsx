@@ -18,6 +18,7 @@ import {
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { ConnectEnterpriseDialog } from "../enterprise/ConnectEnterpriseDialog";
+import { ApprovalsInbox } from "../enterprise/ApprovalsInbox";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
@@ -38,7 +39,10 @@ export function EnterpriseSettingsPanel() {
         )}
       </SettingsSection>
       {environmentId !== null && identity ? (
-        <YourContextSection environmentId={environmentId} />
+        <>
+          <YourContextSection environmentId={environmentId} />
+          <ApprovalsInbox environmentId={environmentId} />
+        </>
       ) : null}
       {environmentId !== null && identity?.role === "admin" ? (
         <MembersSection environmentId={environmentId} />

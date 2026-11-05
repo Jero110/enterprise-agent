@@ -37,6 +37,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
+import { ApprovalCount } from "../enterprise/ApprovalsInbox";
 import { Kbd } from "../ui/kbd";
 import {
   SidebarContent,
@@ -424,6 +425,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                                 >
                                   {SETTINGS_SECTION_LABELS[to]}
                                 </span>
+                                {to === "/settings/enterprise" ? <ApprovalCount /> : null}
                               </SidebarMenuButton>
                             </SidebarMenuItem>
                           );
