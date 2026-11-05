@@ -4,7 +4,9 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Console from "effect/Console";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Runtime from "effect/Runtime";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { ChildProcess, type ChildProcessSpawner } from "effect/process";
 import * as NodeURL from "node:url";
@@ -157,6 +159,27 @@ const printTable = Effect.fn("enterprise-dev.printTable")(function* () {
   );
 });
 
+// The hub has no web UI to flip Labs → Linked environments, and members cannot link without it.
+const SettingsJson = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown));
+const decodeSettings = Schema.decodeEffect(SettingsJson);
+const encodeSettings = Schema.encodeUnknownEffect(SettingsJson);
+const enableHubLinks = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const file = `${root}.t3/instances/hub/userdata/settings.json`;
+  const current = (yield* fs.readFileString(file).pipe(Effect.orElseSucceed(() => "{}"))) || "{}";
+  const settings = yield* decodeSettings(current).pipe(
+    Effect.orElseSucceed((): Record<string, unknown> => ({})),
+  );
+  yield* fs.makeDirectory(`${root}.t3/instances/hub/userdata`, { recursive: true });
+  yield* fs.writeFileString(
+    file,
+    yield* encodeSettings({
+      ...settings,
+      linkedEnvironmentsEnabled: true,
+    }),
+  );
+});
+
 const main = Effect.gen(function* () {
   if (unknown.length > 0 || members.length === 0) {
     yield* Console.error(
@@ -167,6 +190,7 @@ const main = Effect.gen(function* () {
   }
   yield* Effect.gen(function* () {
     const stopped = yield* Deferred.make<number>();
+    yield* enableHubLinks;
     yield* start(
       "hub",
       "-",
