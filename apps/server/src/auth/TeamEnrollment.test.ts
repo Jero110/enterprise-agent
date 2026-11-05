@@ -12,6 +12,7 @@ import { PREAUTHORIZED_ADMIN_EMAIL } from "@t3tools/contracts";
 
 import * as TeamEnrollment from "./TeamEnrollment.ts";
 import * as TeamIdentity from "./TeamIdentity.ts";
+import { layerSeededStore } from "../enterprise/EnterpriseStore.testkit.ts";
 import * as ServerConfig from "../config.ts";
 
 const baseLayer = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto);
@@ -34,6 +35,7 @@ const layerServerConfig = (overrides?: Partial<ServerConfig.ServerConfig["Servic
 const layerTeamEnrollment = (overrides?: Partial<ServerConfig.ServerConfig["Service"]>) =>
   TeamEnrollment.layer.pipe(
     Layer.provideMerge(TeamIdentity.layer),
+    Layer.provideMerge(layerSeededStore),
     Layer.provideMerge(layerServerConfig(overrides)),
     Layer.provideMerge(baseLayer),
   );
@@ -54,12 +56,12 @@ describe("TeamEnrollment", () => {
         });
 
         const invitation = yield* enrollment.createInvitation(adminIdentity, {
-          teamId: "team-1",
-          teamName: "Admin Team",
+          teamId: "ledger",
+          teamName: "Ledger",
         });
 
-        expect(invitation.teamId).toBe("team-1");
-        expect(invitation.teamName).toBe("Admin Team");
+        expect(invitation.teamId).toBe("ledger");
+        expect(invitation.teamName).toBe("Ledger");
         expect(invitation.status).toBe("active");
         expect(invitation.secret).toBeDefined();
       }).pipe(Effect.provide(layerTeamEnrollment())),
@@ -72,7 +74,7 @@ describe("TeamEnrollment", () => {
 
         const memberIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "member@example.com",
+            email: "ent.test.ana@gmail.com",
             sub: "google-member",
             name: "Member",
           }),
@@ -80,8 +82,8 @@ describe("TeamEnrollment", () => {
 
         const result = yield* enrollment
           .createInvitation(memberIdentity, {
-            teamId: "team-1",
-            teamName: "Admin Team",
+            teamId: "ledger",
+            teamName: "Ledger",
           })
           .pipe(Effect.exit);
 
@@ -105,13 +107,13 @@ describe("TeamEnrollment", () => {
         });
 
         const invitation = yield* enrollment.createInvitation(adminIdentity, {
-          teamId: "team-1",
-          teamName: "Admin Team",
+          teamId: "ledger",
+          teamName: "Ledger",
         });
 
         const memberIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "member@example.com",
+            email: "ent.test.ana@gmail.com",
             sub: "google-member",
             name: "Member",
           }),
@@ -121,7 +123,7 @@ describe("TeamEnrollment", () => {
           secret: invitation.secret,
         });
 
-        expect(result.teamId).toBe("team-1");
+        expect(result.teamId).toBe("ledger");
         expect(result.status).toBe("enrolled");
       }).pipe(Effect.provide(layerTeamEnrollment())),
     );
@@ -140,8 +142,8 @@ describe("TeamEnrollment", () => {
         });
 
         const invitation = yield* enrollment.createInvitation(adminIdentity, {
-          teamId: "team-1",
-          teamName: "Admin Team",
+          teamId: "ledger",
+          teamName: "Ledger",
           expiresInHours: 1,
         });
 
@@ -149,7 +151,7 @@ describe("TeamEnrollment", () => {
 
         const memberIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "member@example.com",
+            email: "ent.test.ana@gmail.com",
             sub: "google-member",
             name: "Member",
           }),
@@ -177,15 +179,15 @@ describe("TeamEnrollment", () => {
         });
 
         const invitation = yield* enrollment.createInvitation(adminIdentity, {
-          teamId: "team-1",
-          teamName: "Admin Team",
+          teamId: "ledger",
+          teamName: "Ledger",
         });
 
         yield* enrollment.revokeInvitation(adminIdentity, invitation.id);
 
         const memberIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "member@example.com",
+            email: "ent.test.ana@gmail.com",
             sub: "google-member",
             name: "Member",
           }),
@@ -213,14 +215,14 @@ describe("TeamEnrollment", () => {
         });
 
         const invitation = yield* enrollment.createInvitation(adminIdentity, {
-          teamId: "team-1",
-          teamName: "Admin Team",
+          teamId: "ledger",
+          teamName: "Ledger",
           maxUses: 1,
         });
 
         const member1 = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "member1@example.com",
+            email: "ent.test.bruno@gmail.com",
             sub: "google-member1",
             name: "Member 1",
           }),
@@ -230,7 +232,7 @@ describe("TeamEnrollment", () => {
 
         const member2 = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "member2@example.com",
+            email: "ent.test.carla@gmail.com",
             sub: "google-member2",
             name: "Member 2",
           }),
@@ -260,13 +262,13 @@ describe("TeamEnrollment", () => {
         });
 
         const invitation = yield* enrollment.createInvitation(adminIdentity, {
-          teamId: "team-1",
-          teamName: "Admin Team",
+          teamId: "ledger",
+          teamName: "Ledger",
         });
 
         const memberIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "member@example.com",
+            email: "ent.test.ana@gmail.com",
             sub: "google-member",
             name: "Member",
           }),
@@ -276,8 +278,8 @@ describe("TeamEnrollment", () => {
 
         const result = yield* enrollment.getEnrollment("env-1");
 
-        expect(result?.teamId).toBe("team-1");
-        expect(result?.teamName).toBe("Admin Team");
+        expect(result?.teamId).toBe("ledger");
+        expect(result?.teamName).toBe("Ledger");
       }).pipe(Effect.provide(layerTeamEnrollment())),
     );
 

@@ -3,7 +3,6 @@ import {
   type TeamMember,
   TeamIdentityError,
   type TeamMemberRole,
-  PREAUTHORIZED_ADMIN_EMAIL,
   ANONYMOUS_DEV_EMAIL,
   ANONYMOUS_DEV_DISPLAY_NAME,
   type AuthorizeMemberInput,
@@ -17,6 +16,7 @@ import * as Ref from "effect/Ref";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 
 import * as ServerConfig from "../config.ts";
+import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 
 const FAKE_TOKEN_PREFIX = "fake-google-token:";
 
@@ -40,15 +40,7 @@ const parseFakeGoogleToken = (token: string): FakeGoogleTokenPayload | null => {
 
 type SessionId = string;
 
-interface TeamIdentityState {
-  readonly authorizedMembers: HashMap.HashMap<string, TeamMember>;
-  readonly sessions: HashMap.HashMap<SessionId, VerifiedIdentity>;
-}
-
-const makeInitialState = (): TeamIdentityState => ({
-  authorizedMembers: HashMap.empty(),
-  sessions: HashMap.empty(),
-});
+type Sessions = HashMap.HashMap<SessionId, VerifiedIdentity>;
 
 export interface TeamIdentityService {
   readonly verifyGoogleToken: (input: {
@@ -84,17 +76,24 @@ export class TeamIdentity extends Context.Service<TeamIdentity, TeamIdentityServ
   "t3/auth/TeamIdentity",
 ) {}
 
-const normalizeEmail = (email: string): string => email.toLowerCase().trim();
+const normalizeEmail = EnterpriseStore.normalizeEmail;
 
-const isPreauthorizedAdmin = (email: string): boolean =>
-  normalizeEmail(email) === normalizeEmail(PREAUTHORIZED_ADMIN_EMAIL);
+const toTeamMember = (member: EnterpriseStore.EnterpriseMember): TeamMember => ({
+  email: member.email,
+  displayName: member.displayName,
+  role: member.role,
+  ...(member.teamId === null ? {} : { teamId: member.teamId }),
+  authorizedAt: member.authorizedAt,
+  authorizedBy: member.authorizedBy,
+});
 
 export const layer = Layer.effect(
   TeamIdentity,
   Effect.gen(function* () {
     const config = yield* ServerConfig.ServerConfig;
     const secureRandom = yield* SecureRandom.SecureRandom;
-    const stateRef = yield* Ref.make(makeInitialState());
+    const store = yield* EnterpriseStore.EnterpriseStore;
+    const sessionsRef = yield* Ref.make<Sessions>(HashMap.empty());
 
     const verifyGoogleToken: TeamIdentityService["verifyGoogleToken"] = Effect.fn(
       "TeamIdentity.verifyGoogleToken",
@@ -121,29 +120,15 @@ export const layer = Layer.effect(
     const canEnterTeam: TeamIdentityService["canEnterTeam"] = Effect.fn(
       "TeamIdentity.canEnterTeam",
     )(function* (identity) {
-      if (isPreauthorizedAdmin(identity.email)) {
-        return true;
-      }
-
-      const state = yield* Ref.get(stateRef);
-      return HashMap.has(state.authorizedMembers, normalizeEmail(identity.email));
+      return yield* store.canEnter(identity.email);
     });
 
     const getMemberRole: TeamIdentityService["getMemberRole"] = Effect.fn(
       "TeamIdentity.getMemberRole",
     )(function* (email) {
-      const normalizedEmail = normalizeEmail(email);
-
-      if (isPreauthorizedAdmin(normalizedEmail)) {
-        return "admin" as const;
-      }
-
-      const state = yield* Ref.get(stateRef);
-      const member = HashMap.get(state.authorizedMembers, normalizedEmail);
-      if (member._tag === "Some") {
-        return member.value.role;
-      }
-      return null;
+      if (!(yield* store.canEnter(email))) return null;
+      const member = yield* store.getMember(email);
+      return member?.role ?? null;
     });
 
     const authorizeMember: TeamIdentityService["authorizeMember"] = Effect.fn(
@@ -157,32 +142,21 @@ export const layer = Layer.effect(
         });
       }
 
-      const normalizedEmail = normalizeEmail(input.email);
-      const state = yield* Ref.get(stateRef);
-
-      if (HashMap.has(state.authorizedMembers, normalizedEmail)) {
+      if (yield* store.canEnter(input.email)) {
         return yield* new TeamIdentityError({
           code: "already_authorized",
           message: `Email ${input.email} is already authorized.`,
         });
       }
 
-      const now = yield* DateTime.now;
-      const member: TeamMember = {
-        email: normalizedEmail,
+      const member = yield* store.upsertMember({
+        email: input.email,
         displayName: input.displayName,
+        teamId: input.teamId ?? null,
         role: input.role,
-        ...(input.teamId !== undefined ? { teamId: input.teamId } : {}),
-        authorizedAt: now,
         authorizedBy: actor.email,
-      };
-
-      yield* Ref.update(stateRef, (s) => ({
-        ...s,
-        authorizedMembers: HashMap.set(s.authorizedMembers, normalizedEmail, member),
-      }));
-
-      return member;
+      });
+      return toTeamMember(member);
     });
 
     const deauthorizeMember: TeamIdentityService["deauthorizeMember"] = Effect.fn(
@@ -196,19 +170,14 @@ export const layer = Layer.effect(
         });
       }
 
-      const normalizedEmail = normalizeEmail(email);
-
-      if (isPreauthorizedAdmin(normalizedEmail)) {
+      if (normalizeEmail(email) === normalizeEmail(actor.email)) {
         return yield* new TeamIdentityError({
           code: "not_authorized",
-          message: "Cannot deauthorize the preauthorized admin.",
+          message: "Administrators cannot deauthorize themselves.",
         });
       }
 
-      yield* Ref.update(stateRef, (s) => ({
-        ...s,
-        authorizedMembers: HashMap.remove(s.authorizedMembers, normalizedEmail),
-      }));
+      yield* store.revokeMember(email);
     });
 
     const isDevelopment = config.devUrl !== undefined;
@@ -238,10 +207,7 @@ export const layer = Layer.effect(
     )(function* (identity) {
       const sessionId = yield* secureRandom.uuidV4();
 
-      yield* Ref.update(stateRef, (s) => ({
-        ...s,
-        sessions: HashMap.set(s.sessions, sessionId, identity),
-      }));
+      yield* Ref.update(sessionsRef, HashMap.set(sessionId, identity));
 
       return sessionId;
     });
@@ -249,13 +215,23 @@ export const layer = Layer.effect(
     const getSessionIdentity: TeamIdentityService["getSessionIdentity"] = Effect.fn(
       "TeamIdentity.getSessionIdentity",
     )(function* (sessionId) {
-      const state = yield* Ref.get(stateRef);
-      const identity = HashMap.get(state.sessions, sessionId);
+      const sessions = yield* Ref.get(sessionsRef);
+      const identity = HashMap.get(sessions, sessionId);
 
       if (identity._tag === "None") {
         return yield* new TeamIdentityError({
           code: "not_authorized",
           message: "Session not found or has been revoked.",
+        });
+      }
+
+      if (
+        identity.value.source !== "anonymous-dev" &&
+        !(yield* store.canEnter(identity.value.email))
+      ) {
+        return yield* new TeamIdentityError({
+          code: "not_authorized",
+          message: "This email is no longer authorized.",
         });
       }
 
@@ -265,10 +241,7 @@ export const layer = Layer.effect(
     const revokeSession: TeamIdentityService["revokeSession"] = Effect.fn(
       "TeamIdentity.revokeSession",
     )(function* (sessionId) {
-      yield* Ref.update(stateRef, (s) => ({
-        ...s,
-        sessions: HashMap.remove(s.sessions, sessionId),
-      }));
+      yield* Ref.update(sessionsRef, HashMap.remove(sessionId));
     });
 
     return {

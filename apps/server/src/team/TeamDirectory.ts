@@ -4,17 +4,17 @@ import {
   type TeamMemberInfo,
   type MemberUsage,
   TeamActivityError,
-  PREAUTHORIZED_ADMIN_EMAIL,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
-import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as HashMap from "effect/HashMap";
 import * as Ref from "effect/Ref";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 
-const normalizeEmail = (email: string): string => email.toLowerCase().trim();
+import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
+
+const normalizeEmail = EnterpriseStore.normalizeEmail;
 
 export interface DirectoryPrincipal {
   readonly email: string;
@@ -24,26 +24,7 @@ export interface DirectoryPrincipal {
   readonly teamId?: string;
 }
 
-interface StoredMember {
-  readonly email: string;
-  readonly displayName: string;
-  readonly isAdmin: boolean;
-  readonly isAnonymousDev: boolean;
-  readonly teamId?: string;
-  readonly registeredAt: DateTime.Utc;
-}
-
-interface TeamDirectoryState {
-  readonly teams: HashMap.HashMap<string, Team>;
-  readonly members: HashMap.HashMap<string, StoredMember>;
-  readonly usage: HashMap.HashMap<string, { conversations: number; tokens: number }>;
-}
-
-const makeInitialState = (): TeamDirectoryState => ({
-  teams: HashMap.empty(),
-  members: HashMap.empty(),
-  usage: HashMap.empty(),
-});
+type Usage = HashMap.HashMap<string, { conversations: number; tokens: number }>;
 
 export interface TeamDirectoryService {
   readonly getPrincipal: (identity: VerifiedIdentity) => Effect.Effect<DirectoryPrincipal>;
@@ -90,88 +71,64 @@ export const layer = Layer.effect(
   TeamDirectory,
   Effect.gen(function* () {
     const secureRandom = yield* SecureRandom.SecureRandom;
-    const stateRef = yield* Ref.make(makeInitialState());
+    const store = yield* EnterpriseStore.EnterpriseStore;
+    const usageRef = yield* Ref.make<Usage>(HashMap.empty());
+
+    const activeMember = Effect.fn("TeamDirectory.activeMember")(function* (email: string) {
+      if (!(yield* store.canEnter(email))) return null;
+      return yield* store.getMember(email);
+    });
 
     const getPrincipal: TeamDirectoryService["getPrincipal"] = Effect.fn(
       "TeamDirectory.getPrincipal",
     )(function* (identity) {
-      const email = normalizeEmail(identity.email);
-      const isAdmin = normalizeEmail(PREAUTHORIZED_ADMIN_EMAIL) === email;
-      const isAnonymousDev = identity.source === "anonymous-dev";
-
-      const state = yield* Ref.get(stateRef);
-      const member = HashMap.get(state.members, email);
-      const teamId = member._tag === "Some" ? member.value.teamId : undefined;
+      const member = yield* activeMember(identity.email);
 
       return {
         email: identity.email,
         displayName: identity.displayName,
-        isAdmin,
-        isAnonymousDev,
-        ...(teamId !== undefined ? { teamId } : {}),
+        isAdmin: member?.role === "admin",
+        isAnonymousDev: identity.source === "anonymous-dev",
+        ...(member?.teamId ? { teamId: member.teamId } : {}),
       };
     });
 
     const registerMember: TeamDirectoryService["registerMember"] = Effect.fn(
       "TeamDirectory.registerMember",
     )(function* (identity) {
-      const email = normalizeEmail(identity.email);
-      const isAdmin = normalizeEmail(PREAUTHORIZED_ADMIN_EMAIL) === email;
-      const isAnonymousDev = identity.source === "anonymous-dev";
-      const now = yield* DateTime.now;
-
-      const storedMember: StoredMember = {
-        email,
-        displayName: identity.displayName,
-        isAdmin,
-        isAnonymousDev,
-        registeredAt: now,
-      };
-
-      yield* Ref.update(stateRef, (s) => ({
-        ...s,
-        members: HashMap.set(s.members, email, storedMember),
-      }));
+      const member = yield* activeMember(identity.email);
+      const team = member?.teamId ? yield* store.getTeam(member.teamId) : null;
 
       return {
-        email,
-        displayName: identity.displayName,
-        isAdmin,
-        isAnonymousDev,
+        email: normalizeEmail(identity.email),
+        displayName: member?.displayName ?? identity.displayName,
+        isAdmin: member?.role === "admin",
+        isAnonymousDev: identity.source === "anonymous-dev",
+        ...(member?.role ? { role: member.role } : {}),
+        ...(member?.teamId ? { teamId: member.teamId } : {}),
+        ...(team ? { teamName: team.name } : {}),
       };
     });
 
     const listMembers: TeamDirectoryService["listMembers"] = Effect.fn("TeamDirectory.listMembers")(
       function* (_principal) {
-        const state = yield* Ref.get(stateRef);
+        const teams = new Map((yield* store.listTeams).map((team) => [team.id, team.name]));
+        const members = yield* store.listMembers;
 
-        const members: TeamMemberInfo[] = [];
-
-        members.push({
-          email: normalizeEmail(PREAUTHORIZED_ADMIN_EMAIL),
-          displayName: "Jero",
-          isAdmin: true,
-          isAnonymousDev: false,
-        });
-
-        for (const [, member] of HashMap.entries(state.members)) {
-          if (normalizeEmail(member.email) === normalizeEmail(PREAUTHORIZED_ADMIN_EMAIL)) {
-            continue;
-          }
-
-          const team = member.teamId ? HashMap.get(state.teams, member.teamId) : undefined;
-
-          members.push({
-            email: member.email,
-            displayName: member.displayName,
-            isAdmin: member.isAdmin,
-            isAnonymousDev: member.isAnonymousDev,
-            ...(member.teamId !== undefined ? { teamId: member.teamId } : {}),
-            ...(team?._tag === "Some" ? { teamName: team.value.name } : {}),
+        return members
+          .filter((member) => member.authorized && !member.revoked)
+          .map((member): TeamMemberInfo => {
+            const teamName = member.teamId === null ? undefined : teams.get(member.teamId);
+            return {
+              email: member.email,
+              displayName: member.displayName,
+              role: member.role,
+              isAdmin: member.role === "admin",
+              isAnonymousDev: false,
+              ...(member.teamId === null ? {} : { teamId: member.teamId }),
+              ...(teamName === undefined ? {} : { teamName }),
+            };
           });
-        }
-
-        return members;
       },
     );
 
@@ -184,22 +141,18 @@ export const layer = Layer.effect(
           });
         }
 
-        const now = yield* DateTime.now;
-        const id = yield* secureRandom.uuidV4();
-
-        const team: Team = {
-          id,
+        const created = yield* store.createTeam({
+          id: yield* secureRandom.uuidV4(),
           name: input.name,
-          createdAt: now,
           createdBy: principal.email,
-        };
+        });
 
-        yield* Ref.update(stateRef, (s) => ({
-          ...s,
-          teams: HashMap.set(s.teams, id, team),
-        }));
-
-        return team;
+        return {
+          id: created.id,
+          name: created.name,
+          createdAt: created.createdAt,
+          createdBy: created.createdBy,
+        } satisfies Team;
       },
     );
 
@@ -212,20 +165,12 @@ export const layer = Layer.effect(
           });
         }
 
-        const state = yield* Ref.get(stateRef);
-        const team = HashMap.get(state.teams, teamId);
-
-        if (team._tag === "None") {
+        if (!(yield* store.deleteTeam(teamId))) {
           return yield* new TeamActivityError({
             code: "team_not_found",
             message: "Team not found.",
           });
         }
-
-        yield* Ref.update(stateRef, (s) => ({
-          ...s,
-          teams: HashMap.remove(s.teams, teamId),
-        }));
       },
     );
 
@@ -239,40 +184,21 @@ export const layer = Layer.effect(
         });
       }
 
-      const normalizedEmail = normalizeEmail(email);
-      const state = yield* Ref.get(stateRef);
-
-      const member = HashMap.get(state.members, normalizedEmail);
-      if (member._tag === "None") {
+      if ((yield* activeMember(email)) === null) {
         return yield* new TeamActivityError({
           code: "member_not_found",
           message: "Member not found.",
         });
       }
 
-      if (teamId !== null) {
-        const team = HashMap.get(state.teams, teamId);
-        if (team._tag === "None") {
-          return yield* new TeamActivityError({
-            code: "team_not_found",
-            message: "Team not found.",
-          });
-        }
+      if (teamId !== null && (yield* store.getTeam(teamId)) === null) {
+        return yield* new TeamActivityError({
+          code: "team_not_found",
+          message: "Team not found.",
+        });
       }
 
-      const updatedMember: StoredMember = {
-        ...member.value,
-        ...(teamId !== null ? { teamId } : {}),
-      };
-
-      if (teamId === null) {
-        delete (updatedMember as { teamId?: string }).teamId;
-      }
-
-      yield* Ref.update(stateRef, (s) => ({
-        ...s,
-        members: HashMap.set(s.members, normalizedEmail, updatedMember),
-      }));
+      yield* store.moveMember(email, teamId);
     });
 
     const getMemberUsage: TeamDirectoryService["getMemberUsage"] = Effect.fn(
@@ -282,15 +208,11 @@ export const layer = Layer.effect(
       const normalizedPrincipalEmail = normalizeEmail(principal.email);
 
       if (!principal.isAdmin && normalizedPrincipalEmail !== normalizedEmail) {
-        const state = yield* Ref.get(stateRef);
-        const principalMember = HashMap.get(state.members, normalizedPrincipalEmail);
-        const targetMember = HashMap.get(state.members, normalizedEmail);
+        const principalMember = yield* activeMember(normalizedPrincipalEmail);
+        const targetMember = yield* activeMember(normalizedEmail);
 
         const sameTeam =
-          principalMember._tag === "Some" &&
-          targetMember._tag === "Some" &&
-          principalMember.value.teamId !== undefined &&
-          principalMember.value.teamId === targetMember.value.teamId;
+          principalMember?.teamId != null && principalMember.teamId === targetMember?.teamId;
 
         if (!sameTeam) {
           return yield* new TeamActivityError({
@@ -300,8 +222,7 @@ export const layer = Layer.effect(
         }
       }
 
-      const state = yield* Ref.get(stateRef);
-      const usage = HashMap.get(state.usage, normalizedEmail);
+      const usage = HashMap.get(yield* Ref.get(usageRef), normalizedEmail);
 
       const baseUsage = usage._tag === "Some" ? usage.value : { conversations: 0, tokens: 0 };
 
@@ -317,17 +238,14 @@ export const layer = Layer.effect(
       function* (email, conversations, tokens) {
         const normalizedEmail = normalizeEmail(email);
 
-        yield* Ref.update(stateRef, (s) => {
-          const existing = HashMap.get(s.usage, normalizedEmail);
+        yield* Ref.update(usageRef, (usage) => {
+          const existing = HashMap.get(usage, normalizedEmail);
           const current =
             existing._tag === "Some" ? existing.value : { conversations: 0, tokens: 0 };
-          return {
-            ...s,
-            usage: HashMap.set(s.usage, normalizedEmail, {
-              conversations: current.conversations + conversations,
-              tokens: current.tokens + tokens,
-            }),
-          };
+          return HashMap.set(usage, normalizedEmail, {
+            conversations: current.conversations + conversations,
+            tokens: current.tokens + tokens,
+          });
         });
       },
     );

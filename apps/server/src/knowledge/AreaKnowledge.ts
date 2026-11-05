@@ -1,12 +1,10 @@
 import {
   type VerifiedIdentity,
   type KnowledgeDocument,
-  type AreaMembership,
   type AreaRequest,
   type TeamPrincipal,
   type AreaId,
   AreaKnowledgeError,
-  PREAUTHORIZED_ADMIN_EMAIL,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -16,7 +14,7 @@ import * as HashMap from "effect/HashMap";
 import * as Ref from "effect/Ref";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 
-import * as TeamIdentity from "../auth/TeamIdentity.ts";
+import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 
 const DOCUMENTS: ReadonlyArray<KnowledgeDocument> = [
   {
@@ -31,80 +29,37 @@ This document contains general information available to all team members.
 
 - Be respectful and collaborative
 - Document your work
-- Ask questions when unsure
-
-## Project Overview
-
-T3 Code is a minimal GUI for coding agents. We support multiple providers including Codex, Claude, Cursor, Grok, and OpenCode.
-
-## Contact
-
-For general questions, reach out to the team on our internal channels.`,
+- Ask questions when unsure`,
   },
   {
-    id: "doc-auth",
-    areaId: "auth",
-    title: "Authentication Area Context",
-    content: `# Authentication Area Context
+    id: "doc-ledger",
+    areaId: "ledger",
+    title: "Ledger Area Context",
+    content: `# Ledger Area Context
 
-This document is restricted to the Auth team area.
+This document is restricted to the Ledger team.
 
-## Authentication Architecture
+## Scope
 
-Our authentication system uses:
-- Google OAuth for identity verification
-- Server-side token validation
-- Session-based access control
-
-## Admin Responsibilities
-
-Administrators can:
-- Authorize new team members
-- Manage area permissions
-- View usage statistics
-
-## Security Notes
-
-Never expose credentials in logs or client code.`,
+Ledger owns the transaction ledger services: balance reads, transaction history and the ledger writer.`,
   },
   {
-    id: "doc-no-mail",
-    areaId: "no-mail",
-    title: "No-Mail Area Context",
-    content: `# No-Mail Area Context
+    id: "doc-frontend",
+    areaId: "frontend",
+    title: "Frontend Area Context",
+    content: `# Frontend Area Context
 
-This document is restricted to the No-Mail team area.
+This document is restricted to the Frontend team.
 
-## Offline Development
+## Scope
 
-This area covers development scenarios without email verification:
-- Local development testing
-- Anonymous dev identity (Gerry)
-- Isolated environment testing
-
-## Testing Guidelines
-
-When testing with anonymous identity:
-- Use only for local development
-- Never use in production
-- Verify area permissions work correctly`,
+Frontend owns the web UI that customers use to sign in, view balances and send payments.`,
   },
 ];
 
-interface AreaKnowledgeState {
-  readonly memberships: HashMap.HashMap<string, AreaMembership>;
-  readonly requests: HashMap.HashMap<string, AreaRequest>;
-}
+const GENERAL_AREA = "general";
 
-const makeInitialState = (): AreaKnowledgeState => ({
-  memberships: HashMap.empty(),
-  requests: HashMap.empty(),
-});
-
-const normalizeEmail = (email: string): string => email.toLowerCase().trim();
-
-const membershipKey = (email: string, areaId: AreaId): string =>
-  `${normalizeEmail(email)}:${areaId}`;
+const normalizeEmail = EnterpriseStore.normalizeEmail;
 
 export interface AreaKnowledgeService {
   readonly getPrincipal: (identity: VerifiedIdentity) => Effect.Effect<TeamPrincipal>;
@@ -141,47 +96,37 @@ export class AreaKnowledge extends Context.Service<AreaKnowledge, AreaKnowledgeS
 ) {}
 
 const canReadDocument = (principal: TeamPrincipal, areaId: AreaId): boolean =>
-  areaId === "general" || principal.areaIds.includes(areaId);
+  areaId === GENERAL_AREA || principal.areaIds.includes(areaId);
 
 export const layer = Layer.effect(
   AreaKnowledge,
   Effect.gen(function* () {
-    yield* TeamIdentity.TeamIdentity;
+    const store = yield* EnterpriseStore.EnterpriseStore;
     const secureRandom = yield* SecureRandom.SecureRandom;
-    const stateRef = yield* Ref.make(makeInitialState());
+    const requestsRef = yield* Ref.make<HashMap.HashMap<string, AreaRequest>>(HashMap.empty());
 
     const getPrincipal: AreaKnowledgeService["getPrincipal"] = Effect.fn(
       "AreaKnowledge.getPrincipal",
     )(function* (identity) {
-      const state = yield* Ref.get(stateRef);
-      const email = normalizeEmail(identity.email);
-      const isAdmin = normalizeEmail(PREAUTHORIZED_ADMIN_EMAIL) === email;
       const isAnonymousDev = identity.source === "anonymous-dev";
+      const member = (yield* store.canEnter(identity.email))
+        ? yield* store.getMember(identity.email)
+        : null;
+      const isAdmin = member?.role === "admin";
 
-      const baseAreas: AreaId[] = [];
-
+      const areaIds: AreaId[] = [];
       if (isAdmin) {
-        baseAreas.push("auth");
+        areaIds.push(...(yield* store.listTeams).map((team) => team.id));
+      } else if (member) {
+        if (member.teamId !== null) areaIds.push(member.teamId);
+        areaIds.push(...(yield* store.listGrants(member.email)).map((grant) => grant.areaId));
       }
-
-      if (isAnonymousDev) {
-        baseAreas.push("no-mail");
-      }
-
-      const grantedAreas: AreaId[] = [];
-      for (const [key, membership] of HashMap.entries(state.memberships)) {
-        if (key.startsWith(`${email}:`)) {
-          grantedAreas.push(membership.areaId);
-        }
-      }
-
-      const areaIds = [...new Set([...baseAreas, ...grantedAreas])];
 
       return {
         email: identity.email,
         displayName: identity.displayName,
         isAdmin,
-        areaIds,
+        areaIds: [...new Set(areaIds)],
         isAnonymousDev,
       } satisfies TeamPrincipal;
     });
@@ -221,8 +166,7 @@ export const layer = Layer.effect(
         });
       }
 
-      const state = yield* Ref.get(stateRef);
-      for (const [, request] of HashMap.entries(state.requests)) {
+      for (const [, request] of HashMap.entries(yield* Ref.get(requestsRef))) {
         if (
           normalizeEmail(request.email) === normalizeEmail(principal.email) &&
           request.areaId === areaId &&
@@ -246,10 +190,7 @@ export const layer = Layer.effect(
         requestedAt: now,
       };
 
-      yield* Ref.update(stateRef, (s) => ({
-        ...s,
-        requests: HashMap.set(s.requests, id, request),
-      }));
+      yield* Ref.update(requestsRef, HashMap.set(id, request));
 
       return request;
     });
@@ -264,8 +205,7 @@ export const layer = Layer.effect(
         });
       }
 
-      const state = yield* Ref.get(stateRef);
-      const request = HashMap.get(state.requests, requestId);
+      const request = HashMap.get(yield* Ref.get(requestsRef), requestId);
 
       if (request._tag === "None") {
         return yield* new AreaKnowledgeError({
@@ -282,24 +222,15 @@ export const layer = Layer.effect(
         resolvedBy: adminPrincipal.email,
       };
 
-      let newMemberships = state.memberships;
-
       if (status === "approved") {
-        const key = membershipKey(request.value.email, request.value.areaId);
-        const membership: AreaMembership = {
+        yield* store.grantArea({
           email: request.value.email,
           areaId: request.value.areaId,
-          grantedAt: now,
           grantedBy: adminPrincipal.email,
-        };
-        newMemberships = HashMap.set(newMemberships, key, membership);
+        });
       }
 
-      yield* Ref.update(stateRef, (s) => ({
-        ...s,
-        requests: HashMap.set(s.requests, requestId, updatedRequest),
-        memberships: newMemberships,
-      }));
+      yield* Ref.update(requestsRef, HashMap.set(requestId, updatedRequest));
 
       return updatedRequest;
     });
@@ -314,12 +245,7 @@ export const layer = Layer.effect(
         });
       }
 
-      const key = membershipKey(email, areaId);
-
-      yield* Ref.update(stateRef, (s) => ({
-        ...s,
-        memberships: HashMap.remove(s.memberships, key),
-      }));
+      yield* store.revokeArea(email, areaId);
     });
 
     return {

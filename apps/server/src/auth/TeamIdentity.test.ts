@@ -9,6 +9,7 @@ import * as SecureRandom from "effect/crypto/SecureRandom";
 import { PREAUTHORIZED_ADMIN_EMAIL, ANONYMOUS_DEV_EMAIL } from "@t3tools/contracts";
 
 import * as TeamIdentity from "./TeamIdentity.ts";
+import { layerSeededStore } from "../enterprise/EnterpriseStore.testkit.ts";
 import * as ServerConfig from "../config.ts";
 
 const baseLayer = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto);
@@ -30,6 +31,7 @@ const layerServerConfig = (overrides?: Partial<ServerConfig.ServerConfig["Servic
 
 const layerTeamIdentity = (overrides?: Partial<ServerConfig.ServerConfig["Service"]>) =>
   TeamIdentity.layer.pipe(
+    Layer.provideMerge(layerSeededStore),
     Layer.provideMerge(layerServerConfig(overrides)),
     Layer.provideMerge(baseLayer),
   );

@@ -16,6 +16,7 @@ import * as HashMap from "effect/HashMap";
 import * as Ref from "effect/Ref";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 
+import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 import * as TeamIdentity from "./TeamIdentity.ts";
 
 const DEFAULT_INVITATION_HOURS = 24 * 7;
@@ -24,13 +25,11 @@ const DEFAULT_MAX_USES = 100;
 interface TeamEnrollmentState {
   readonly invitations: HashMap.HashMap<string, TeamInvitation>;
   readonly invitationsBySecret: HashMap.HashMap<string, string>;
-  readonly enrollments: HashMap.HashMap<string, TeamEnrollmentType>;
 }
 
 const makeInitialState = (): TeamEnrollmentState => ({
   invitations: HashMap.empty(),
   invitationsBySecret: HashMap.empty(),
-  enrollments: HashMap.empty(),
 });
 
 export interface TeamEnrollmentService {
@@ -63,6 +62,7 @@ export const layer = Layer.effect(
   TeamEnrollment,
   Effect.gen(function* () {
     const teamIdentity = yield* TeamIdentity.TeamIdentity;
+    const store = yield* EnterpriseStore.EnterpriseStore;
     const secureRandom = yield* SecureRandom.SecureRandom;
     const stateRef = yield* Ref.make(makeInitialState());
 
@@ -143,11 +143,18 @@ export const layer = Layer.effect(
     )(function* (actor, environmentId, input) {
       const state = yield* Ref.get(stateRef);
 
-      const existingEnrollment = HashMap.get(state.enrollments, environmentId);
-      if (existingEnrollment._tag === "Some") {
+      if ((yield* store.getEnrollment(environmentId)) !== null) {
         return yield* new TeamEnrollmentError({
           code: "already_enrolled",
           message: "This environment is already enrolled in a team.",
+        });
+      }
+
+      const member = yield* store.getMember(actor.email);
+      if (member === null || !(yield* store.canEnter(actor.email))) {
+        return yield* new TeamEnrollmentError({
+          code: "not_authorized",
+          message: "Only authorized members can enroll an environment.",
         });
       }
 
@@ -191,23 +198,22 @@ export const layer = Layer.effect(
         });
       }
 
-      const enrollment: TeamEnrollmentType = {
-        environmentId,
-        teamId: inv.teamId,
-        teamName: inv.teamName,
-        enrolledAt: now,
-        enrolledBy: actor.email,
-      };
+      if (member.teamId !== inv.teamId) {
+        return yield* new TeamEnrollmentError({
+          code: "team_mismatch",
+          message: "This invitation is for a different team.",
+        });
+      }
 
       const updatedInvitation: TeamInvitation = {
         ...inv,
         uses: inv.uses + 1,
       };
 
+      yield* store.enroll({ environmentId, email: actor.email });
       yield* Ref.update(stateRef, (s) => ({
         ...s,
         invitations: HashMap.set(s.invitations, invitationId.value, updatedInvitation),
-        enrollments: HashMap.set(s.enrollments, environmentId, enrollment),
       }));
 
       return {
@@ -220,32 +226,30 @@ export const layer = Layer.effect(
     const getEnrollment: TeamEnrollmentService["getEnrollment"] = Effect.fn(
       "TeamEnrollment.getEnrollment",
     )(function* (environmentId) {
-      const state = yield* Ref.get(stateRef);
-      const enrollment = HashMap.get(state.enrollments, environmentId);
+      const enrollment = yield* store.getEnrollment(environmentId);
+      if (enrollment === null) return null;
 
-      if (enrollment._tag === "None") {
-        return null;
-      }
+      const member = yield* store.getMember(enrollment.email);
+      const team = member?.teamId ? yield* store.getTeam(member.teamId) : null;
+      if (team === null) return null;
 
-      return enrollment.value;
+      return {
+        environmentId,
+        teamId: team.id,
+        teamName: team.name,
+        enrolledAt: enrollment.enrolledAt,
+        enrolledBy: enrollment.email,
+      } satisfies TeamEnrollmentType;
     });
 
     const unenroll: TeamEnrollmentService["unenroll"] = Effect.fn("TeamEnrollment.unenroll")(
       function* (environmentId) {
-        const state = yield* Ref.get(stateRef);
-        const enrollment = HashMap.get(state.enrollments, environmentId);
-
-        if (enrollment._tag === "None") {
+        if (!(yield* store.unenroll(environmentId))) {
           return yield* new TeamEnrollmentError({
             code: "not_enrolled",
             message: "This environment is not enrolled in any team.",
           });
         }
-
-        yield* Ref.update(stateRef, (s) => ({
-          ...s,
-          enrollments: HashMap.remove(s.enrollments, environmentId),
-        }));
       },
     );
 

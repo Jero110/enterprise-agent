@@ -11,6 +11,7 @@ import { PREAUTHORIZED_ADMIN_EMAIL } from "@t3tools/contracts";
 import * as TeamPublication from "./TeamPublication.ts";
 import * as TeamDirectory from "./TeamDirectory.ts";
 import * as TeamIdentity from "../auth/TeamIdentity.ts";
+import { layerSeededStore } from "../enterprise/EnterpriseStore.testkit.ts";
 import * as ServerConfig from "../config.ts";
 
 const baseLayer = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto);
@@ -34,6 +35,7 @@ const layerTeamPublication = (overrides?: Partial<ServerConfig.ServerConfig["Ser
   TeamPublication.layer.pipe(
     Layer.provideMerge(TeamDirectory.layer),
     Layer.provideMerge(TeamIdentity.layer),
+    Layer.provideMerge(layerSeededStore),
     Layer.provideMerge(layerServerConfig(overrides)),
     Layer.provideMerge(baseLayer),
   );
@@ -78,7 +80,7 @@ describe("TeamPublication", () => {
 
         const ownerIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "owner@example.com",
+            email: "ent.test.bruno@gmail.com",
             sub: "google-owner",
             name: "Owner",
           }),
@@ -87,7 +89,7 @@ describe("TeamPublication", () => {
 
         const otherIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "other@example.com",
+            email: "ent.test.hugo@gmail.com",
             sub: "google-other",
             name: "Other",
           }),
@@ -95,7 +97,7 @@ describe("TeamPublication", () => {
         yield* directory.registerMember(otherIdentity);
 
         const threadId = "thread-456";
-        yield* pub.registerThread(threadId, "owner@example.com", "Owner's Thread");
+        yield* pub.registerThread(threadId, "ent.test.bruno@gmail.com", "Owner's Thread");
 
         const principal = yield* directory.getPrincipal(otherIdentity);
         const result = yield* pub.publishToTeam(principal, threadId).pipe(Effect.exit);
@@ -114,7 +116,7 @@ describe("TeamPublication", () => {
 
         const ownerIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "owner@example.com",
+            email: "ent.test.bruno@gmail.com",
             sub: "google-owner",
             name: "Owner",
           }),
@@ -123,7 +125,7 @@ describe("TeamPublication", () => {
 
         const otherIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "other@example.com",
+            email: "ent.test.hugo@gmail.com",
             sub: "google-other",
             name: "Other",
           }),
@@ -131,7 +133,7 @@ describe("TeamPublication", () => {
         yield* directory.registerMember(otherIdentity);
 
         const threadId = "thread-789";
-        yield* pub.registerThread(threadId, "owner@example.com", "Private Thread");
+        yield* pub.registerThread(threadId, "ent.test.bruno@gmail.com", "Private Thread");
 
         const principal = yield* directory.getPrincipal(otherIdentity);
         const canRead = yield* pub.canReadThreadContent(principal, threadId);
@@ -160,26 +162,26 @@ describe("TeamPublication", () => {
 
         const ownerIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "owner@example.com",
+            email: "ent.test.bruno@gmail.com",
             sub: "google-owner",
             name: "Owner",
           }),
         });
         yield* directory.registerMember(ownerIdentity);
-        yield* directory.moveMemberToTeam(adminPrincipal, "owner@example.com", team.id);
+        yield* directory.moveMemberToTeam(adminPrincipal, "ent.test.bruno@gmail.com", team.id);
 
         const teammateIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "teammate@example.com",
+            email: "ent.test.carla@gmail.com",
             sub: "google-teammate",
             name: "Teammate",
           }),
         });
         yield* directory.registerMember(teammateIdentity);
-        yield* directory.moveMemberToTeam(adminPrincipal, "teammate@example.com", team.id);
+        yield* directory.moveMemberToTeam(adminPrincipal, "ent.test.carla@gmail.com", team.id);
 
         const threadId = "thread-shared";
-        yield* pub.registerThread(threadId, "owner@example.com", "Shared Thread");
+        yield* pub.registerThread(threadId, "ent.test.bruno@gmail.com", "Shared Thread");
 
         const ownerPrincipal = yield* directory.getPrincipal(ownerIdentity);
         yield* pub.publishToTeam(ownerPrincipal, threadId);
@@ -211,17 +213,17 @@ describe("TeamPublication", () => {
 
         const ownerIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "owner@example.com",
+            email: "ent.test.bruno@gmail.com",
             sub: "google-owner",
             name: "Owner",
           }),
         });
         yield* directory.registerMember(ownerIdentity);
-        yield* directory.moveMemberToTeam(adminPrincipal, "owner@example.com", team.id);
+        yield* directory.moveMemberToTeam(adminPrincipal, "ent.test.bruno@gmail.com", team.id);
 
         const outsiderIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "outsider@example.com",
+            email: "ent.test.hugo@gmail.com",
             sub: "google-outsider",
             name: "Outsider",
           }),
@@ -229,7 +231,7 @@ describe("TeamPublication", () => {
         yield* directory.registerMember(outsiderIdentity);
 
         const threadId = "thread-team-only";
-        yield* pub.registerThread(threadId, "owner@example.com", "Team Only Thread");
+        yield* pub.registerThread(threadId, "ent.test.bruno@gmail.com", "Team Only Thread");
 
         const ownerPrincipal = yield* directory.getPrincipal(ownerIdentity);
         yield* pub.publishToTeam(ownerPrincipal, threadId);
@@ -284,7 +286,7 @@ describe("TeamPublication", () => {
 
         const ownerIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "owner@example.com",
+            email: "ent.test.bruno@gmail.com",
             sub: "google-owner",
             name: "Owner",
           }),
@@ -300,8 +302,8 @@ describe("TeamPublication", () => {
         });
         yield* directory.registerMember(viewerIdentity);
 
-        yield* pub.registerThread("t1", "owner@example.com", "Thread One");
-        yield* pub.registerThread("t2", "owner@example.com", "Thread Two");
+        yield* pub.registerThread("t1", "ent.test.bruno@gmail.com", "Thread One");
+        yield* pub.registerThread("t2", "ent.test.bruno@gmail.com", "Thread Two");
 
         const viewerPrincipal = yield* directory.getPrincipal(viewerIdentity);
         const threads = yield* pub.listThreadMetadata(viewerPrincipal);

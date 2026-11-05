@@ -10,6 +10,7 @@ import { PREAUTHORIZED_ADMIN_EMAIL } from "@t3tools/contracts";
 
 import * as AreaKnowledge from "./AreaKnowledge.ts";
 import * as TeamIdentity from "../auth/TeamIdentity.ts";
+import { layerSeededStore } from "../enterprise/EnterpriseStore.testkit.ts";
 import * as ServerConfig from "../config.ts";
 
 const baseLayer = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto);
@@ -32,13 +33,14 @@ const layerServerConfig = (overrides?: Partial<ServerConfig.ServerConfig["Servic
 const layerAreaKnowledge = (overrides?: Partial<ServerConfig.ServerConfig["Service"]>) =>
   AreaKnowledge.layer.pipe(
     Layer.provideMerge(TeamIdentity.layer),
+    Layer.provideMerge(layerSeededStore),
     Layer.provideMerge(layerServerConfig(overrides)),
     Layer.provideMerge(baseLayer),
   );
 
 describe("AreaKnowledge", () => {
   describe("listDocuments", () => {
-    it.effect("admin sees general + auth documents", () =>
+    it.effect("admin sees general + every team document", () =>
       Effect.gen(function* () {
         const knowledge = yield* AreaKnowledge.AreaKnowledge;
         const identity = yield* TeamIdentity.TeamIdentity;
@@ -55,13 +57,11 @@ describe("AreaKnowledge", () => {
         const docs = yield* knowledge.listDocuments(principal);
 
         const areaIds = docs.map((d) => d.areaId);
-        expect(areaIds).toContain("general");
-        expect(areaIds).toContain("auth");
-        expect(areaIds).not.toContain("no-mail");
+        expect(areaIds).toEqual(["general", "ledger", "frontend"]);
       }).pipe(Effect.provide(layerAreaKnowledge())),
     );
 
-    it.effect("anonymous dev sees general + no-mail documents", () =>
+    it.effect("anonymous dev sees only general documents", () =>
       Effect.gen(function* () {
         const knowledge = yield* AreaKnowledge.AreaKnowledge;
         const identity = yield* TeamIdentity.TeamIdentity;
@@ -71,15 +71,13 @@ describe("AreaKnowledge", () => {
         const docs = yield* knowledge.listDocuments(principal);
 
         const areaIds = docs.map((d) => d.areaId);
-        expect(areaIds).toContain("general");
-        expect(areaIds).toContain("no-mail");
-        expect(areaIds).not.toContain("auth");
+        expect(areaIds).toEqual(["general"]);
       }).pipe(Effect.provide(layerAreaKnowledge({ devUrl: new URL("http://localhost:5173") }))),
     );
   });
 
   describe("readDocument", () => {
-    it.effect("admin can read auth document", () =>
+    it.effect("admin can read any team document", () =>
       Effect.gen(function* () {
         const knowledge = yield* AreaKnowledge.AreaKnowledge;
         const identity = yield* TeamIdentity.TeamIdentity;
@@ -93,41 +91,41 @@ describe("AreaKnowledge", () => {
         });
 
         const principal = yield* knowledge.getPrincipal(adminIdentity);
-        const doc = yield* knowledge.readDocument(principal, "doc-auth");
+        const doc = yield* knowledge.readDocument(principal, "doc-ledger");
 
-        expect(doc.areaId).toBe("auth");
-        expect(doc.content).toContain("Authentication");
+        expect(doc.areaId).toBe("ledger");
+        expect(doc.content).toContain("Ledger");
       }).pipe(Effect.provide(layerAreaKnowledge())),
     );
 
-    it.effect("admin cannot read no-mail document", () =>
+    it.effect("a member cannot read another team's document", () =>
       Effect.gen(function* () {
         const knowledge = yield* AreaKnowledge.AreaKnowledge;
         const identity = yield* TeamIdentity.TeamIdentity;
 
         const adminIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: PREAUTHORIZED_ADMIN_EMAIL,
-            sub: "google-jero",
-            name: "Jero",
+            email: "ent.test.ana@gmail.com",
+            sub: "google-ana",
+            name: "Ana",
           }),
         });
 
         const principal = yield* knowledge.getPrincipal(adminIdentity);
-        const result = yield* knowledge.readDocument(principal, "doc-no-mail").pipe(Effect.exit);
+        const result = yield* knowledge.readDocument(principal, "doc-frontend").pipe(Effect.exit);
 
         expect(Exit.isFailure(result)).toBe(true);
       }).pipe(Effect.provide(layerAreaKnowledge())),
     );
 
-    it.effect("anonymous dev cannot read auth document even by direct id", () =>
+    it.effect("anonymous dev cannot read a team document even by direct id", () =>
       Effect.gen(function* () {
         const knowledge = yield* AreaKnowledge.AreaKnowledge;
         const identity = yield* TeamIdentity.TeamIdentity;
 
         const anonIdentity = yield* identity.getAnonymousDevIdentity();
         const principal = yield* knowledge.getPrincipal(anonIdentity);
-        const result = yield* knowledge.readDocument(principal, "doc-auth").pipe(Effect.exit);
+        const result = yield* knowledge.readDocument(principal, "doc-ledger").pipe(Effect.exit);
 
         expect(Exit.isFailure(result)).toBe(true);
       }).pipe(Effect.provide(layerAreaKnowledge({ devUrl: new URL("http://localhost:5173") }))),
@@ -148,7 +146,7 @@ describe("AreaKnowledge", () => {
 
         const principal = yield* knowledge.getPrincipal(unknownIdentity);
 
-        const authResult = yield* knowledge.readDocument(principal, "doc-auth").pipe(Effect.exit);
+        const authResult = yield* knowledge.readDocument(principal, "doc-ledger").pipe(Effect.exit);
         const noMailResult = yield* knowledge
           .readDocument(principal, "doc-no-mail")
           .pipe(Effect.exit);
@@ -187,17 +185,17 @@ describe("AreaKnowledge", () => {
 
         const userIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "user@example.com",
+            email: "ent.test.gerry@gmail.com",
             sub: "google-user",
             name: "User",
           }),
         });
 
         const principal = yield* knowledge.getPrincipal(userIdentity);
-        const request = yield* knowledge.requestAreaAccess(principal, "auth");
+        const request = yield* knowledge.requestAreaAccess(principal, "ledger");
 
         expect(request.status).toBe("pending");
-        expect(request.areaId).toBe("auth");
+        expect(request.areaId).toBe("ledger");
       }).pipe(Effect.provide(layerAreaKnowledge())),
     );
 
@@ -208,16 +206,16 @@ describe("AreaKnowledge", () => {
 
         const userIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "user@example.com",
+            email: "ent.test.gerry@gmail.com",
             sub: "google-user",
             name: "User",
           }),
         });
 
         const principal = yield* knowledge.getPrincipal(userIdentity);
-        yield* knowledge.requestAreaAccess(principal, "auth");
+        yield* knowledge.requestAreaAccess(principal, "ledger");
 
-        const result = yield* knowledge.readDocument(principal, "doc-auth").pipe(Effect.exit);
+        const result = yield* knowledge.readDocument(principal, "doc-ledger").pipe(Effect.exit);
         expect(Exit.isFailure(result)).toBe(true);
       }).pipe(Effect.provide(layerAreaKnowledge())),
     );
@@ -229,7 +227,7 @@ describe("AreaKnowledge", () => {
 
         const userIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "user@example.com",
+            email: "ent.test.gerry@gmail.com",
             sub: "google-user",
             name: "User",
           }),
@@ -244,15 +242,15 @@ describe("AreaKnowledge", () => {
         });
 
         const userPrincipal = yield* knowledge.getPrincipal(userIdentity);
-        const request = yield* knowledge.requestAreaAccess(userPrincipal, "auth");
+        const request = yield* knowledge.requestAreaAccess(userPrincipal, "ledger");
 
         const adminPrincipal = yield* knowledge.getPrincipal(adminIdentity);
         yield* knowledge.resolveRequest(adminPrincipal, request.id, "approved");
 
         const updatedPrincipal = yield* knowledge.getPrincipal(userIdentity);
-        const doc = yield* knowledge.readDocument(updatedPrincipal, "doc-auth");
+        const doc = yield* knowledge.readDocument(updatedPrincipal, "doc-ledger");
 
-        expect(doc.areaId).toBe("auth");
+        expect(doc.areaId).toBe("ledger");
       }).pipe(Effect.provide(layerAreaKnowledge())),
     );
 
@@ -263,7 +261,7 @@ describe("AreaKnowledge", () => {
 
         const user1Identity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "user1@example.com",
+            email: "ent.test.gerry@gmail.com",
             sub: "google-user1",
             name: "User 1",
           }),
@@ -271,14 +269,14 @@ describe("AreaKnowledge", () => {
 
         const user2Identity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "user2@example.com",
+            email: "ent.test.hugo@gmail.com",
             sub: "google-user2",
             name: "User 2",
           }),
         });
 
         const user1Principal = yield* knowledge.getPrincipal(user1Identity);
-        const request = yield* knowledge.requestAreaAccess(user1Principal, "auth");
+        const request = yield* knowledge.requestAreaAccess(user1Principal, "ledger");
 
         const user2Principal = yield* knowledge.getPrincipal(user2Identity);
         const result = yield* knowledge
@@ -296,7 +294,7 @@ describe("AreaKnowledge", () => {
 
         const userIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "user@example.com",
+            email: "ent.test.gerry@gmail.com",
             sub: "google-user",
             name: "User",
           }),
@@ -311,20 +309,20 @@ describe("AreaKnowledge", () => {
         });
 
         const userPrincipal = yield* knowledge.getPrincipal(userIdentity);
-        const request = yield* knowledge.requestAreaAccess(userPrincipal, "auth");
+        const request = yield* knowledge.requestAreaAccess(userPrincipal, "ledger");
 
         const adminPrincipal = yield* knowledge.getPrincipal(adminIdentity);
         yield* knowledge.resolveRequest(adminPrincipal, request.id, "approved");
 
         const grantedPrincipal = yield* knowledge.getPrincipal(userIdentity);
-        const doc = yield* knowledge.readDocument(grantedPrincipal, "doc-auth");
-        expect(doc.areaId).toBe("auth");
+        const doc = yield* knowledge.readDocument(grantedPrincipal, "doc-ledger");
+        expect(doc.areaId).toBe("ledger");
 
-        yield* knowledge.revokeAreaAccess(adminPrincipal, "user@example.com", "auth");
+        yield* knowledge.revokeAreaAccess(adminPrincipal, "ent.test.gerry@gmail.com", "ledger");
 
         const revokedPrincipal = yield* knowledge.getPrincipal(userIdentity);
         const result = yield* knowledge
-          .readDocument(revokedPrincipal, "doc-auth")
+          .readDocument(revokedPrincipal, "doc-ledger")
           .pipe(Effect.exit);
         expect(Exit.isFailure(result)).toBe(true);
       }).pipe(Effect.provide(layerAreaKnowledge())),
