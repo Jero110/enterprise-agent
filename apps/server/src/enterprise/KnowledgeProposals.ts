@@ -197,7 +197,18 @@ export const layer = Layer.effect(
             resolvedAt: yield* now,
           };
         } else if (input.action === "approve") {
-          const commit = yield* repo.apply(proposal, member.email);
+          const commit = yield* repo.apply(proposal, member.email).pipe(
+            Effect.catchIf(
+              (error) => error.code === "conflict",
+              (error) =>
+                repo.findApprovalCommit(proposal.id).pipe(
+                  Effect.filterOrFail(
+                    (commit) => commit !== null,
+                    () => error,
+                  ),
+                ),
+            ),
+          );
           if (proposal.kind === "area-access")
             yield* store.grantArea({
               email: proposal.proposedBy,

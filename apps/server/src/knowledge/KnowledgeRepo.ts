@@ -28,6 +28,9 @@ export class KnowledgeRepo extends Context.Service<
   {
     /** Every document, read from the working tree on each call; no scope filtering here. */
     readonly documents: Effect.Effect<ReadonlyArray<KnowledgeDocument>>;
+    readonly findApprovalCommit: (
+      proposalId: string,
+    ) => Effect.Effect<string | null, EnterpriseError>;
     readonly contentHash: (path: string) => Effect.Effect<string, EnterpriseError>;
     readonly version: (path: string) => Effect.Effect<string, EnterpriseError>;
     readonly apply: (
@@ -144,6 +147,16 @@ export const layer = Layer.effect(
             message: "Could not read the knowledge snapshot.",
           }),
       ),
+    );
+    const findApprovalCommit = Effect.fn("KnowledgeRepo.findApprovalCommit")((id: string) =>
+      checkedGit(
+        "log",
+        "-1",
+        "--format=%H",
+        "--all-match",
+        "--grep=^knowledge: ",
+        `--grep=^Proposal-Id: ${id}$`,
+      ).pipe(Effect.map((commit) => commit || null)),
     );
     const version = Effect.fn("KnowledgeRepo.version")((file: string) =>
       checkedGit("log", "-1", "--format=%H", "--", file),
@@ -272,6 +285,6 @@ export const layer = Layer.effect(
       }
       return yield* checkedGit("rev-parse", "HEAD");
     });
-    return KnowledgeRepo.of({ documents, contentHash, version, apply, revert });
+    return KnowledgeRepo.of({ documents, findApprovalCommit, contentHash, version, apply, revert });
   }),
 );

@@ -193,6 +193,30 @@ describe("KnowledgeProposals", () => {
     }).pipe(Effect.provide(layer)),
   );
 
+  it.effect("recovers a pending proposal whose approval commit already exists", () =>
+    Effect.gen(function* () {
+      const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+      const repo = yield* KnowledgeRepo.KnowledgeRepo;
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      const proposal = yield* proposals.propose(BRUNO, create);
+      const commit = yield* repo.apply(proposal, ANA);
+      expect((yield* store.listProposals).find((p) => p.id === proposal.id)?.status).toBe(
+        "pending",
+      );
+      const recovered = yield* proposals.decide(ANA, { id: proposal.id, action: "approve" });
+      expect(recovered).toMatchObject({ status: "applied", commit });
+      expect((yield* store.listProposals).find((p) => p.id === proposal.id)?.commit).toBe(commit);
+      const config = yield* ServerConfig.ServerConfig;
+      const runner = yield* ProcessRunner.ProcessRunner;
+      const count = yield* runner.run({
+        command: "git",
+        args: ["rev-list", "--count", "HEAD"],
+        cwd: `${config.baseDir}/enterprise/knowledge`,
+      });
+      expect(count.stdout.trim()).toBe("2");
+    }).pipe(Effect.provide(layer)),
+  );
+
   it.effect("serializes concurrent approvals and refuses stale same-file snapshots", () =>
     Effect.gen(function* () {
       const proposals = yield* KnowledgeProposals.KnowledgeProposals;
