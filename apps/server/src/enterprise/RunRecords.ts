@@ -68,7 +68,7 @@ const make = Effect.gen(function* () {
       AND (${filters.turnId ?? null} IS NULL OR turn_id = ${filters.turnId ?? null})
       ORDER BY member, turn_id`.pipe(Effect.orDie);
       return yield* Effect.forEach(rows, (row) =>
-        Schema.decodeUnknownEffect(codec)(row.record_json).pipe(Effect.orDie),
+        Schema.decodeEffect(codec)(row.record_json).pipe(Effect.orDie),
       );
     },
   );

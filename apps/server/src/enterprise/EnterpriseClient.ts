@@ -21,6 +21,7 @@ import {
   type KnowledgeSearchInput,
   KnowledgeSearchResult,
   type OrchestratorMcpFailure,
+  type RunRecordInput,
   type PeerLinkError,
   TeamThreadSummary,
   TeamThreadSnapshot,
@@ -64,6 +65,11 @@ export class EnterpriseClient extends Context.Service<
       input: KnowledgeProposalDecision,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
     readonly status: Effect.Effect<EnterpriseStatus, EnterpriseError>;
+    /** The linked hub, read locally so it answers while the hub is offline. */
+    readonly hubEnvironmentId: Effect.Effect<EnvironmentId | null>;
+    readonly runReport: (
+      input: RunRecordInput,
+    ) => Effect.Effect<TeamPublicationResult, EnterpriseError>;
     readonly connectionChanges: Stream.Stream<void>;
     readonly teamList: Effect.Effect<ReadonlyArray<TeamThreadSummary>, EnterpriseError>;
     readonly teamGet: (
@@ -246,6 +252,12 @@ const make = Effect.gen(function* () {
       ),
     ),
     status,
+    hubEnvironmentId: readConnection,
+    runReport: Effect.fn("EnterpriseClient.runReport")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "enterprise_run_report", input, TeamPublicationResult),
+      ),
+    ),
     connectionChanges: Stream.fromPubSub(changes),
     teamList: withConnection((hub) =>
       callResult(hub, "enterprise_team_list", {}, Schema.Array(TeamThreadSummary)),

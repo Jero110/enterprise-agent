@@ -83,6 +83,7 @@ import * as KnowledgeProposals from "./enterprise/KnowledgeProposals.ts";
 import * as AreaKnowledge from "./knowledge/AreaKnowledge.ts";
 import * as KnowledgeRepo from "./knowledge/KnowledgeRepo.ts";
 import * as RunRecords from "./enterprise/RunRecords.ts";
+import * as RunReporter from "./enterprise/RunReporter.ts";
 import * as TeamPublication from "./team/TeamPublication.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
 import * as PeerForwarding from "./peer/PeerForwarding.ts";
@@ -835,12 +836,14 @@ const layerMakeRoutes = Layer.mergeAll(
     Layer.provide(McpOAuth.layerMcpClientAuthenticator),
   ),
   Layer.effectDiscard(TeamReporter.TeamReporter.pipe(Effect.flatMap((reporter) => reporter.start))),
+  Layer.effectDiscard(RunReporter.RunReporter.pipe(Effect.flatMap((reporter) => reporter.start))),
   // Follows delegated tasks running in linked environments, including after a restart.
   Layer.effectDiscard(
     RemoteDelegation.RemoteDelegation.pipe(Effect.flatMap((remote) => remote.start())),
   ),
 ).pipe(
   Layer.provide(TeamReporter.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+  Layer.provide(RunReporter.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provide(
     PullRequestReviewGuideService.layer.pipe(Layer.provide(PullRequestReviewGuides.layer)),
   ),
