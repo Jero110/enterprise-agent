@@ -65,6 +65,7 @@ import * as OtlpEndpointCheck from "./observability/OtlpEndpointCheck.ts";
 import * as PairingGrantStore from "./auth/PairingGrantStore.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
+import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
 import * as PortScanner from "./preview/PortScanner.ts";
@@ -688,6 +689,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(PairingGrantStore.PairingGrantStore)({}),
   Layer.mock(EnterpriseClient.EnterpriseClient)({}),
   Layer.mock(TeamReporter.TeamReporter)({}),
+  Layer.mock(ThreadKnowledge.ThreadKnowledge)({}),
   Layer.mock(PeerLinks.PeerLinks)({}),
   Layer.mock(PeerLinkRequests.PeerLinkRequests)({}),
   Layer.mock(PortScanner.PortDiscovery)({ trackAgent: () => () => undefined }),
