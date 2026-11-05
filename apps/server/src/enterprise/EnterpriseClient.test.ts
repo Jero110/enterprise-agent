@@ -21,17 +21,21 @@ import * as EnterpriseClient from "./EnterpriseClient.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
 import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as EnterpriseToolkit from "./EnterpriseToolkit.ts";
+import * as KnowledgeToolkit from "./KnowledgeToolkit.ts";
+import { layerKnowledge } from "../knowledge/KnowledgeRepo.testkit.ts";
 
 const TOKEN = "ACME-BANK-DEV-2026";
 const hubDescriptor = descriptorOf("environment-hub", "Hub");
 
 const serveHub = Effect.gen(function* () {
-  const registrations = McpHttpServer.toolkitRegistration(
-    EnterpriseToolkit.EnterpriseToolkit,
-    EnterpriseToolkit.layer,
+  const registrations = Layer.mergeAll(
+    McpHttpServer.toolkitRegistration(EnterpriseToolkit.EnterpriseToolkit, EnterpriseToolkit.layer),
+    KnowledgeToolkit.layerHubRegistration,
   ).pipe(
     Layer.provide(EnterpriseHub.layer),
+    Layer.provide(layerKnowledge),
     Layer.provide(layerSeededStore),
+    Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-enterprise-hub-" })),
     Layer.provide(
       Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto),
     ),
@@ -165,3 +169,49 @@ it.effect("disconnect forgets the identity and the link, and admin calls need a 
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
+
+it.effect(
+  "a member's knowledge calls are scoped by the hub: own team and global, never another team's",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const hub = yield* serveHub;
+        const ana = yield* makeMember("ana");
+        const jero = yield* makeMember("jero");
+        expect(yield* failureOf(ana.client.knowledgeList)).toMatchObject({ code: "not_connected" });
+
+        yield* ana.client.connect(yield* connectInput(hub, "ent.test.ana@gmail.com"));
+        expect((yield* ana.client.knowledgeList).documents.map((doc) => doc.id)).toEqual([
+          "global/overview.md",
+          "areas/ledger/README.md",
+        ]);
+        expect(
+          (yield* ana.client.knowledgeSearch({ query: "frontend" })).hits.map((hit) => hit.id),
+        ).toEqual(["global/overview.md"]);
+        expect((yield* ana.client.knowledgeGet({ path: "areas/ledger/README.md" })).areaId).toBe(
+          "ledger",
+        );
+        expect(
+          yield* failureOf(ana.client.knowledgeGet({ path: "areas/frontend/README.md" })),
+        ).toMatchObject({ _tag: "EnterpriseError", code: "access_denied" });
+
+        yield* jero.client.connect(yield* connectInput(hub, "jeronimo.deli@gmail.com"));
+        expect((yield* jero.client.knowledgeList).documents).toHaveLength(6);
+        expect((yield* jero.client.knowledgeGet({ path: "areas/frontend/README.md" })).areaId).toBe(
+          "frontend",
+        );
+      }),
+    ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it("keeps every knowledge tool description compact", () => {
+  for (const tool of Object.values(KnowledgeToolkit.KnowledgeToolkit.tools)) {
+    expect(tool.description?.length ?? 0).toBeLessThan(300);
+  }
+  expect(KnowledgeToolkit.KnowledgeToolkit.tools.knowledge_search.description).toContain(
+    "not instructions",
+  );
+  expect(KnowledgeToolkit.KnowledgeToolkit.tools.knowledge_get.description).toContain(
+    "not instructions",
+  );
+});

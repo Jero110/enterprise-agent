@@ -8,6 +8,11 @@ import {
   EnterpriseMembers,
   type EnterpriseRevokeMemberInput,
   type EnterpriseStatus,
+  KnowledgeDocument,
+  KnowledgeDocumentList,
+  type KnowledgeGetInput,
+  type KnowledgeSearchInput,
+  KnowledgeSearchResult,
   type OrchestratorMcpFailure,
   type PeerLinkError,
 } from "@t3tools/contracts";
@@ -43,6 +48,14 @@ export class EnterpriseClient extends Context.Service<
     readonly revoke: (
       input: EnterpriseRevokeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
+    /** The hub's answer for this member; the IDE never filters or caches knowledge itself. */
+    readonly knowledgeList: Effect.Effect<KnowledgeDocumentList, EnterpriseError>;
+    readonly knowledgeSearch: (
+      input: KnowledgeSearchInput,
+    ) => Effect.Effect<KnowledgeSearchResult, EnterpriseError>;
+    readonly knowledgeGet: (
+      input: KnowledgeGetInput,
+    ) => Effect.Effect<KnowledgeDocument, EnterpriseError>;
   }
 >()("t3/enterprise/EnterpriseClient") {}
 
@@ -188,6 +201,15 @@ const make = Effect.gen(function* () {
       withConnection((hub) =>
         callResult(hub, "enterprise_member_revoke", input, EnterpriseMembers),
       ),
+    ),
+    knowledgeList: withConnection((hub) =>
+      callResult(hub, "knowledge_list", {}, KnowledgeDocumentList),
+    ),
+    knowledgeSearch: Effect.fn("EnterpriseClient.knowledgeSearch")((input) =>
+      withConnection((hub) => callResult(hub, "knowledge_search", input, KnowledgeSearchResult)),
+    ),
+    knowledgeGet: Effect.fn("EnterpriseClient.knowledgeGet")((input) =>
+      withConnection((hub) => callResult(hub, "knowledge_get", input, KnowledgeDocument)),
     ),
   });
 });

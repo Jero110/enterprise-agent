@@ -90,13 +90,13 @@ const noSession = new EnterpriseError({
 });
 
 /** The session the hub binds members to: the MCP client's, never an argument. */
-const sessionId = McpInvocationContext.McpInvocationContext.pipe(
+export const sessionId = McpInvocationContext.McpInvocationContext.pipe(
   Effect.flatMap((scope) =>
     scope.client === undefined ? Effect.fail(noSession) : Effect.succeed(scope.client.sessionId),
   ),
 );
 
-const asResult = <A, R>(effect: Effect.Effect<A, EnterpriseError, R>) =>
+export const asResult = <A, R>(effect: Effect.Effect<A, EnterpriseError, R>) =>
   effect.pipe(
     Effect.map((value) => ({ ok: true as const, value })),
     Effect.catchTags({

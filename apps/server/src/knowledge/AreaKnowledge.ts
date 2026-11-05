@@ -1,6 +1,8 @@
 import {
   type VerifiedIdentity,
   type KnowledgeDocument,
+  type KnowledgeDocumentSummary,
+  type KnowledgeSearchHit,
   type AreaRequest,
   type TeamPrincipal,
   type AreaId,
@@ -15,58 +17,25 @@ import * as Ref from "effect/Ref";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
-
-const DOCUMENTS: ReadonlyArray<KnowledgeDocument> = [
-  {
-    id: "doc-general",
-    areaId: "general",
-    title: "General Company Context",
-    content: `# General Company Context
-
-This document contains general information available to all team members.
-
-## Team Guidelines
-
-- Be respectful and collaborative
-- Document your work
-- Ask questions when unsure`,
-  },
-  {
-    id: "doc-ledger",
-    areaId: "ledger",
-    title: "Ledger Area Context",
-    content: `# Ledger Area Context
-
-This document is restricted to the Ledger team.
-
-## Scope
-
-Ledger owns the transaction ledger services: balance reads, transaction history and the ledger writer.`,
-  },
-  {
-    id: "doc-frontend",
-    areaId: "frontend",
-    title: "Frontend Area Context",
-    content: `# Frontend Area Context
-
-This document is restricted to the Frontend team.
-
-## Scope
-
-Frontend owns the web UI that customers use to sign in, view balances and send payments.`,
-  },
-];
-
-const GENERAL_AREA = "general";
+import { GENERAL_AREA, KnowledgeRepo } from "./KnowledgeRepo.ts";
 
 const normalizeEmail = EnterpriseStore.normalizeEmail;
 
 export interface AreaKnowledgeService {
   readonly getPrincipal: (identity: VerifiedIdentity) => Effect.Effect<TeamPrincipal>;
 
+  /** The principal of an enrolled member's email, or null when the email cannot enter. */
+  readonly getMemberPrincipal: (email: string) => Effect.Effect<TeamPrincipal | null>;
+
   readonly listDocuments: (
     principal: TeamPrincipal,
-  ) => Effect.Effect<ReadonlyArray<KnowledgeDocument>>;
+  ) => Effect.Effect<ReadonlyArray<KnowledgeDocumentSummary>>;
+
+  /** Text over path, headings and body, among the documents the principal may read. */
+  readonly searchDocuments: (
+    principal: TeamPrincipal,
+    query: string,
+  ) => Effect.Effect<ReadonlyArray<KnowledgeSearchHit>>;
 
   readonly readDocument: (
     principal: TeamPrincipal,
@@ -95,6 +64,28 @@ export class AreaKnowledge extends Context.Service<AreaKnowledge, AreaKnowledgeS
   "t3/knowledge/AreaKnowledge",
 ) {}
 
+const MAX_HITS = 20;
+const SNIPPET_CHARS = 160;
+
+/** Path matches outrank headings, which outrank body text. */
+const scoreDocument = (doc: KnowledgeDocument, terms: ReadonlyArray<string>) => {
+  const path = doc.id.toLowerCase();
+  const lines = doc.content.split("\n");
+  const headings = lines
+    .filter((line) => line.startsWith("#"))
+    .join("\n")
+    .toLowerCase();
+  const body = doc.content.toLowerCase();
+  let score = 0;
+  for (const term of terms) {
+    if (!path.includes(term) && !body.includes(term)) return null;
+    score += (path.includes(term) ? 3 : 0) + (headings.includes(term) ? 2 : 0) + 1;
+  }
+  const first = terms[0]!;
+  const line = lines.find((l) => l.toLowerCase().includes(first)) ?? doc.title;
+  return { score, snippet: line.trim().slice(0, SNIPPET_CHARS) };
+};
+
 const canReadDocument = (principal: TeamPrincipal, areaId: AreaId): boolean =>
   areaId === GENERAL_AREA || principal.areaIds.includes(areaId);
 
@@ -105,13 +96,14 @@ export const layer = Layer.effect(
     const secureRandom = yield* SecureRandom.SecureRandom;
     const requestsRef = yield* Ref.make<HashMap.HashMap<string, AreaRequest>>(HashMap.empty());
 
-    const getPrincipal: AreaKnowledgeService["getPrincipal"] = Effect.fn(
-      "AreaKnowledge.getPrincipal",
-    )(function* (identity) {
-      const isAnonymousDev = identity.source === "anonymous-dev";
-      const member = (yield* store.canEnter(identity.email))
-        ? yield* store.getMember(identity.email)
-        : null;
+    const repo = yield* KnowledgeRepo;
+
+    const principalOf = Effect.fn("AreaKnowledge.principalOf")(function* (
+      email: string,
+      displayName: string,
+      isAnonymousDev: boolean,
+    ) {
+      const member = (yield* store.canEnter(email)) ? yield* store.getMember(email) : null;
       const isAdmin = member?.role === "admin";
 
       const areaIds: AreaId[] = [];
@@ -123,21 +115,64 @@ export const layer = Layer.effect(
       }
 
       return {
-        email: identity.email,
-        displayName: identity.displayName,
+        email,
+        displayName,
         isAdmin,
         areaIds: [...new Set(areaIds)],
         isAnonymousDev,
       } satisfies TeamPrincipal;
     });
 
+    const getPrincipal: AreaKnowledgeService["getPrincipal"] = (identity) =>
+      principalOf(identity.email, identity.displayName, identity.source === "anonymous-dev");
+
+    const getMemberPrincipal: AreaKnowledgeService["getMemberPrincipal"] = Effect.fn(
+      "AreaKnowledge.getMemberPrincipal",
+    )(function* (email) {
+      const member = (yield* store.canEnter(email)) ? yield* store.getMember(email) : null;
+      return member === null ? null : yield* principalOf(member.email, member.displayName, false);
+    });
+
+    const readable = (principal: TeamPrincipal) =>
+      Effect.map(repo.documents, (docs) =>
+        docs.filter((doc) => canReadDocument(principal, doc.areaId)),
+      );
+
     const listDocuments: AreaKnowledgeService["listDocuments"] = (principal) =>
-      Effect.succeed(DOCUMENTS.filter((doc) => canReadDocument(principal, doc.areaId)));
+      Effect.map(readable(principal), (docs) =>
+        docs.map(({ id, areaId, title }) => ({ id, areaId, title })),
+      );
+
+    const searchDocuments: AreaKnowledgeService["searchDocuments"] = (principal, query) =>
+      Effect.map(readable(principal), (docs) => {
+        const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+        if (terms.length === 0) return [];
+        return docs
+          .flatMap((doc) => {
+            const match = scoreDocument(doc, terms);
+            return match === null
+              ? []
+              : [
+                  {
+                    score: match.score,
+                    hit: {
+                      id: doc.id,
+                      areaId: doc.areaId,
+                      title: doc.title,
+                      snippet: match.snippet,
+                    },
+                  },
+                ];
+          })
+          .toSorted((a, b) => b.score - a.score || a.hit.id.localeCompare(b.hit.id))
+          .slice(0, MAX_HITS)
+          .map((entry) => entry.hit);
+      });
 
     const readDocument: AreaKnowledgeService["readDocument"] = Effect.fn(
       "AreaKnowledge.readDocument",
     )(function* (principal, documentId) {
-      const doc = DOCUMENTS.find((d) => d.id === documentId);
+      const doc = (yield* repo.documents).find((d) => d.id === documentId);
 
       if (!doc) {
         return yield* new AreaKnowledgeError({
@@ -250,7 +285,9 @@ export const layer = Layer.effect(
 
     return {
       getPrincipal,
+      getMemberPrincipal,
       listDocuments,
+      searchDocuments,
       readDocument,
       requestAreaAccess,
       resolveRequest,

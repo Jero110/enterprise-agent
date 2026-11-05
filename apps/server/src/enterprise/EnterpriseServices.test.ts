@@ -9,6 +9,7 @@ import * as TeamEnrollment from "../auth/TeamEnrollment.ts";
 import * as TeamIdentity from "../auth/TeamIdentity.ts";
 import * as ServerConfig from "../config.ts";
 import * as AreaKnowledge from "../knowledge/AreaKnowledge.ts";
+import { layerKnowledge } from "../knowledge/KnowledgeRepo.testkit.ts";
 import * as TeamDirectory from "../team/TeamDirectory.ts";
 import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
@@ -18,7 +19,7 @@ const baseLayer = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRan
 const layerServices = Layer.mergeAll(
   TeamEnrollment.layer,
   TeamDirectory.layer,
-  AreaKnowledge.layer,
+  layerKnowledge,
 ).pipe(
   Layer.provideMerge(TeamIdentity.layer),
   Layer.provideMerge(layerSeededStore),

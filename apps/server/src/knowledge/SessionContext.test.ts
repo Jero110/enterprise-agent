@@ -9,6 +9,8 @@ import * as SecureRandom from "effect/crypto/SecureRandom";
 import { PREAUTHORIZED_ADMIN_EMAIL } from "@t3tools/contracts";
 import { layerSeededStore } from "../enterprise/EnterpriseStore.testkit.ts";
 import * as ServerConfig from "../config.ts";
+import * as ProcessRunner from "../processRunner.ts";
+import * as KnowledgeRepo from "./KnowledgeRepo.ts";
 import * as TeamIdentity from "../auth/TeamIdentity.ts";
 import * as AreaKnowledge from "./AreaKnowledge.ts";
 import * as SessionContext from "./SessionContext.ts";
@@ -16,6 +18,8 @@ import * as SessionContext from "./SessionContext.ts";
 const base = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto);
 const layer = SessionContext.layer.pipe(
   Layer.provideMerge(AreaKnowledge.layer),
+  Layer.provideMerge(KnowledgeRepo.layer),
+  Layer.provideMerge(ProcessRunner.layer),
   Layer.provideMerge(TeamIdentity.layer),
   Layer.provideMerge(layerSeededStore),
   Layer.provideMerge(
@@ -47,8 +51,11 @@ describe("SessionContext", () => {
       const documents = yield* context.listAuthorizedDocuments(identity);
       expect(documents.map((document) => document.areaId)).toEqual([
         "general",
-        "ledger",
+        "accounts",
         "frontend",
+        "ledger",
+        "platform",
+        "risk",
       ]);
     }).pipe(Effect.provide(layer)),
   );
@@ -58,7 +65,7 @@ describe("SessionContext", () => {
       const context = yield* SessionContext.SessionContext;
       const identity = yield* (yield* TeamIdentity.TeamIdentity).getAnonymousDevIdentity();
       const result = yield* context
-        .readAuthorizedDocument(identity, "doc-ledger")
+        .readAuthorizedDocument(identity, "areas/ledger/README.md")
         .pipe(Effect.exit);
       expect(Exit.isFailure(result)).toBe(true);
     }).pipe(Effect.provide(layer)),

@@ -1,5 +1,6 @@
 import {
   type KnowledgeDocument,
+  type KnowledgeDocumentSummary,
   type TeamPrincipal,
   type VerifiedIdentity,
   AreaKnowledgeError,
@@ -13,14 +14,14 @@ import * as AreaKnowledge from "./AreaKnowledge.ts";
 export interface SessionContextService {
   readonly listAuthorizedDocuments: (
     identity: VerifiedIdentity,
-  ) => Effect.Effect<ReadonlyArray<KnowledgeDocument>>;
+  ) => Effect.Effect<ReadonlyArray<KnowledgeDocumentSummary>>;
   readonly readAuthorizedDocument: (
     identity: VerifiedIdentity,
     documentId: string,
   ) => Effect.Effect<KnowledgeDocument, AreaKnowledgeError>;
   readonly listForPrincipal: (
     principal: TeamPrincipal,
-  ) => Effect.Effect<ReadonlyArray<KnowledgeDocument>>;
+  ) => Effect.Effect<ReadonlyArray<KnowledgeDocumentSummary>>;
   readonly readForPrincipal: (
     principal: TeamPrincipal,
     documentId: string,
