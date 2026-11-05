@@ -1,4 +1,5 @@
 import {
+  EnterpriseError,
   KnowledgeDocument,
   KnowledgeProposeInput,
   KnowledgeProposal,
@@ -19,6 +20,7 @@ import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import { EnterpriseClient } from "./EnterpriseClient.ts";
 import { EnterpriseHub } from "./EnterpriseHub.ts";
+import { ThreadKnowledge } from "./ThreadKnowledge.ts";
 import { asResult, hubResult, sessionId } from "./EnterpriseToolkit.ts";
 
 const shared = {
@@ -140,15 +142,54 @@ const layerMember = McpToolAccess.toLayer(
   KnowledgeToolkit,
   Effect.gen(function* () {
     const client = yield* EnterpriseClient;
+    const threadKnowledge = yield* ThreadKnowledge;
+    // Only narrows what the hub returned, for the conversation that is calling.
+    const callingThread = Effect.map(
+      McpInvocationContext.McpInvocationContext,
+      (scope) => scope.thread?.threadId,
+    );
+    const allowed = <A extends { readonly areaId: string }>(items: ReadonlyArray<A>) =>
+      Effect.flatMap(callingThread, (threadId) =>
+        threadId === undefined
+          ? Effect.succeed(items)
+          : Effect.filter(items, (item) => threadKnowledge.allows(threadId, item.areaId)),
+      );
     return {
       knowledge_propose: McpToolAccess.reads((input) => asResult(client.knowledgePropose(input))),
       knowledge_proposals: McpToolAccess.reads((input) => asResult(client.proposalInbox(input))),
       knowledge_proposal_decide: McpToolAccess.reads((input) =>
         asResult(client.proposalDecide(input)),
       ),
-      knowledge_list: McpToolAccess.reads(() => asResult(client.knowledgeList)),
-      knowledge_search: McpToolAccess.reads((input) => asResult(client.knowledgeSearch(input))),
-      knowledge_get: McpToolAccess.reads((input) => asResult(client.knowledgeGet(input))),
+      knowledge_list: McpToolAccess.reads(() =>
+        asResult(
+          Effect.flatMap(client.knowledgeList, (list) =>
+            Effect.map(allowed(list.documents), (documents) => ({ documents })),
+          ),
+        ),
+      ),
+      knowledge_search: McpToolAccess.reads((input) =>
+        asResult(
+          Effect.flatMap(client.knowledgeSearch(input), (result) =>
+            Effect.map(allowed(result.hits), (hits) => ({ hits })),
+          ),
+        ),
+      ),
+      knowledge_get: McpToolAccess.reads((input) =>
+        asResult(
+          Effect.flatMap(client.knowledgeGet(input), (document) =>
+            Effect.flatMap(allowed([document]), ([permitted]) =>
+              permitted === undefined
+                ? Effect.fail(
+                    new EnterpriseError({
+                      code: "access_denied",
+                      message: "This conversation's access to that knowledge is turned off.",
+                    }),
+                  )
+                : Effect.succeed(permitted),
+            ),
+          ),
+        ),
+      ),
     };
   }),
 );

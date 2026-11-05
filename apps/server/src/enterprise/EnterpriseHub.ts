@@ -8,6 +8,7 @@ import {
   type EnterpriseAuthorizeMemberInput,
   type EnterpriseHubIdentity,
   type EnterpriseMembers,
+  type EnterpriseOrg,
   type EnterpriseRevokeMemberInput,
   type KnowledgeDocument,
   type KnowledgeDocumentList,
@@ -65,6 +66,8 @@ export class EnterpriseHub extends Context.Service<
     readonly whoami: (sessionId: string) => Effect.Effect<EnterpriseHubIdentity, EnterpriseError>;
     readonly disconnect: (sessionId: string) => Effect.Effect<boolean>;
     readonly listMembers: (sessionId: string) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
+    /** Teams with their active members, for any enrolled member; the caller's access is marked. */
+    readonly org: (sessionId: string) => Effect.Effect<EnterpriseOrg, EnterpriseError>;
     readonly authorize: (
       sessionId: string,
       input: EnterpriseAuthorizeMemberInput,
@@ -173,6 +176,35 @@ const make = Effect.gen(function* () {
     yield* requireAdmin(sessionId);
     return yield* members();
   });
+
+  const org: EnterpriseHub["Service"]["org"] = Effect.fn("EnterpriseHub.org")(
+    function* (sessionId) {
+      const me = yield* whoami(sessionId);
+      const granted = new Set((yield* store.listGrants(me.email)).map((grant) => grant.areaId));
+      const active = (yield* store.listMembers).filter(
+        (member) => member.authorized && !member.revoked,
+      );
+      return {
+        teams: (yield* store.listTeams).map((team) => ({
+          id: team.id,
+          name: team.name,
+          access:
+            me.teamId === team.id
+              ? ("member" as const)
+              : granted.has(team.id)
+                ? ("granted" as const)
+                : ("none" as const),
+          members: active
+            .filter((member) => member.teamId === team.id)
+            .map((member) => ({
+              displayName: member.displayName,
+              role: member.role,
+              isMe: member.email === me.email,
+            })),
+        })),
+      } satisfies EnterpriseOrg;
+    },
+  );
 
   const authorize: EnterpriseHub["Service"]["authorize"] = Effect.fn("EnterpriseHub.authorize")(
     function* (sessionId, input) {
@@ -300,6 +332,7 @@ const make = Effect.gen(function* () {
     whoami,
     disconnect,
     listMembers,
+    org,
     authorize,
     revoke,
     knowledgeList,

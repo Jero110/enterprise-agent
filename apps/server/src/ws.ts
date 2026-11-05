@@ -4,6 +4,7 @@ import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
+import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
 
@@ -1468,6 +1469,7 @@ export const layerWsRpc = (
       const peerLinks = yield* PeerLinks.PeerLinks;
       const enterprise = yield* EnterpriseClient.EnterpriseClient;
       const teamReporter = yield* TeamReporter.TeamReporter;
+      const threadKnowledge = yield* ThreadKnowledge.ThreadKnowledge;
       const peerLinkRequests = yield* PeerLinkRequests.PeerLinkRequests;
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
@@ -2643,6 +2645,9 @@ export const layerWsRpc = (
         [WS_METHODS.enterpriseKnowledgeGet]: (input) => enterprise.knowledgeGet(input),
         [WS_METHODS.enterpriseKnowledgePropose]: (input) => enterprise.knowledgePropose(input),
         [WS_METHODS.enterpriseIngestStart]: (input) => enterprise.ingestStart(input),
+        [WS_METHODS.enterpriseOrg]: () => enterprise.org,
+        [WS_METHODS.enterpriseThreadContext]: (input) => threadKnowledge.get(input),
+        [WS_METHODS.enterpriseThreadContextSet]: (input) => threadKnowledge.set(input),
         [WS_METHODS.enterpriseProposalInbox]: (input) => enterprise.proposalInbox(input),
         [WS_METHODS.enterpriseProposalDecide]: (input) => enterprise.proposalDecide(input),
         [WS_METHODS.serverUpdateSettings]:
@@ -3443,6 +3448,7 @@ export const layer = Layer.unwrap(
     const peerLinks = yield* PeerLinks.PeerLinks;
     const enterprise = yield* EnterpriseClient.EnterpriseClient;
     const teamReporter = yield* TeamReporter.TeamReporter;
+    const threadKnowledge = yield* ThreadKnowledge.ThreadKnowledge;
     const peerLinkRequests = yield* PeerLinkRequests.PeerLinkRequests;
     const sql = yield* SqlClient.SqlClient;
     return HttpRouter.add(
@@ -3534,6 +3540,7 @@ export const layer = Layer.unwrap(
               Layer.provide(Layer.succeed(PeerLinks.PeerLinks, peerLinks)),
               Layer.provide(Layer.succeed(EnterpriseClient.EnterpriseClient, enterprise)),
               Layer.provide(Layer.succeed(TeamReporter.TeamReporter, teamReporter)),
+              Layer.provide(Layer.succeed(ThreadKnowledge.ThreadKnowledge, threadKnowledge)),
               Layer.provide(Layer.succeed(PeerLinkRequests.PeerLinkRequests, peerLinkRequests)),
               Layer.provide(
                 SourceControlDiscovery.layer.pipe(

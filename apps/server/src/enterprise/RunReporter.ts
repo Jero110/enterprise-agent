@@ -80,6 +80,21 @@ const total = (values: ReadonlyArray<number | undefined>) => {
   return known.length === 0 ? null : known.reduce((sum, value) => sum + value, 0);
 };
 
+/** Documents a conversation's agents read through `knowledge_get`, across all its runs. */
+export const knowledgeReadPaths = (turnItems: ThreadRecords["turnItems"]): ReadonlySet<string> => {
+  const paths = new Set<string>();
+  for (const item of turnItems) {
+    if (item.type !== "dynamic_tool" || item.toolName === null || item.status !== "completed") {
+      continue;
+    }
+    if (splitToolName(item.toolName).name !== "knowledge_get") continue;
+    if (hubAnswer(item.output)?.ok === false) continue;
+    const path = stringField(item.input, "path");
+    if (typeof path === "string") paths.add(path);
+  }
+  return paths;
+};
+
 const buildRecord = (
   runId: RunId,
   records: ThreadRecords,

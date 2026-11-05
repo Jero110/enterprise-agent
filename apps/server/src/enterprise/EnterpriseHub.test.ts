@@ -180,6 +180,28 @@ describe("EnterpriseHub", () => {
     }).pipe(Effect.provide(layer)),
   );
 
+  it.effect(
+    "any enrolled member reads the org chart with their own access marked, without emails",
+    () =>
+      Effect.gen(function* () {
+        const hub = yield* EnterpriseHub.EnterpriseHub;
+        const store = yield* EnterpriseStore.EnterpriseStore;
+        expect(yield* codeOf(hub.org("stranger"))).toBe("not_connected");
+        yield* hub.enroll("session-ana", { email: ANA, token: TOKEN });
+        yield* store.grantArea({ email: ANA, areaId: "frontend", grantedBy: JERO });
+        const { teams } = yield* hub.org("session-ana");
+        expect(teams.map((team) => [team.id, team.access])).toContainEqual(["ledger", "member"]);
+        expect(teams.find((team) => team.id === "frontend")?.access).toBe("granted");
+        expect(teams.find((team) => team.id === "risk")?.access).toBe("none");
+        const ledger = teams.find((team) => team.id === "ledger");
+        expect(ledger?.members).toHaveLength(6);
+        expect(ledger?.members.filter((member) => member.isMe)).toEqual([
+          { displayName: "Ana", role: "lead", isMe: true },
+        ]);
+        expect(JSON.stringify(teams)).not.toContain("@");
+      }).pipe(Effect.provide(layer)),
+  );
+
   it.effect("non-admins cannot call admin methods", () =>
     Effect.gen(function* () {
       const hub = yield* EnterpriseHub.EnterpriseHub;

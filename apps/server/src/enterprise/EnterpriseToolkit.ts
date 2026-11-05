@@ -8,6 +8,7 @@ import {
   EnterpriseIngestStartInput,
   EnterpriseIngestStartResult,
   EnterpriseMembers,
+  EnterpriseOrg,
   OrchestratorMcpFailure,
   TeamThreadReport,
   TeamThreadSummary,
@@ -74,6 +75,12 @@ const MembersTool = Tool.make("enterprise_members", {
   description: "Admin only: every enterprise member and team.",
   parameters: emptyParameters,
   success: hubResult(EnterpriseMembers),
+}).annotate(Tool.Readonly, true);
+const OrgTool = Tool.make("enterprise_org", {
+  ...shared,
+  description: "The organization: teams with their members' names and roles, and your own access.",
+  parameters: emptyParameters,
+  success: hubResult(EnterpriseOrg),
 }).annotate(Tool.Readonly, true);
 const AuthorizeTool = Tool.make("enterprise_member_authorize", {
   ...shared,
@@ -159,6 +166,7 @@ export const EnterpriseToolkit = Toolkit.make(
   WhoAmITool,
   DisconnectTool,
   MembersTool,
+  OrgTool,
   AuthorizeTool,
   RevokeTool,
 );
@@ -228,6 +236,7 @@ export const layer = McpToolAccess.toLayer(
       enterprise_members: McpToolAccess.reads(() =>
         asResult(Effect.flatMap(sessionId, hub.listMembers)),
       ),
+      enterprise_org: McpToolAccess.reads(() => asResult(Effect.flatMap(sessionId, hub.org))),
       enterprise_member_authorize: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => hub.authorize(id, input))),
       ),

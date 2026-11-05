@@ -82,6 +82,59 @@ export type EnterpriseAuthorizeMemberInput = typeof EnterpriseAuthorizeMemberInp
 export const EnterpriseRevokeMemberInput = Schema.Struct({ email: TrimmedNonEmptyString });
 export type EnterpriseRevokeMemberInput = typeof EnterpriseRevokeMemberInput.Type;
 
+/** The org chart any enrolled member may read: names and roles, no emails. */
+export const EnterpriseOrgMember = Schema.Struct({
+  displayName: TrimmedNonEmptyString,
+  role: TeamMemberRole,
+  isMe: Schema.Boolean,
+});
+export type EnterpriseOrgMember = typeof EnterpriseOrgMember.Type;
+
+export const EnterpriseOrgTeam = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  /** The caller belongs to this team or holds an approved grant to its area. */
+  access: Schema.Literals(["member", "granted", "none"]),
+  members: Schema.Array(EnterpriseOrgMember),
+});
+export type EnterpriseOrgTeam = typeof EnterpriseOrgTeam.Type;
+
+export const EnterpriseOrg = Schema.Struct({ teams: Schema.Array(EnterpriseOrgTeam) });
+export type EnterpriseOrg = typeof EnterpriseOrg.Type;
+
+/** Knowledge levels a conversation can switch off; the individual level has no source yet. */
+export const ThreadKnowledgeScope = Schema.Literals(["general", "area"]);
+export type ThreadKnowledgeScope = typeof ThreadKnowledgeScope.Type;
+
+export const ThreadContextInput = Schema.Struct({ threadId: TrimmedNonEmptyString });
+export type ThreadContextInput = typeof ThreadContextInput.Type;
+
+export const ThreadContextCard = Schema.Struct({
+  scope: ThreadKnowledgeScope,
+  /** False once the conversation's access to this level was turned off. */
+  enabled: Schema.Boolean,
+  documents: Schema.Array(
+    Schema.Struct({
+      path: TrimmedNonEmptyString,
+      title: TrimmedNonEmptyString,
+      areaId: TrimmedNonEmptyString,
+      /** True when an agent turn of this conversation read the document. */
+      loaded: Schema.Boolean,
+    }),
+  ),
+});
+export type ThreadContextCard = typeof ThreadContextCard.Type;
+
+export const ThreadContext = Schema.Struct({ cards: Schema.Array(ThreadContextCard) });
+export type ThreadContext = typeof ThreadContext.Type;
+
+export const ThreadContextSetInput = Schema.Struct({
+  threadId: TrimmedNonEmptyString,
+  scope: ThreadKnowledgeScope,
+  enabled: Schema.Boolean,
+});
+export type ThreadContextSetInput = typeof ThreadContextSetInput.Type;
+
 export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("EnterpriseError", {
   code: Schema.Literals([
     "invalid_token",

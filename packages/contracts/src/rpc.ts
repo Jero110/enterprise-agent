@@ -35,8 +35,12 @@ import {
   EnterpriseIngestStartInput,
   EnterpriseIngestStartResult,
   EnterpriseMembers,
+  EnterpriseOrg,
   EnterpriseRevokeMemberInput,
   EnterpriseStatus,
+  ThreadContext,
+  ThreadContextInput,
+  ThreadContextSetInput,
 } from "./enterprise.ts";
 import { KnowledgeDocument, KnowledgeDocumentList, KnowledgeGetInput } from "./areaKnowledge.ts";
 import {
@@ -554,6 +558,9 @@ export const WS_METHODS = {
   enterpriseProposalInbox: "enterprise.proposals.inbox",
   enterpriseProposalDecide: "enterprise.proposals.decide",
   enterpriseIngestStart: "enterprise.ingest.start",
+  enterpriseOrg: "enterprise.org",
+  enterpriseThreadContext: "enterprise.threadContext",
+  enterpriseThreadContextSet: "enterprise.threadContext.set",
   serverUpdateSettings: "server.updateSettings",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverSearchAcpRegistry: "server.searchAcpRegistry",
@@ -882,6 +889,21 @@ const WsEnterpriseProposalInboxRpc = Rpc.make(WS_METHODS.enterpriseProposalInbox
 const WsEnterpriseProposalDecideRpc = Rpc.make(WS_METHODS.enterpriseProposalDecide, {
   payload: KnowledgeProposalDecision,
   success: KnowledgeProposal,
+  error: enterpriseError,
+});
+const WsEnterpriseOrgRpc = Rpc.make(WS_METHODS.enterpriseOrg, {
+  payload: Schema.Struct({}),
+  success: EnterpriseOrg,
+  error: enterpriseError,
+});
+const WsEnterpriseThreadContextRpc = Rpc.make(WS_METHODS.enterpriseThreadContext, {
+  payload: ThreadContextInput,
+  success: ThreadContext,
+  error: enterpriseError,
+});
+const WsEnterpriseThreadContextSetRpc = Rpc.make(WS_METHODS.enterpriseThreadContextSet, {
+  payload: ThreadContextSetInput,
+  success: ThreadContext,
   error: enterpriseError,
 });
 const WsTeamThreadsListRpc = Rpc.make(WS_METHODS.teamThreadsList, {
@@ -2161,6 +2183,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseKnowledgeListRpc,
   WsEnterpriseKnowledgeGetRpc,
   WsEnterpriseIngestStartRpc,
+  WsEnterpriseOrgRpc,
+  WsEnterpriseThreadContextRpc,
+  WsEnterpriseThreadContextSetRpc,
   WsEnterpriseKnowledgeProposeRpc,
   WsEnterpriseProposalInboxRpc,
   WsEnterpriseProposalDecideRpc,

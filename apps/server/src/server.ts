@@ -84,6 +84,7 @@ import * as AreaKnowledge from "./knowledge/AreaKnowledge.ts";
 import * as KnowledgeRepo from "./knowledge/KnowledgeRepo.ts";
 import * as RunRecords from "./enterprise/RunRecords.ts";
 import * as RunReporter from "./enterprise/RunReporter.ts";
+import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
 import * as TeamPublication from "./team/TeamPublication.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
 import * as PeerForwarding from "./peer/PeerForwarding.ts";
@@ -844,6 +845,7 @@ const layerMakeRoutes = Layer.mergeAll(
 ).pipe(
   Layer.provide(TeamReporter.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provide(RunReporter.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+  Layer.provide(ThreadKnowledge.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provide(
     PullRequestReviewGuideService.layer.pipe(Layer.provide(PullRequestReviewGuides.layer)),
   ),

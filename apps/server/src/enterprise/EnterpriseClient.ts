@@ -13,6 +13,7 @@ import {
   EnterpriseHubIdentity,
   type EnterpriseIdentity,
   EnterpriseMembers,
+  EnterpriseOrg,
   type EnterpriseRevokeMemberInput,
   type EnterpriseStatus,
   KnowledgeDocument,
@@ -86,6 +87,7 @@ export class EnterpriseClient extends Context.Service<
     ) => Effect.Effect<EnterpriseIdentity, EnterpriseError | PeerLinkError>;
     readonly disconnect: Effect.Effect<{ readonly disconnected: boolean }>;
     readonly listMembers: Effect.Effect<EnterpriseMembers, EnterpriseError>;
+    readonly org: Effect.Effect<EnterpriseOrg, EnterpriseError>;
     readonly authorize: (
       input: EnterpriseAuthorizeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
@@ -280,6 +282,7 @@ const make = Effect.gen(function* () {
     listMembers: withConnection((hub) =>
       callResult(hub, "enterprise_members", {}, EnterpriseMembers),
     ),
+    org: withConnection((hub) => callResult(hub, "enterprise_org", {}, EnterpriseOrg)),
     authorize: Effect.fn("EnterpriseClient.authorize")((input) =>
       withConnection((hub) =>
         callResult(hub, "enterprise_member_authorize", input, EnterpriseMembers),
