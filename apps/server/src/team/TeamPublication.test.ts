@@ -12,6 +12,7 @@ import * as TeamPublication from "./TeamPublication.ts";
 import * as TeamDirectory from "./TeamDirectory.ts";
 import * as TeamIdentity from "../auth/TeamIdentity.ts";
 import { layerSeededStore } from "../enterprise/EnterpriseStore.testkit.ts";
+import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 import * as ServerConfig from "../config.ts";
 
 const baseLayer = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto);
@@ -41,6 +42,81 @@ const layerTeamPublication = (overrides?: Partial<ServerConfig.ServerConfig["Ser
   );
 
 describe("TeamPublication", () => {
+  it.effect("inherits publication through subagents and revokes the whole tree", () =>
+    Effect.gen(function* () {
+      const pub = yield* TeamPublication.TeamPublication;
+      const owner = {
+        email: "ent.test.hugo@gmail.com",
+        displayName: "Hugo",
+        isAdmin: false,
+        isAnonymousDev: false,
+        teamId: "frontend",
+      };
+      const juan = { ...owner, email: "ent.test.juan@gmail.com" };
+      const ana = { ...owner, email: "ent.test.ana@gmail.com", teamId: "ledger" };
+      yield* pub.registerThread("parent", owner.email, "Parent");
+      yield* pub.registerThread("child", owner.email, "Child", { parentThreadId: "parent" });
+      yield* pub.registerThread("grandchild", owner.email, "Grandchild", {
+        parentThreadId: "child",
+      });
+      expect(yield* pub.canReadThreadContent(juan, "parent")).toBe(false);
+      yield* pub.publishToTeam(owner, "parent");
+      for (const id of ["parent", "child", "grandchild"]) {
+        expect(yield* pub.canReadThreadContent(juan, id)).toBe(true);
+        expect(yield* pub.canReadThreadContent(ana, id)).toBe(false);
+      }
+      yield* pub.registerThread("late-child", owner.email, "Late child", {
+        parentThreadId: "parent",
+      });
+      expect(yield* pub.canReadThreadContent(juan, "late-child")).toBe(true);
+      yield* pub.registerThread("parent", owner.email, "Parent renamed", { status: "active" });
+      expect(yield* pub.canReadThreadContent(juan, "parent")).toBe(true);
+      const summaries = yield* pub.listThreadMetadata(juan);
+      expect(summaries.every((thread) => thread.publicationStatus === "published")).toBe(true);
+      expect(summaries.find((thread) => thread.threadId === "parent")).toEqual({
+        threadId: "parent",
+        title: "Parent renamed",
+        ownerEmail: owner.email,
+        ownerDisplayName: "Hugo",
+        status: "active",
+        publicationStatus: "published",
+      });
+      expect(yield* pub.listThreadMetadata(ana)).toEqual([]);
+      expect(
+        (yield* pub.listThreadMetadata({ ...ana, email: PREAUTHORIZED_ADMIN_EMAIL })).length,
+      ).toBe(4);
+      yield* pub.unpublish(owner, "parent");
+      for (const id of ["parent", "child", "grandchild", "late-child"]) {
+        expect(yield* pub.canReadThreadContent(juan, id)).toBe(false);
+      }
+    }).pipe(Effect.provide(layerTeamPublication())),
+  );
+
+  it.effect("rechecks membership rather than trusting stale caller flags", () =>
+    Effect.gen(function* () {
+      const pub = yield* TeamPublication.TeamPublication;
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      const hugo = {
+        email: "ent.test.hugo@gmail.com",
+        displayName: "Hugo",
+        isAdmin: false,
+        isAnonymousDev: false,
+        teamId: "frontend",
+      };
+      const juan = { ...hugo, email: "ent.test.juan@gmail.com" };
+      yield* pub.registerThread("hugo-thread", hugo.email, "Frontend work");
+      yield* pub.publishToTeam(hugo, "hugo-thread");
+      yield* store.moveMember(juan.email, "ledger");
+      expect(yield* pub.canReadThreadContent(juan, "hugo-thread")).toBe(false);
+      expect(yield* pub.listThreadMetadata({ ...juan, isAdmin: true })).toEqual([]);
+      yield* store.revokeMember(hugo.email);
+      expect(yield* pub.canReadThreadContent(hugo, "hugo-thread")).toBe(false);
+      expect(yield* pub.listThreadMetadata(hugo)).toEqual([]);
+      expect(Exit.isFailure(yield* pub.publishToTeam(hugo, "hugo-thread").pipe(Effect.exit))).toBe(
+        true,
+      );
+    }).pipe(Effect.provide(layerTeamPublication())),
+  );
   describe("publish", () => {
     it.effect("owner can publish thread to their team", () =>
       Effect.gen(function* () {
@@ -278,7 +354,7 @@ describe("TeamPublication", () => {
   });
 
   describe("metadata listing", () => {
-    it.effect("lists thread metadata without content for non-owners", () =>
+    it.effect("limits metadata to the current team and administrators", () =>
       Effect.gen(function* () {
         const pub = yield* TeamPublication.TeamPublication;
         const directory = yield* TeamDirectory.TeamDirectory;
@@ -295,7 +371,7 @@ describe("TeamPublication", () => {
 
         const viewerIdentity = yield* identity.verifyGoogleToken({
           token: TeamIdentity.createFakeGoogleToken({
-            email: "viewer@example.com",
+            email: "ent.test.hugo@gmail.com",
             sub: "google-viewer",
             name: "Viewer",
           }),
@@ -308,8 +384,11 @@ describe("TeamPublication", () => {
         const viewerPrincipal = yield* directory.getPrincipal(viewerIdentity);
         const threads = yield* pub.listThreadMetadata(viewerPrincipal);
 
-        expect(threads.length).toBe(2);
-        expect(threads.every((t) => t.publicationStatus === "unpublished")).toBe(true);
+        expect(threads).toEqual([]);
+        const teammate = { ...viewerPrincipal, email: "ent.test.carla@gmail.com" };
+        const summaries = yield* pub.listThreadMetadata(teammate);
+        expect(summaries.map((thread) => thread.threadId)).toEqual(["t1", "t2"]);
+        expect(summaries.every((thread) => thread.publicationStatus === "unpublished")).toBe(true);
       }).pipe(Effect.provide(layerTeamPublication())),
     );
   });
