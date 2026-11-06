@@ -1,10 +1,12 @@
 import { createEnterpriseEnvironmentAtoms } from "@t3tools/client-runtime/state/enterprise";
+import { createEnterpriseFileCommands } from "@t3tools/client-runtime/state/enterpriseFiles";
 
 import { connectionAtomRuntime } from "../connection/runtime";
 import { usePrimaryEnvironmentId } from "./environments";
 import { useEnvironmentQuery } from "./query";
 
 export const enterpriseEnvironment = createEnterpriseEnvironmentAtoms(connectionAtomRuntime);
+export const enterpriseFiles = createEnterpriseFileCommands(connectionAtomRuntime);
 
 /** The primary environment's enterprise identity, as the hub last confirmed it. */
 export function useEnterpriseStatus() {

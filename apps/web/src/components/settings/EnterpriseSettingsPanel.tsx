@@ -1,11 +1,9 @@
-import { useAtomValue } from "@effect/atom-react";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import {
   TeamMemberRole,
-  ProviderInstanceId,
   type EnterpriseMemberSummary,
   type EnterpriseTeamSummary,
   type EnvironmentId,
@@ -20,7 +18,7 @@ import {
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { ConnectEnterpriseDialog } from "../enterprise/ConnectEnterpriseDialog";
-import { ApprovalsInbox } from "../enterprise/ApprovalsInbox";
+import { ContextChanges } from "../enterprise/ContextChanges";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
@@ -43,95 +41,15 @@ export function EnterpriseSettingsPanel() {
       {environmentId !== null && identity ? (
         <>
           <YourContextSection environmentId={environmentId} />
-          <ApprovalsInbox environmentId={environmentId} />
+          <ContextChanges environmentId={environmentId} />
         </>
       ) : null}
       {environmentId !== null && identity?.role === "admin" ? (
         <>
-          <IngestionSection environmentId={environmentId} />
           <MembersSection environmentId={environmentId} />
         </>
       ) : null}
     </SettingsPageContainer>
-  );
-}
-
-function IngestionSection({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const [folder, setFolder] = useState("");
-  const [provider, setProvider] = useState("codex");
-  const [model, setModel] = useState("");
-  const [busy, setBusy] = useState(false);
-  const canStart = useAtomValue(enterpriseEnvironment.ingestStart.permissionAtom(environmentId));
-  const start = useAtomCommand(enterpriseEnvironment.ingestStart, {
-    label: "start ingestion",
-    reportFailure: false,
-  });
-  const submit = async () => {
-    if (busy || !folder.trim() || !provider.trim() || !model.trim()) return;
-    setBusy(true);
-    const result = await start({
-      environmentId,
-      input: {
-        folder: folder.trim(),
-        modelSelection: {
-          instanceId: ProviderInstanceId.make(provider.trim()),
-          model: model.trim(),
-        },
-      },
-    });
-    setBusy(false);
-    if (result._tag === "Failure") {
-      if (!isAtomCommandInterrupted(result))
-        toastManager.add({
-          type: "error",
-          title: "Could not start ingestion",
-          description: enterpriseFailureMessage(squashAtomCommandFailure(result)),
-        });
-    } else
-      toastManager.add({
-        type: "success",
-        title: "Ingestion started",
-        description: `Hub thread: ${result.value.threadId}`,
-      });
-  };
-  return (
-    <SettingsSection title="Load bucket">
-      <SettingsRow
-        title="Ingest sources"
-        description="Use a folder path and provider instance available on the hub machine."
-      >
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Input
-            nativeInput
-            aria-label="Hub folder"
-            placeholder="Hub folder path"
-            value={folder}
-            onChange={(e) => setFolder(e.target.value)}
-          />
-          <Input
-            nativeInput
-            aria-label="Hub provider instance"
-            placeholder="Provider instance"
-            value={provider}
-            onChange={(e) => setProvider(e.target.value)}
-          />
-          <Input
-            nativeInput
-            aria-label="Hub model"
-            placeholder="Model"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-          />
-          <Button
-            size="xs"
-            disabled={busy || !canStart || !folder.trim() || !provider.trim() || !model.trim()}
-            onClick={() => void submit()}
-          >
-            Load bucket
-          </Button>
-        </div>
-      </SettingsRow>
-    </SettingsSection>
   );
 }
 

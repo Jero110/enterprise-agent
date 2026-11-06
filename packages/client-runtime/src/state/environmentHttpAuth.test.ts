@@ -34,6 +34,7 @@ import { type RemoteEnvironmentRequestError } from "../rpc/http.ts";
 import * as RpcHttp from "../rpc/http.ts";
 import * as PullRequestDiffLoader from "./pullRequestDiffHttp.ts";
 import { fetchEnvironmentSessionState } from "./session.ts";
+import { requestEnterpriseFile } from "./enterpriseFiles.ts";
 import { fetchEnvironmentShellSnapshot } from "./shellSnapshotHttp.ts";
 import * as ThreadSnapshotLoader from "./threadSnapshotHttp.ts";
 import { fetchEnvironmentThreadTranscript } from "./threadTranscriptHttp.ts";
@@ -259,6 +260,63 @@ const LOADERS: ReadonlyArray<{
 ];
 
 describe("authenticated environment HTTP requests", () => {
+  it.effect("uses the cookie on a primary environment proposal file download", () =>
+    Effect.gen(function* () {
+      const harness = makeHarness(() => new Response("file bytes"));
+      const result = yield* requestEnterpriseFile({
+        ...harness.input,
+        prepared: { ...PREPARED, httpAuthorization: null },
+        method: "GET",
+        suffix: "/proposal-1/file-1",
+      }).pipe(Effect.provide(harness.httpLayer));
+      expect(new TextDecoder().decode(result as ArrayBuffer)).toBe("file bytes");
+      expect(harness.calls[0]?.url).toBe(
+        "https://previous.example.test/api/enterprise/proposals/files/proposal-1/file-1",
+      );
+      expect(harness.calls[0]?.init.credentials).toBe("include");
+      expect(new Headers(harness.calls[0]?.init.headers).get("authorization")).toBeNull();
+    }),
+  );
+
+  it.effect(
+    "uploads device files to the renewed relay origin with the signed POST URL and downloads authorized bytes",
+    () =>
+      Effect.gen(function* () {
+        const payload = {
+          scope: "personal",
+          recipient: "ana@example.test",
+          reason: "Review",
+          files: [{ name: "notes.txt", mimeType: "text/plain", base64: "aGVsbG8=" }],
+        };
+        const harness = makeHarness((number) =>
+          number === 1
+            ? credentialRejectedResponse()
+            : number === 2
+              ? Response.json({ id: "proposal-1" })
+              : new Response("hello"),
+        );
+        const uploaded = yield* requestEnterpriseFile({
+          ...harness.input,
+          method: "POST",
+          body: payload,
+        }).pipe(Effect.provide(harness.httpLayer));
+        expect(uploaded).toMatchObject({ id: "proposal-1" });
+        expect(harness.calls).toHaveLength(2);
+        expect(harness.calls[0]?.url).toBe(`${CURRENT_ORIGIN}/api/enterprise/proposals/files`);
+        expect(harness.calls[1]?.url).toBe(`${RENEWED_ORIGIN}/api/enterprise/proposals/files`);
+        expect(new Headers(harness.calls[1]?.init.headers).get("dpop")).toBe("proof-2");
+        expect(JSON.parse(String(harness.calls[1]?.init.body))).toEqual(payload);
+        const downloaded = yield* requestEnterpriseFile({
+          ...harness.input,
+          method: "GET",
+          suffix: "/proposal-1/file-1",
+        }).pipe(Effect.provide(harness.httpLayer));
+        expect(new TextDecoder().decode(downloaded as ArrayBuffer)).toBe("hello");
+        expect(harness.calls[2]?.url).toBe(
+          `${CURRENT_ORIGIN}/api/enterprise/proposals/files/proposal-1/file-1`,
+        );
+      }),
+  );
   it.effect.each(LOADERS)("rejects an invalid $name response", (loader) =>
     Effect.gen(function* () {
       const harness = makeHarness(() => Response.json({}));
