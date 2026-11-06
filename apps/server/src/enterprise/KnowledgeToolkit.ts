@@ -5,6 +5,9 @@ import {
   KnowledgeProposal,
   KnowledgeProposalInbox,
   KnowledgeProposalDecision,
+  KnowledgeUploadInput,
+  KnowledgeAttachmentInput,
+  KnowledgeAttachment,
   KnowledgeProposalInboxInput,
   KnowledgeDocumentList,
   KnowledgeGetInput,
@@ -74,7 +77,23 @@ const DecideTool = Tool.make("knowledge_proposal_decide", {
   success: hubResult(KnowledgeProposal),
 }).annotate(Tool.Destructive, true);
 
+const UploadTool = Tool.make("knowledge_upload_files", {
+  ...shared,
+  description:
+    "Transfer bounded client-device files to a durable proposed upload. Bytes are base64 encoded; no knowledge is applied until a future processing step.",
+  parameters: KnowledgeUploadInput,
+  success: hubResult(KnowledgeProposal),
+}).annotate(Tool.Destructive, false);
+const AttachmentTool = Tool.make("knowledge_proposal_attachment", {
+  ...shared,
+  description: "Read a proposal attachment you authored or are authorized to review.",
+  parameters: KnowledgeAttachmentInput,
+  success: hubResult(KnowledgeAttachment),
+}).annotate(Tool.Readonly, true);
+
 export const KnowledgeToolkit = Toolkit.make(
+  UploadTool,
+  AttachmentTool,
   ListTool,
   SearchTool,
   GetTool,
@@ -89,6 +108,12 @@ const layerHub = McpToolAccess.toLayer(
   Effect.gen(function* () {
     const hub = yield* EnterpriseHub;
     return {
+      knowledge_upload_files: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.proposalUpload(id, input))),
+      ),
+      knowledge_proposal_attachment: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.proposalAttachment(id, input))),
+      ),
       knowledge_propose: McpToolAccess.reads((input) =>
         asResult(
           Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
@@ -155,6 +180,12 @@ const layerMember = McpToolAccess.toLayer(
           : Effect.filter(items, (item) => threadKnowledge.allows(threadId, item.areaId)),
       );
     return {
+      knowledge_upload_files: McpToolAccess.reads((input) =>
+        asResult(client.proposalUpload(input)),
+      ),
+      knowledge_proposal_attachment: McpToolAccess.reads((input) =>
+        asResult(client.proposalAttachment(input)),
+      ),
       knowledge_propose: McpToolAccess.reads((input) => asResult(client.knowledgePropose(input))),
       knowledge_proposals: McpToolAccess.reads((input) => asResult(client.proposalInbox(input))),
       knowledge_proposal_decide: McpToolAccess.reads((input) =>

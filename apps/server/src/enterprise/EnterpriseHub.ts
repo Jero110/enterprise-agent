@@ -5,6 +5,9 @@ import {
   type KnowledgeProposalInbox,
   type KnowledgeProposalDecision,
   type KnowledgeProposalInboxInput,
+  type KnowledgeUploadInput,
+  type KnowledgeAttachmentInput,
+  type KnowledgeAttachment,
   type EnterpriseAuthorizeMemberInput,
   type EnterpriseHubIdentity,
   type EnterpriseMembers,
@@ -51,6 +54,14 @@ export class EnterpriseHub extends Context.Service<
       sessionId: string,
       input: KnowledgeProposeInput,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly proposalUpload: (
+      sessionId: string,
+      input: KnowledgeUploadInput,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly proposalAttachment: (
+      sessionId: string,
+      input: KnowledgeAttachmentInput,
+    ) => Effect.Effect<KnowledgeAttachment, EnterpriseError>;
     readonly proposalInbox: (
       sessionId: string,
       input: KnowledgeProposalInboxInput,
@@ -321,6 +332,21 @@ const make = Effect.gen(function* () {
     }),
     knowledgePropose: Effect.fn("EnterpriseHub.knowledgePropose")(function* (sessionId, input) {
       return yield* proposals.propose((yield* whoami(sessionId)).email, input);
+    }),
+    proposalUpload: Effect.fn("EnterpriseHub.proposalUpload")(function* (sessionId, input) {
+      return yield* proposals.uploadEncoded((yield* whoami(sessionId)).email, input);
+    }),
+    proposalAttachment: Effect.fn("EnterpriseHub.proposalAttachment")(function* (sessionId, input) {
+      const file = yield* proposals.readAttachment(
+        (yield* whoami(sessionId)).email,
+        input.proposalId,
+        input.fileId,
+      );
+      return {
+        name: file.name,
+        mimeType: file.mimeType,
+        base64: Buffer.from(file.bytes).toString("base64"),
+      };
     }),
     proposalInbox: Effect.fn("EnterpriseHub.proposalInbox")(function* (sessionId, input) {
       return yield* proposals.inbox((yield* whoami(sessionId)).email, input);

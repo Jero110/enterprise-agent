@@ -33,6 +33,16 @@ export const KnowledgeProposal = Schema.Struct({
   rejectionReason: Schema.optional(Schema.String),
   commit: Schema.optional(Schema.String),
   revertCommit: Schema.optional(Schema.String),
+  files: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        id: Schema.String,
+        name: Schema.String,
+        mimeType: Schema.String,
+        sizeBytes: Schema.Number,
+      }),
+    ),
+  ),
   reviewers: Schema.optional(
     Schema.Array(
       Schema.Struct({
@@ -53,6 +63,31 @@ export const KnowledgeProposalInbox = Schema.Struct({
   pendingCount: Schema.Number,
 });
 export type KnowledgeProposalInbox = typeof KnowledgeProposalInbox.Type;
+export const KnowledgeUploadInput = Schema.Struct({
+  scope: TrimmedNonEmptyString,
+  recipient: Schema.optional(TrimmedNonEmptyString),
+  reason: TrimmedNonEmptyString,
+  files: Schema.Array(
+    Schema.Struct({
+      name: TrimmedNonEmptyString,
+      mimeType: TrimmedNonEmptyString,
+      base64: TrimmedNonEmptyString,
+    }),
+  ),
+});
+export type KnowledgeUploadInput = typeof KnowledgeUploadInput.Type;
+export const KnowledgeAttachmentInput = Schema.Struct({
+  proposalId: Schema.String,
+  fileId: Schema.String,
+});
+export type KnowledgeAttachmentInput = typeof KnowledgeAttachmentInput.Type;
+export const KnowledgeAttachment = Schema.Struct({
+  name: Schema.String,
+  mimeType: Schema.String,
+  base64: Schema.String,
+});
+export type KnowledgeAttachment = typeof KnowledgeAttachment.Type;
+
 export const KnowledgeProposalDecision = Schema.Struct({
   id: TrimmedNonEmptyString,
   action: Schema.Literals(["approve", "reject", "revert"]),

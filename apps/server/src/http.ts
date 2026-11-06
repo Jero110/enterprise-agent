@@ -3,6 +3,7 @@ import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   EnvironmentHttpApi,
+  KnowledgeUploadInput,
 } from "@t3tools/contracts";
 import { isDevProxiedPath } from "@t3tools/shared/devProxy";
 import { injectMcpAppCookieBootstrap, injectMcpAppThemeBootstrap } from "@t3tools/shared/mcpApp";
@@ -30,6 +31,7 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { OtlpTracer, OtlpSerialization } from "effect/observability";
 
 import * as ServerConfig from "./config.ts";
+import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import { ASSET_ROUTE_PREFIX, readMcpAppHtml, resolveAsset } from "./assets/AssetAccess.ts";
 import { sourceControlMediaResponse } from "./assets/sourceControlMediaResponse.ts";
 import { statMediaFile, streamMediaFile, type OpenMediaFile } from "./assets/MediaFile.ts";
@@ -459,6 +461,115 @@ export const layerAssetRoute = HttpRouter.add(
       Effect.orElseSucceed(() => HttpServerResponse.text("Internal Server Error", { status: 500 })),
     );
   }),
+);
+
+const proposalRoute = "/api/enterprise/proposals/files";
+const decodeProposalUpload = Schema.decodeEffect(Schema.fromJsonString(KnowledgeUploadInput));
+const proposalFailure = (error: { readonly code: string; readonly message: string }) =>
+  HttpServerResponse.text(error.message, {
+    status:
+      error.code === "proposal_not_found"
+        ? 404
+        : error.code === "access_denied"
+          ? 403
+          : error.code === "invalid_proposal"
+            ? 400
+            : 502,
+    headers: { "Cache-Control": "no-store" },
+  });
+
+export const layerProposalUploadRoute = Layer.unwrap(
+  Effect.map(EnterpriseClient.EnterpriseClient, (client) =>
+    HttpRouter.add(
+      "POST",
+      proposalRoute,
+      Effect.gen(function* () {
+        yield* authenticateRawRouteWithScope(AuthOrchestrationOperateScope);
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const maxBytes = 56 * 1024 * 1024;
+        if (Number(request.headers["content-length"] ?? 0) > maxBytes)
+          return HttpServerResponse.text("Upload too large.", { status: 413 });
+        const chunks = yield* request.stream.pipe(
+          Stream.runFoldEffect(
+            () => ({ chunks: [] as Uint8Array[], size: 0 }),
+            (state, chunk) =>
+              state.size + chunk.byteLength > maxBytes
+                ? Effect.fail("too_large" as const)
+                : Effect.succeed({
+                    chunks: [...state.chunks, chunk],
+                    size: state.size + chunk.byteLength,
+                  }),
+          ),
+          Effect.orElseSucceed(() => null),
+        );
+        if (!chunks) return HttpServerResponse.text("Upload too large.", { status: 413 });
+        const input = yield* decodeProposalUpload(
+          new TextDecoder().decode(Buffer.concat(chunks.chunks)),
+        ).pipe(Effect.orElseSucceed(() => null));
+        if (!input) return HttpServerResponse.text("Invalid upload batch.", { status: 400 });
+        return yield* client.proposalUpload(input).pipe(
+          Effect.map((proposal) =>
+            HttpServerResponse.jsonUnsafe(proposal, { headers: { "Cache-Control": "no-store" } }),
+          ),
+          Effect.catch((error) => Effect.succeed(proposalFailure(error))),
+        );
+      }).pipe(
+        Effect.catchTags({
+          EnvironmentAuthInvalidError: HttpServerRespondable.toResponse,
+          EnvironmentInternalError: HttpServerRespondable.toResponse,
+          EnvironmentScopeRequiredError: HttpServerRespondable.toResponse,
+        }),
+      ),
+    ),
+  ),
+);
+
+export function proposalAttachmentResponse(file: {
+  readonly name: string;
+  readonly mimeType: string;
+  readonly base64: string;
+}) {
+  const bytes = Buffer.from(file.base64, "base64");
+  const pdf = file.mimeType === "application/pdf";
+  return HttpServerResponse.uint8Array(bytes, {
+    headers: {
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+      "Content-Disposition": pdf ? "inline" : downloadContentDisposition(file.name),
+      "Content-Type": pdf ? "application/pdf" : "application/octet-stream",
+    },
+  });
+}
+
+export const layerProposalAttachmentRoute = Layer.unwrap(
+  Effect.map(EnterpriseClient.EnterpriseClient, (client) =>
+    HttpRouter.add(
+      "GET",
+      `${proposalRoute}/*`,
+      Effect.gen(function* () {
+        yield* authenticateRawRouteWithScope(AuthOrchestrationReadScope);
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const url = requestUrl(request);
+        if (Option.isNone(url)) return HttpServerResponse.text("Bad Request", { status: 400 });
+        const match =
+          /^\/api\/enterprise\/proposals\/files\/([0-9a-f-]{36})\/([0-9a-f-]{36})$/.exec(
+            url.value.pathname,
+          );
+        if (!match) return HttpServerResponse.text("Not Found", { status: 404 });
+        return yield* client.proposalAttachment({ proposalId: match[1]!, fileId: match[2]! }).pipe(
+          Effect.map(proposalAttachmentResponse),
+          Effect.catch((error) => Effect.succeed(proposalFailure(error))),
+        );
+      }).pipe(
+        Effect.catchTags({
+          EnvironmentAuthInvalidError: HttpServerRespondable.toResponse,
+          EnvironmentInternalError: HttpServerRespondable.toResponse,
+          EnvironmentScopeRequiredError: HttpServerRespondable.toResponse,
+        }),
+      ),
+    ),
+  ),
 );
 
 export const layerAttachmentUploadRoute = HttpRouter.add(

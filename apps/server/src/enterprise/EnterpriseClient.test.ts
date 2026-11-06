@@ -268,6 +268,54 @@ it.effect(
         expect((yield* jero.client.knowledgeGet({ path: "areas/frontend/README.md" })).areaId).toBe(
           "frontend",
         );
+        const bytes = Buffer.from("proof from a remote device");
+        const staged = yield* ana.client.proposalUpload({
+          scope: "ledger",
+          reason: "Review device file",
+          files: [
+            { name: "proof.txt", mimeType: "text/plain", base64: bytes.toString("base64") },
+            {
+              name: "note.txt",
+              mimeType: "text/plain",
+              base64: Buffer.from("note").toString("base64"),
+            },
+          ],
+        });
+        expect(staged).toMatchObject({
+          status: "pending",
+          kind: "upload",
+          files: [
+            { name: "proof.txt", sizeBytes: bytes.length },
+            { name: "note.txt", sizeBytes: 4 },
+          ],
+        });
+        expect(
+          Buffer.from(
+            (yield* jero.client.proposalAttachment({
+              proposalId: staged.id,
+              fileId: staged.files![0]!.id,
+            })).base64,
+            "base64",
+          ),
+        ).toEqual(bytes);
+        expect(
+          yield* failureOf(
+            jero.client.proposalAttachment({ proposalId: staged.id, fileId: "arbitrary" }),
+          ),
+        ).toMatchObject({ code: "proposal_not_found" });
+        expect(
+          (yield* jero.client.proposalDecide({ id: staged.id, action: "approve" })).status,
+        ).toBe("approved-awaiting-processing");
+        expect((yield* jero.client.knowledgeList).documents).toHaveLength(8);
+        yield* jero.client.revoke({ email: "ent.test.ana@gmail.com" });
+        expect(
+          yield* failureOf(
+            ana.client.proposalAttachment({
+              proposalId: staged.id,
+              fileId: staged.files![0]!.id,
+            }),
+          ),
+        ).toMatchObject({ code: "not_authorized" });
       }),
     ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

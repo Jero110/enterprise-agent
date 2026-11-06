@@ -3,6 +3,9 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as Sqlite from "../persistence/Sqlite.ts";
+import { acmeSeedPath } from "./EnterpriseStore.testkit.ts";
 import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -28,6 +31,19 @@ const layer = AreaKnowledge.layer.pipe(
     Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto),
   ),
 );
+const layerAt = (baseDir: string, dbPath: string) =>
+  AreaKnowledge.layer.pipe(
+    Layer.provideMerge(KnowledgeProposals.layer),
+    Layer.provideMerge(KnowledgeRepo.layer),
+    Layer.provideMerge(ProcessRunner.layer),
+    Layer.provideMerge(
+      EnterpriseStore.layer.pipe(Layer.provideMerge(Sqlite.layerFromPath(dbPath))),
+    ),
+    Layer.provideMerge(ServerConfig.layerTest(process.cwd(), baseDir)),
+    Layer.provideMerge(
+      Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto),
+    ),
+  );
 const codeOf = <A>(effect: Effect.Effect<A, { readonly code: string }>) =>
   Effect.map(Effect.result(effect), (result) =>
     Result.isFailure(result) ? result.failure.code : "ok",
@@ -42,6 +58,184 @@ const create = {
 } as const;
 
 describe("KnowledgeProposals", () => {
+  it.effect("keeps uploaded bytes after hub restart and rechecks reviewer grants on read", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-upload-restart-" });
+      const dbPath = path.join(baseDir, "enterprise.sqlite");
+      const bytes = new TextEncoder().encode("persisted");
+      const staged = yield* Effect.gen(function* () {
+        const store = yield* EnterpriseStore.EnterpriseStore;
+        yield* store.seed(yield* EnterpriseStore.loadSeedFile(acmeSeedPath));
+        const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+        return yield* proposals.uploadEncoded(BRUNO, {
+          scope: "ledger",
+          reason: "Review",
+          files: [
+            {
+              name: "evidence.txt",
+              mimeType: "text/plain",
+              base64: Buffer.from(bytes).toString("base64"),
+            },
+            {
+              name: "second.txt",
+              mimeType: "text/plain",
+              base64: Buffer.from("second").toString("base64"),
+            },
+          ],
+        });
+      }).pipe(Effect.provide(layerAt(baseDir, dbPath)));
+      yield* Effect.gen(function* () {
+        const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+        const store = yield* EnterpriseStore.EnterpriseStore;
+        const fileId = staged.files![0]!.id;
+        expect((yield* proposals.inbox(ANA)).proposals.map((p) => p.id)).toContain(staged.id);
+        expect(Array.from((yield* proposals.readAttachment(ANA, staged.id, fileId)).bytes)).toEqual(
+          Array.from(bytes),
+        );
+        expect(
+          new TextDecoder().decode(
+            (yield* proposals.readAttachment(ANA, staged.id, staged.files![1]!.id)).bytes,
+          ),
+        ).toBe("second");
+        yield* store.moveMember(ANA, "frontend");
+        expect(yield* codeOf(proposals.readAttachment(ANA, staged.id, fileId))).toBe(
+          "proposal_not_found",
+        );
+        expect((yield* proposals.readAttachment(BRUNO, staged.id, fileId)).name).toBe(
+          "evidence.txt",
+        );
+      }).pipe(Effect.provide(layerAt(baseDir, dbPath)));
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+  it.effect("stages actual files without changing knowledge on approval or rejection", () =>
+    Effect.gen(function* () {
+      const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+      const repo = yield* KnowledgeRepo.KnowledgeRepo;
+      const before = yield* repo.documents;
+      const bytes = new TextEncoder().encode("sample PDF bytes");
+      const upload = yield* proposals.upload(BRUNO, {
+        scope: "personal",
+        recipient: ANA,
+        reason: "Review this",
+        files: [
+          { name: "brief.pdf", mimeType: "application/pdf", bytes },
+          {
+            name: "notes.txt",
+            mimeType: "text/plain",
+            bytes: new TextEncoder().encode("review notes"),
+          },
+        ],
+      });
+      expect(upload).toMatchObject({
+        kind: "upload",
+        status: "pending",
+        path: "",
+        files: [
+          { name: "brief.pdf", mimeType: "application/pdf", sizeBytes: bytes.length },
+          { name: "notes.txt", mimeType: "text/plain", sizeBytes: 12 },
+        ],
+      });
+      expect(
+        new TextDecoder().decode(
+          (yield* proposals.readAttachment(ANA, upload.id, upload.files![1]!.id)).bytes,
+        ),
+      ).toBe("review notes");
+      expect((yield* proposals.inbox(ANA)).proposals.map((p) => p.id)).toContain(upload.id);
+      expect(
+        Array.from((yield* proposals.readAttachment(ANA, upload.id, upload.files![0]!.id)).bytes),
+      ).toEqual(Array.from(bytes));
+      expect(yield* codeOf(proposals.readAttachment(GERRY, upload.id, upload.files![0]!.id))).toBe(
+        "proposal_not_found",
+      );
+      expect(yield* codeOf(proposals.readAttachment(ANA, upload.id, "arbitrary"))).toBe(
+        "proposal_not_found",
+      );
+      expect((yield* proposals.decide(ANA, { id: upload.id, action: "approve" })).status).toBe(
+        "approved-awaiting-processing",
+      );
+      expect(yield* repo.documents).toEqual(before);
+      const rejected = yield* proposals.upload(BRUNO, {
+        scope: "ledger",
+        reason: "Review",
+        files: [{ name: "ledger.txt", mimeType: "text/plain", bytes }],
+      });
+      expect(
+        (yield* proposals.decide(ANA, { id: rejected.id, action: "reject", reason: "No" })).status,
+      ).toBe("rejected");
+      expect(yield* repo.documents).toEqual(before);
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      yield* store.revokeMember(ANA);
+      expect(yield* codeOf(proposals.readAttachment(ANA, upload.id, upload.files![0]!.id))).toBe(
+        "access_denied",
+      );
+      expect((yield* proposals.readAttachment(BRUNO, upload.id, upload.files![0]!.id)).name).toBe(
+        "brief.pdf",
+      );
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("does not approve a proposed upload when a staged file disappeared", () =>
+    Effect.gen(function* () {
+      const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+      const fs = yield* FileSystem.FileSystem;
+      const config = yield* ServerConfig.ServerConfig;
+      const p = yield* proposals.upload(BRUNO, {
+        scope: "ledger",
+        reason: "Review",
+        files: [{ name: "gone.txt", mimeType: "text/plain", bytes: new Uint8Array([1]) }],
+      });
+      yield* fs.remove(`${config.baseDir}/enterprise/proposal-uploads/${p.id}/${p.files![0]!.id}`);
+      expect(yield* codeOf(proposals.decide(ANA, { id: p.id, action: "approve" }))).toBe(
+        "invalid_proposal",
+      );
+      expect((yield* proposals.inbox(ANA)).proposals.find((item) => item.id === p.id)?.status).toBe(
+        "pending",
+      );
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("rejects inaccessible targets, malformed batches and traversal names", () =>
+    Effect.gen(function* () {
+      const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+      const bytes = new Uint8Array([1]);
+      const valid = {
+        scope: "ledger",
+        reason: "Review",
+        files: [{ name: "a.pdf", mimeType: "application/pdf", bytes }],
+      };
+      for (const input of [
+        { ...valid, scope: "global" },
+        { ...valid, scope: "personal", recipient: "absent@example.com" },
+        { ...valid, scope: "frontend" },
+        { ...valid, files: [] },
+        { ...valid, files: [{ ...valid.files[0]!, name: "../attack.html" }] },
+        { ...valid, files: [{ ...valid.files[0]!, bytes: new Uint8Array(10_485_761) }] },
+      ]) {
+        expect(yield* codeOf(proposals.upload(BRUNO, input))).not.toBe("ok");
+      }
+    }).pipe(Effect.provide(layer)),
+  );
+  it.effect("rejects malformed encoded uploads before creating a proposal", () =>
+    Effect.gen(function* () {
+      const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      const before = (yield* store.listProposals).length;
+      for (const base64 of ["!!!", "YQ=", "YQ==YQ==", "A".repeat(14_000_000)]) {
+        expect(
+          yield* codeOf(
+            proposals.uploadEncoded(BRUNO, {
+              scope: "ledger",
+              reason: "Review",
+              files: [{ name: "a.txt", mimeType: "text/plain", base64 }],
+            }),
+          ),
+        ).toBe("invalid_proposal");
+      }
+      expect((yield* store.listProposals).length).toBe(before);
+    }).pipe(Effect.provide(layer)),
+  );
   it.effect("does not duplicate identical pending create proposals", () =>
     Effect.gen(function* () {
       const proposals = yield* KnowledgeProposals.KnowledgeProposals;
@@ -113,45 +307,36 @@ describe("KnowledgeProposals", () => {
     () =>
       Effect.gen(function* () {
         const proposals = yield* KnowledgeProposals.KnowledgeProposals;
-        const store = yield* EnterpriseStore.EnterpriseStore;
-        yield* store.saveProposal({
-          ...create,
-          id: "personal-upload",
-          kind: "upload",
+        const upload = yield* proposals.upload(BRUNO, {
           scope: "personal",
           recipient: ANA,
-          path: "",
-          proposedBy: BRUNO,
-          createdAt: "2026-01-01T00:00:00Z",
-          status: "pending",
-          baseContentHash: "absent",
-          baseVersion: "",
-          targetVersion: "",
+          reason: "Review",
+          files: [{ name: "note.txt", mimeType: "text/plain", bytes: new Uint8Array([1]) }],
         });
         expect((yield* proposals.inbox(BRUNO)).proposals).toMatchObject([
           {
-            id: "personal-upload",
+            id: upload.id,
             canDecide: false,
             reviewers: [{ email: ANA, role: "recipient" }],
           },
         ]);
         expect((yield* proposals.inbox(ANA)).pendingCount).toBe(1);
         expect((yield* proposals.inbox(GERRY)).proposals).toEqual([]);
-        expect(
-          yield* codeOf(proposals.decide(GERRY, { id: "personal-upload", action: "approve" })),
-        ).toBe("proposal_not_found");
+        expect(yield* codeOf(proposals.decide(GERRY, { id: upload.id, action: "approve" }))).toBe(
+          "proposal_not_found",
+        );
         expect(
           yield* codeOf(proposals.decide(GERRY, { id: "not-a-proposal", action: "approve" })),
         ).toBe("proposal_not_found");
-        expect(
-          yield* codeOf(proposals.decide(ADMIN, { id: "personal-upload", action: "approve" })),
-        ).toBe("proposal_not_found");
-        expect(
-          yield* codeOf(proposals.decide(BRUNO, { id: "personal-upload", action: "approve" })),
-        ).toBe("access_denied");
-        expect(
-          (yield* proposals.decide(ANA, { id: "personal-upload", action: "approve" })).status,
-        ).toBe("approved-awaiting-processing");
+        expect(yield* codeOf(proposals.decide(ADMIN, { id: upload.id, action: "approve" }))).toBe(
+          "proposal_not_found",
+        );
+        expect(yield* codeOf(proposals.decide(BRUNO, { id: upload.id, action: "approve" }))).toBe(
+          "access_denied",
+        );
+        expect((yield* proposals.decide(ANA, { id: upload.id, action: "approve" })).status).toBe(
+          "approved-awaiting-processing",
+        );
         expect((yield* proposals.inbox(BRUNO)).proposals[0]?.status).toBe(
           "approved-awaiting-processing",
         );

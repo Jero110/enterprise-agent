@@ -5,11 +5,15 @@ import {
   type KnowledgeProposalInbox,
   type KnowledgeProposalDecision,
   type KnowledgeProposalInboxInput,
+  type KnowledgeUploadInput,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as ServerConfig from "../config.ts";
 import * as Semaphore from "effect/Semaphore";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
@@ -23,6 +27,31 @@ export class KnowledgeProposals extends Context.Service<
       input: KnowledgeProposeInput,
       ingestion?: boolean,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly upload: (
+      email: string,
+      input: {
+        readonly scope: string;
+        readonly recipient?: string;
+        readonly reason: string;
+        readonly files: ReadonlyArray<{
+          readonly name: string;
+          readonly mimeType: string;
+          readonly bytes: Uint8Array;
+        }>;
+      },
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly uploadEncoded: (
+      email: string,
+      input: KnowledgeUploadInput,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly readAttachment: (
+      email: string,
+      proposalId: string,
+      fileId: string,
+    ) => Effect.Effect<
+      { readonly name: string; readonly mimeType: string; readonly bytes: Uint8Array },
+      EnterpriseError
+    >;
     readonly inbox: (
       email: string,
       input?: KnowledgeProposalInboxInput,
@@ -66,6 +95,18 @@ export const layer = Layer.effect(
     const repo = yield* KnowledgeRepo.KnowledgeRepo;
     const random = yield* SecureRandom.SecureRandom;
     const mutex = yield* Semaphore.make(1);
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const config = yield* ServerConfig.ServerConfig;
+    const uploadDir = path.join(config.baseDir, "enterprise", "proposal-uploads");
+    const missing = new EnterpriseError({
+      code: "proposal_not_found",
+      message: "Proposal not found.",
+    });
+    const uploadInvalid = new EnterpriseError({
+      code: "invalid_proposal",
+      message: "Invalid upload batch.",
+    });
     const memberOf = Effect.fn("KnowledgeProposals.memberOf")(function* (email: string) {
       const member = yield* store.getMember(email);
       if (member === null || !(yield* store.canEnter(email))) return yield* denied;
@@ -205,6 +246,165 @@ export const layer = Layer.effect(
       yield* store.saveProposal(proposal);
       return proposal;
     }, mutex.withPermits(1));
+    const upload = Effect.fn("KnowledgeProposals.upload")(function* (
+      email: string,
+      input: {
+        readonly scope: string;
+        readonly recipient?: string;
+        readonly reason: string;
+        readonly files: ReadonlyArray<{
+          readonly name: string;
+          readonly mimeType: string;
+          readonly bytes: Uint8Array;
+        }>;
+      },
+    ) {
+      const member = yield* memberOf(email);
+      if (
+        !input.reason.trim() ||
+        input.reason.length > 2_000 ||
+        input.files.length < 1 ||
+        input.files.length > 20 ||
+        input.files.reduce((size, file) => size + file.bytes.byteLength, 0) > 40 * 1024 * 1024 ||
+        input.files.some(
+          (file) =>
+            !file.name ||
+            file.name.length > 255 ||
+            file.name === "." ||
+            file.name === ".." ||
+            /[\\/\r\n\0]/.test(file.name) ||
+            !file.mimeType ||
+            file.mimeType.length > 128 ||
+            file.bytes.byteLength < 1 ||
+            file.bytes.byteLength > 10 * 1024 * 1024,
+        )
+      )
+        return yield* uploadInvalid;
+      if (input.scope === "personal") {
+        const recipient = input.recipient && (yield* store.getMember(input.recipient));
+        if (!recipient || !(yield* store.canEnter(recipient.email))) return yield* denied;
+      } else {
+        if (input.recipient !== undefined) return yield* uploadInvalid;
+        if (input.scope !== "global" && (yield* store.getTeam(input.scope)) === null)
+          return yield* uploadInvalid;
+        if (
+          member.role !== "admin" &&
+          (input.scope === "global" ||
+            (member.teamId !== input.scope &&
+              !(yield* store.listGrants(member.email)).some(
+                (grant) => grant.areaId === input.scope,
+              )))
+        )
+          return yield* denied;
+      }
+      const id = yield* random.uuidV4();
+      const files = yield* Effect.forEach(input.files, (file) =>
+        Effect.map(random.uuidV4(), (fileId) => ({
+          id: fileId,
+          name: file.name,
+          mimeType: file.mimeType,
+          sizeBytes: file.bytes.byteLength,
+        })),
+      );
+      const directory = path.join(uploadDir, id);
+      const proposal: KnowledgeProposal = {
+        id,
+        kind: "upload",
+        scope: input.scope,
+        ...(input.scope === "personal" ? { recipient: input.recipient!.trim().toLowerCase() } : {}),
+        path: "",
+        reason: input.reason.trim(),
+        evidence: [],
+        files,
+        proposedBy: member.email,
+        createdAt: yield* now,
+        status: "pending",
+        baseContentHash: "absent",
+        baseVersion: "",
+        targetVersion: "",
+      };
+      yield* fs.makeDirectory(directory, { recursive: true }).pipe(Effect.orDie);
+      yield* Effect.forEach(
+        input.files,
+        (file, index) => fs.writeFile(path.join(directory, files[index]!.id), file.bytes),
+        { discard: true },
+      ).pipe(
+        Effect.mapError(
+          () =>
+            new EnterpriseError({
+              code: "knowledge_write_failed",
+              message: "Could not store the uploaded files.",
+            }),
+        ),
+        Effect.tapError(() =>
+          fs.remove(directory, { recursive: true, force: true }).pipe(Effect.ignore),
+        ),
+      );
+      yield* store
+        .saveProposal(proposal)
+        .pipe(
+          Effect.tapError(() =>
+            fs.remove(directory, { recursive: true, force: true }).pipe(Effect.ignore),
+          ),
+        );
+      return proposal;
+    }, mutex.withPermits(1));
+    const uploadEncoded = Effect.fn("KnowledgeProposals.uploadEncoded")(function* (
+      email: string,
+      input: KnowledgeUploadInput,
+    ) {
+      if (
+        input.files.length < 1 ||
+        input.files.length > 20 ||
+        input.files.some(
+          (file) =>
+            file.base64.length > 13_981_016 ||
+            !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.base64),
+        )
+      )
+        return yield* uploadInvalid;
+      const files = input.files.map((file) => ({
+        name: file.name,
+        mimeType: file.mimeType,
+        bytes: Uint8Array.from(Buffer.from(file.base64, "base64")),
+      }));
+      if (
+        files.reduce((total, file) => total + file.bytes.byteLength, 0) > 40 * 1024 * 1024 ||
+        files.some(
+          (file, i) => Buffer.from(file.bytes).toString("base64") !== input.files[i]!.base64,
+        )
+      )
+        return yield* uploadInvalid;
+      return yield* upload(email, {
+        scope: input.scope,
+        ...(input.recipient === undefined ? {} : { recipient: input.recipient }),
+        reason: input.reason,
+        files,
+      });
+    });
+    const readAttachment = Effect.fn("KnowledgeProposals.readAttachment")(function* (
+      email: string,
+      proposalId: string,
+      fileId: string,
+    ) {
+      const member = yield* memberOf(email);
+      const proposal = (yield* store.listProposals).find(
+        (p) => p.id === proposalId && p.kind === "upload",
+      );
+      if (
+        !proposal ||
+        (proposal.proposedBy !== member.email &&
+          !canApprove(member, yield* store.listGrants(member.email), proposal))
+      )
+        return yield* missing;
+      const file = proposal.files?.find((f) => f.id === fileId);
+      if (!file) return yield* missing;
+      const bytes = yield* fs
+        .readFile(path.join(uploadDir, proposal.id, file.id))
+        .pipe(Effect.mapError(() => missing));
+      if (bytes.byteLength !== file.sizeBytes) return yield* missing;
+      return { name: file.name, mimeType: file.mimeType, bytes };
+    });
     const inbox = Effect.fn("KnowledgeProposals.inbox")(function* (
       email: string,
       input: KnowledgeProposalInboxInput = {},
@@ -277,6 +477,16 @@ export const layer = Layer.effect(
             message: "This proposal has already been resolved.",
           });
         let updated: KnowledgeProposal;
+        if (input.action === "approve" && proposal.kind === "upload") {
+          for (const file of proposal.files ?? []) {
+            const info = yield* fs
+              .stat(path.join(uploadDir, proposal.id, file.id))
+              .pipe(Effect.orElseSucceed(() => null));
+            if (info?.type !== "File" || Number(info.size) !== file.sizeBytes)
+              return yield* uploadInvalid;
+          }
+          if (!proposal.files?.length) return yield* uploadInvalid;
+        }
         if (input.action === "reject") {
           if (!input.reason?.trim()) return yield* invalid;
           updated = {
@@ -340,6 +550,6 @@ export const layer = Layer.effect(
       mutex.withPermits(1),
       Effect.uninterruptible,
     );
-    return KnowledgeProposals.of({ propose, inbox, decide });
+    return KnowledgeProposals.of({ propose, upload, uploadEncoded, readAttachment, inbox, decide });
   }),
 );

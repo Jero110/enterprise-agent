@@ -25,12 +25,140 @@ import {
   injectMcpAppThemeBootstrap,
   MCP_APP_MAX_HTML_BYTES,
 } from "@t3tools/shared/mcpApp";
-import { ORCHESTRATION_PROTOCOL_HEADER } from "@t3tools/contracts";
+import {
+  AuthSessionId,
+  AuthOrchestrationOperateScope,
+  AuthOrchestrationReadScope,
+  ORCHESTRATION_PROTOCOL_HEADER,
+} from "@t3tools/contracts";
+import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
+import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 
 import * as ServerConfig from "./config.ts";
 
 import { assetResponseHeaders, assetFileResponse, downloadContentDisposition } from "./http.ts";
 import * as ServerHttp from "./http.ts";
+
+describe("member proposal file HTTP routes", () => {
+  it("authenticates before forwarding uploads and reads through the member service", async () => {
+    const calls: string[] = [];
+    const client = Layer.mock(EnterpriseClient.EnterpriseClient)({
+      proposalUpload: (input) =>
+        Effect.sync(() => {
+          calls.push("upload");
+          return {
+            id: "uploaded",
+            kind: "upload" as const,
+            scope: input.scope,
+            path: "",
+            reason: input.reason,
+            evidence: [],
+            proposedBy: "test@example.com",
+            createdAt: "2026-01-01",
+            status: "pending" as const,
+            baseContentHash: "absent",
+            baseVersion: "",
+            targetVersion: "",
+            files: input.files.map((f) => ({
+              id: "id",
+              name: f.name,
+              mimeType: f.mimeType,
+              sizeBytes: 1,
+            })),
+          };
+        }),
+      proposalAttachment: () =>
+        Effect.sync(() => {
+          calls.push("read");
+          return { name: "evil.html", mimeType: "text/html", base64: "YQ==" };
+        }),
+    });
+    const layer = Layer.mergeAll(
+      Layer.merge(
+        ServerHttp.layerProposalUploadRoute,
+        ServerHttp.layerProposalAttachmentRoute,
+      ).pipe(Layer.provide(client)),
+      Layer.mock(EnvironmentAuth.EnvironmentAuth)({
+        authenticateHttpRequest: () =>
+          Effect.sync(() => {
+            calls.push("auth");
+            return {
+              sessionId: AuthSessionId.make("test"),
+              subject: "test",
+              method: "browser-session-cookie" as const,
+              scopes: [AuthOrchestrationOperateScope, AuthOrchestrationReadScope],
+            };
+          }),
+      }),
+    );
+    const { handler, dispose } = HttpRouter.toWebHandler(layer, { disableLogger: true });
+    try {
+      const body = JSON.stringify({
+        scope: "ledger",
+        reason: "Review",
+        files: [{ name: "note.txt", mimeType: "text/plain", base64: "YQ==" }],
+      });
+      const upload = await handler(
+        new Request("https://member.example/api/enterprise/proposals/files", {
+          method: "POST",
+          body,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+      expect({ status: upload.status, body: await upload.text(), calls }).toMatchObject({
+        status: 200,
+        calls: ["auth", "upload"],
+      });
+      const read = await handler(
+        new Request(
+          "https://member.example/api/enterprise/proposals/files/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222",
+        ),
+      );
+      expect(read.status).toBe(200);
+      expect(read.headers.get("content-type")).toBe("application/octet-stream");
+      expect(await read.text()).toBe("a");
+      expect(calls).toEqual(["auth", "upload", "auth", "read"]);
+      const invalid = await handler(
+        new Request("https://member.example/api/enterprise/proposals/files", {
+          method: "POST",
+          body: "not-json",
+        }),
+      );
+      expect(invalid.status).toBe(400);
+      const guessed = await handler(
+        new Request("https://member.example/api/enterprise/proposals/files/../../etc/passwd"),
+      );
+      expect(guessed.status).toBe(404);
+      expect(calls).toEqual(["auth", "upload", "auth", "read", "auth"]);
+    } finally {
+      await dispose();
+    }
+  });
+});
+
+describe("proposal attachment responses", () => {
+  it("sandboxes PDFs and downloads untrusted HTML and SVG with no MIME sniffing", async () => {
+    for (const mimeType of ["application/pdf", "text/html", "image/svg+xml"]) {
+      const response = HttpServerResponse.toWeb(
+        ServerHttp.proposalAttachmentResponse({
+          name: mimeType === "application/pdf" ? "report.pdf" : 'evil"\r\n.html',
+          mimeType,
+          base64: Buffer.from("<script>bad()</script>").toString("base64"),
+        }),
+      );
+      expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(response.headers.get("content-type")).toBe(
+        mimeType === "application/pdf" ? "application/pdf" : "application/octet-stream",
+      );
+      expect(response.headers.get("content-disposition")).toBe(
+        mimeType === "application/pdf" ? "inline" : 'attachment; filename="evil___.html"',
+      );
+      expect(await response.text()).toBe("<script>bad()</script>");
+    }
+  });
+});
 
 describe("MCP app asset responses", () => {
   it.effect(

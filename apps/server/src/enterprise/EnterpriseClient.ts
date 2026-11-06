@@ -7,6 +7,9 @@ import {
   KnowledgeProposalInbox,
   type KnowledgeProposalDecision,
   type KnowledgeProposalInboxInput,
+  type KnowledgeUploadInput,
+  type KnowledgeAttachmentInput,
+  KnowledgeAttachment,
   EnvironmentId,
   type EnterpriseAuthorizeMemberInput,
   type EnterpriseConnectInput,
@@ -59,6 +62,12 @@ export class EnterpriseClient extends Context.Service<
     readonly knowledgePropose: (
       input: KnowledgeProposeInput,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly proposalUpload: (
+      input: KnowledgeUploadInput,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly proposalAttachment: (
+      input: KnowledgeAttachmentInput,
+    ) => Effect.Effect<typeof KnowledgeAttachment.Type, EnterpriseError>;
     readonly proposalInbox: (
       input: KnowledgeProposalInboxInput,
     ) => Effect.Effect<KnowledgeProposalInbox, EnterpriseError>;
@@ -242,6 +251,14 @@ const make = Effect.gen(function* () {
     ),
     knowledgePropose: Effect.fn("EnterpriseClient.knowledgePropose")((input) =>
       withConnection((hub) => callResult(hub, "knowledge_propose", input, KnowledgeProposal)),
+    ),
+    proposalUpload: Effect.fn("EnterpriseClient.proposalUpload")((input) =>
+      withConnection((hub) => callResult(hub, "knowledge_upload_files", input, KnowledgeProposal)),
+    ),
+    proposalAttachment: Effect.fn("EnterpriseClient.proposalAttachment")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "knowledge_proposal_attachment", input, KnowledgeAttachment),
+      ),
     ),
     proposalInbox: Effect.fn("EnterpriseClient.proposalInbox")((input) =>
       withConnection((hub) =>
