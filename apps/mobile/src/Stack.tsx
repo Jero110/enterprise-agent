@@ -94,6 +94,7 @@ import { SettingsDiagnosticsRouteScreen } from "./features/diagnostics/SettingsD
 import { SettingsProviderAccountsRouteScreen } from "./features/settings/SettingsProviderAccountsRouteScreen";
 import { SettingsAuthRouteScreen } from "./features/settings/SettingsAuthRouteScreen";
 import { SettingsEnvironmentDetailRouteScreen } from "./features/settings/SettingsEnvironmentDetailRouteScreen";
+import { EnterpriseChangesScreen } from "./features/enterprise/EnterpriseChangesScreen";
 import { SettingsEnvironmentsRouteScreen } from "./features/settings/SettingsEnvironmentsRouteScreen";
 import { SettingsFollowUpRouteScreen } from "./features/settings/SettingsFollowUpRouteScreen";
 import {
@@ -230,6 +231,11 @@ const SETTINGS_SCREENS = {
     screen: SettingsEnvironmentDetailRouteScreen,
     linking: "settings/environments/:environmentId",
     options: { ...SETTINGS_PAGE_OPTIONS, title: "Environment" },
+  }),
+  EnterpriseChanges: createNativeStackScreen({
+    screen: EnterpriseChangesScreen,
+    linking: "settings/environments/:environmentId/context-changes",
+    options: { ...SETTINGS_PAGE_OPTIONS, title: "Context changes" },
   }),
   // Old links to New threads and Agent behavior open Threads, which absorbed them.
   SettingsEnvironmentNewThreads: createNativeStackScreen({

@@ -196,6 +196,14 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                 onUpdate={connections.onUpdateEnvironment}
               />
             </SettingsSection>
+            {connected && !outdated && (
+              <SettingsSection title="Enterprise">
+                <SettingsActionRow
+                  label="Context changes"
+                  onPress={() => navigation.navigate("EnterpriseChanges", { environmentId })}
+                />
+              </SettingsSection>
+            )}
             <EnvironmentRoutesSection
               environmentId={environmentId}
               connected={connected}
