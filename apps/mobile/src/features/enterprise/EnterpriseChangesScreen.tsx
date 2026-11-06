@@ -104,9 +104,8 @@ export function EnterpriseChangesScreen({
       await action();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The hub request failed.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
   const refresh = () => {
     inbox.refresh();
