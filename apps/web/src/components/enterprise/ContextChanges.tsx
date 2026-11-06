@@ -42,6 +42,7 @@ function ProposalDetails({
   const permission = useAtomValue(
     enterpriseEnvironment.proposalDecide.permissionAtom(environmentId),
   );
+  const { identity } = useEnterpriseStatus();
   const decide = useAtomCommand(enterpriseEnvironment.proposalDecide, {
     label: "resolve proposal",
     reportFailure: false,
@@ -52,7 +53,7 @@ function ProposalDetails({
   });
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
-  const resolve = async (action: "approve" | "reject") => {
+  const resolve = async (action: "approve" | "reject" | "revert") => {
     setBusy(true);
     const result = await decide({
       environmentId,
@@ -150,6 +151,18 @@ function ProposalDetails({
           Resolved by {proposal.resolvedBy} · {proposal.resolvedAt}
         </p>
       )}
+      {proposal.status === "applied" &&
+        permission &&
+        proposal.reviewers?.some((reviewer) => reviewer.email === identity?.email) && (
+          <Button
+            size="xs"
+            variant="destructive-outline"
+            disabled={busy}
+            onClick={() => void resolve("revert")}
+          >
+            Revert
+          </Button>
+        )}
       {proposal.status === "pending" && proposal.canDecide === true && permission && (
         <div className="flex flex-wrap items-center gap-2">
           <Button size="xs" disabled={busy} onClick={() => void resolve("approve")}>
