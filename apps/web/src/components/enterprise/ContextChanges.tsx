@@ -30,6 +30,20 @@ function fileBase64(file: File): Promise<string> {
   });
 }
 
+function CurrentDocument({ environmentId, path }: { environmentId: EnvironmentId; path: string }) {
+  const document = useEnvironmentQuery(
+    enterpriseEnvironment.knowledgeGet({ environmentId, input: { path } }),
+  );
+  return (
+    <div className="space-y-1">
+      <p>Current content</p>
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs">
+        {document.error ?? document.data?.content ?? "Loading…"}
+      </pre>
+    </div>
+  );
+}
+
 function ProposalDetails({
   proposal,
   environmentId,
@@ -128,6 +142,9 @@ function ProposalDetails({
       </p>
       <p>{proposal.reason}</p>
       {proposal.evidence.length > 0 && <p>Evidence: {proposal.evidence.join(", ")}</p>}
+      {proposal.path && proposal.kind !== "create" && proposal.kind !== "area-access" && (
+        <CurrentDocument environmentId={environmentId} path={proposal.path} />
+      )}
       {proposal.content && (
         <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2">
           {proposal.content}
