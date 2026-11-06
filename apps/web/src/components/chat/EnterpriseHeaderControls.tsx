@@ -14,6 +14,7 @@ import type {
 } from "@t3tools/contracts";
 import {
   BookOpenIcon,
+  FileClockIcon,
   GlobeIcon,
   LayersIcon,
   NetworkIcon,
@@ -31,6 +32,10 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { cn } from "~/lib/utils";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
+import { ContextChanges } from "../enterprise/ContextChanges";
+import { useState } from "react";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Radio, RadioGroup } from "../ui/radio-group";
 import { Switch } from "../ui/switch";
@@ -326,6 +331,41 @@ function SharePanel(props: { readonly environmentId: EnvironmentId; readonly thr
   );
 }
 
+function EnterpriseChangesDialog({ environmentId }: { readonly environmentId: EnvironmentId }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Context changes"
+              onClick={() => setOpen(true)}
+            />
+          }
+        >
+          <FileClockIcon className="size-4" />
+        </TooltipTrigger>
+        <TooltipPopup side="bottom">Context changes</TooltipPopup>
+      </Tooltip>
+      <DialogPopup
+        className="flex h-[min(840px,90dvh)] w-[min(1050px,94vw)] max-w-none flex-col overflow-hidden"
+        bottomStickOnMobile={false}
+      >
+        <div className="shrink-0 border-b border-border/60 px-8 py-5">
+          <DialogTitle>Context changes</DialogTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pending proposals, file ingest and review history.
+          </p>
+        </div>
+        {open && <ContextChanges environmentId={environmentId} />}
+      </DialogPopup>
+    </Dialog>
+  );
+}
+
 /** Org chart, conversation context and team sharing: only for an IDE linked to an enterprise hub. */
 export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(props: {
   readonly threadId: ThreadId;
@@ -339,6 +379,7 @@ export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(p
       <HeaderPopover icon={NetworkIcon} label="Organization">
         <OrgPanel environmentId={environmentId} />
       </HeaderPopover>
+      <EnterpriseChangesDialog environmentId={environmentId} />
       {props.isServerThread ? (
         <>
           <HeaderPopover icon={BookOpenIcon} label="Conversation context">
