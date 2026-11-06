@@ -345,23 +345,24 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           files: encoded,
         },
       });
-      if (result._tag === "Failure")
-        throw new Error(enterpriseFailureMessage(squashAtomCommandFailure(result)));
-      setFiles([]);
-      setFileInputKey((value) => value + 1);
-      setReason("");
-      setSelected(result.value.id);
-      inbox.refresh();
-      toastManager.add({
-        type: "success",
-        title: "Files staged for review",
-        description: "Approval does not process or add them to current context.",
-      });
+      if (result._tag === "Failure") {
+        setError(enterpriseFailureMessage(squashAtomCommandFailure(result)));
+      } else {
+        setFiles([]);
+        setFileInputKey((value) => value + 1);
+        setReason("");
+        setSelected(result.value.id);
+        inbox.refresh();
+        toastManager.add({
+          type: "success",
+          title: "Files staged for review",
+          description: "Approval does not process or add them to current context.",
+        });
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Upload failed. Please try again.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
