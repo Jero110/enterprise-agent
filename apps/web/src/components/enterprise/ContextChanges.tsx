@@ -1,6 +1,6 @@
 import type { EnvironmentId, KnowledgeProposal } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   enterpriseEnvironment,
   enterpriseFiles,
@@ -16,6 +16,7 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { toastManager } from "../ui/toast";
+import { pendingGraphNodes } from "./proposalGraph";
 
 const MAX_FILES = 20;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -259,9 +260,50 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [graphReady, setGraphReady] = useState(false);
+  const frame = useRef<HTMLIFrameElement>(null);
   const proposals = inbox.data?.proposals ?? [];
   const pending = proposals.filter((proposal) => proposal.status === "pending");
   const selectedProposal = proposals.find((proposal) => proposal.id === selected);
+  const graphNodes = pendingGraphNodes(inbox.data?.proposals ?? [], org.data?.teams ?? []);
+  const graphGroups = [
+    ...new Map(graphNodes.map((node) => [node.groupId, node.groupLabel])).entries(),
+  ];
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- synchronize the sandboxed graph with hub-confirmed pending proposals
+  useEffect(() => {
+    if (graphReady)
+      frame.current?.contentWindow?.postMessage(
+        {
+          type: "knowledge-proposals",
+          nodes: pendingGraphNodes(inbox.data?.proposals ?? [], org.data?.teams ?? []),
+        },
+        "*",
+      );
+  }, [graphReady, inbox.data?.proposals, org.data?.teams]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- receive node selection and readiness from the sandboxed graph
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== frame.current?.contentWindow) return;
+      if (event.data?.type === "knowledge-graph-ready") setGraphReady(true);
+      if (
+        event.data?.type === "knowledge-proposal-selected" &&
+        inbox.data?.proposals.some(
+          (proposal) => proposal.status === "pending" && proposal.id === event.data.id,
+        )
+      )
+        setSelected(event.data.id);
+      if (event.data?.type === "knowledge-proposal-cleared") setSelected(null);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [inbox.data?.proposals]);
+  const selectProposal = (id: string) => {
+    setSelected(id);
+    frame.current?.contentWindow?.postMessage(
+      { type: "knowledge-proposal-focus", id: `proposal:${id}` },
+      "*",
+    );
+  };
   const scopes = [
     { id: "personal", name: "Personal" },
     ...(org.data?.teams ?? [])
@@ -325,45 +367,54 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
       <section
         aria-label="Pending context changes"
-        className="relative min-h-64 overflow-hidden rounded-xl border bg-background"
+        className="overflow-hidden rounded-xl border bg-background"
       >
-        <iframe
-          title="Knowledge map behind pending changes"
-          sandbox="allow-scripts"
-          src="/context-graph/index.html"
-          tabIndex={-1}
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 size-full border-0 opacity-20 grayscale"
-        />
-        <div className="relative grid gap-3 p-4 sm:grid-cols-3">
-          {scopes.map((group) => (
-            <section key={group.id} className="rounded-lg border bg-background/95 p-3">
-              <h3 className="mb-2 text-sm font-medium">{group.name}</h3>
-              {pending
-                .filter((proposal) => proposal.scope === group.id)
-                .map((proposal) => (
-                  <button
-                    key={proposal.id}
-                    type="button"
-                    aria-pressed={selected === proposal.id}
-                    className="mb-2 block w-full rounded-md border border-primary/50 bg-primary/10 p-2 text-left text-xs focus-visible:outline-2 focus-visible:outline-ring"
-                    onClick={() => setSelected(proposal.id)}
-                  >
-                    {proposal.kind === "upload"
-                      ? proposal.files?.map((file) => file.name).join(", ")
-                      : proposal.path || proposal.kind}
-                    <span className="block text-muted-foreground">
-                      {group.id === "personal" ? proposal.recipient : proposal.proposedBy}
-                    </span>
-                  </button>
-                ))}
-              {pending.every((proposal) => proposal.scope !== group.id) && (
-                <p className="text-xs text-muted-foreground">No pending changes</p>
-              )}
-            </section>
-          ))}
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_230px]">
+          <iframe
+            ref={frame}
+            title="Interactive context changes graph"
+            sandbox="allow-scripts"
+            src="/context-graph/index.html"
+            className="h-[470px] w-full border-0"
+          />
+          <aside
+            aria-label="Pending proposals by scope"
+            className="max-h-[470px] space-y-3 overflow-y-auto border-t p-4 lg:border-t-0 lg:border-l"
+          >
+            {graphGroups.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                {inbox.data ? "No pending changes" : "Loading proposals…"}
+              </p>
+            )}
+            {graphGroups.map(([groupId, groupLabel]) => (
+              <div key={groupId} className="space-y-1">
+                <h3 className="text-xs font-medium">{groupLabel}</h3>
+                {graphNodes
+                  .filter((node) => node.groupId === groupId)
+                  .map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      aria-pressed={selected === node.proposalId}
+                      className="block w-full rounded border px-2 py-1 text-left text-xs hover:bg-muted"
+                      onClick={() => selectProposal(node.proposalId)}
+                    >
+                      {node.title}
+                    </button>
+                  ))}
+              </div>
+            ))}
+          </aside>
         </div>
       </section>
+      {selectedProposal && (
+        <ProposalDetails
+          key={selectedProposal.id}
+          proposal={selectedProposal}
+          environmentId={environmentId}
+          refresh={inbox.refresh}
+        />
+      )}
       <section aria-label="Ingest files" className="space-y-3 rounded-xl border p-4">
         <h2 className="font-medium">Ingest files</h2>
         <p className="text-xs text-muted-foreground">
@@ -447,29 +498,21 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
                 proposal.reviewers?.some((reviewer) => reviewer.email === identity?.email),
               )}
               selected={selected}
-              onSelect={setSelected}
+              onSelect={selectProposal}
             />
             <ProposalList
               title="Authored by you"
               proposals={pending.filter((proposal) => proposal.proposedBy === identity?.email)}
               selected={selected}
-              onSelect={setSelected}
+              onSelect={selectProposal}
             />
             <ProposalList
               title="History"
               proposals={proposals.filter((proposal) => proposal.status !== "pending")}
               selected={selected}
-              onSelect={setSelected}
+              onSelect={selectProposal}
             />
           </div>
-        )}
-        {selectedProposal && (
-          <ProposalDetails
-            key={selectedProposal.id}
-            proposal={selectedProposal}
-            environmentId={environmentId}
-            refresh={inbox.refresh}
-          />
         )}
       </section>
     </div>
