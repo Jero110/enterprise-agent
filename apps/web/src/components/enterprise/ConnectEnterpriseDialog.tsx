@@ -20,6 +20,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { toastManager } from "../ui/toast";
+import { parseEnterpriseInvite } from "./invite";
 
 export function ConnectEnterpriseDialog({
   environmentId,
@@ -30,10 +31,8 @@ export function ConnectEnterpriseDialog({
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
-  const [hubUrl, setHubUrl] = useState("");
-  const [pairingCode, setPairingCode] = useState("");
+  const [invite, setInvite] = useState("");
   const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const formId = useId();
@@ -41,29 +40,32 @@ export function ConnectEnterpriseDialog({
     label: "connect enterprise",
     reportFailure: false,
   });
-  const ready = [hubUrl, pairingCode, email, token].every((value) => value.trim().length > 0);
+  const ready = email.trim().length > 0 && invite.trim().length > 0;
 
   const handleOpenChange = (next: boolean) => {
     if (!next && busy) return;
     onOpenChange(next);
     if (!next) {
-      setHubUrl("");
-      setPairingCode("");
+      setInvite("");
       setEmail("");
-      setToken("");
       setError(null);
     }
   };
   const submit = async () => {
     if (busy || !ready) return;
+    const credentials = parseEnterpriseInvite(invite);
+    if (credentials === null) {
+      setError("Invalid Enterprise invite. Ask an admin for a fresh one.");
+      return;
+    }
     setBusy(true);
     setError(null);
     const result = await connect({
       environmentId,
       input: {
-        link: { url: hubUrl.trim(), pairingCode: pairingCode.trim(), access: "read-only" },
+        link: credentials.link,
         email: email.trim(),
-        token: token.trim(),
+        token: credentials.token,
       },
     });
     setBusy(false);
@@ -85,9 +87,8 @@ export function ConnectEnterpriseDialog({
         <DialogHeader>
           <DialogTitle>Connect Enterprise</DialogTitle>
           <DialogDescription>
-            Sign in to your company's hub with your work email and the enterprise token. Without
-            connecting, everything here works as before. Needs Linked environments on in Settings →
-            Labs.
+            Enter your work email and the Enterprise invite from your admin. Each invite works for
+            one connection. Linked environments must be on in Settings → Labs.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -101,30 +102,6 @@ export function ConnectEnterpriseDialog({
             }}
           >
             <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Hub address</span>
-              <Input
-                value={hubUrl}
-                onChange={(event) => setHubUrl(event.target.value)}
-                placeholder="https://hub.example.ts.net"
-                disabled={busy}
-                autoFocus
-                nativeInput
-                spellCheck={false}
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Pairing code</span>
-              <Input
-                value={pairingCode}
-                onChange={(event) => setPairingCode(event.target.value)}
-                placeholder="From the hub's Connections, or t3 pair there"
-                disabled={busy}
-                autoComplete="one-time-code"
-                nativeInput
-                spellCheck={false}
-              />
-            </label>
-            <label className="block space-y-1.5">
               <span className="block text-xs font-medium text-foreground">Email</span>
               <Input
                 type="email"
@@ -132,16 +109,17 @@ export function ConnectEnterpriseDialog({
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@company.com"
                 disabled={busy}
+                autoFocus
                 nativeInput
                 spellCheck={false}
               />
             </label>
             <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Enterprise token</span>
+              <span className="block text-xs font-medium text-foreground">Enterprise invite</span>
               <Input
                 type="password"
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
+                value={invite}
+                onChange={(event) => setInvite(event.target.value)}
                 disabled={busy}
                 nativeInput
                 spellCheck={false}

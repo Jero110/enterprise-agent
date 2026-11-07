@@ -18,6 +18,7 @@ import {
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { ConnectEnterpriseDialog } from "../enterprise/ConnectEnterpriseDialog";
+import { createEnterpriseInvite } from "../enterprise/invite";
 import { ContextChanges } from "../enterprise/ContextChanges";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -147,7 +148,7 @@ function IdentityRows({
       ) : (
         <SettingsRow
           title="Not connected"
-          description="Connect with your work email and the enterprise token. Nothing changes here until you do."
+          description="Connect with your work email and a one-time Enterprise invite. Nothing changes here until you do."
           control={
             <Button size="xs" onClick={() => setConnecting(true)}>
               Connect Enterprise
@@ -171,6 +172,7 @@ function MembersSection({ environmentId }: { readonly environmentId: Environment
   const members = useEnvironmentQuery(enterpriseEnvironment.members({ environmentId, input: {} }));
   return (
     <SettingsSection title="Members">
+      <InviteRow />
       <AuthorizeRow environmentId={environmentId} teams={members.data?.teams ?? []} />
       {members.error ? (
         <SettingsRow title="Could not load members" description={members.error} />
@@ -187,6 +189,96 @@ function MembersSection({ environmentId }: { readonly environmentId: Environment
         ))
       )}
     </SettingsSection>
+  );
+}
+
+function InviteRow() {
+  const [url, setUrl] = useState("");
+  const [pairingCode, setPairingCode] = useState("");
+  const [token, setToken] = useState("");
+  const [invite, setInvite] = useState("");
+  const [error, setError] = useState("");
+  return (
+    <SettingsRow
+      title="Create an Enterprise invite"
+      description="On the hub, get a fresh pairing code in Connections. Use its HTTPS or Tailscale address. Each code works once. The invite contains the reusable Enterprise token (encoded, not encrypted); share it privately."
+    >
+      <form
+        className="mt-3 flex flex-wrap items-center gap-2"
+        autoComplete="off"
+        onSubmit={(event) => {
+          event.preventDefault();
+          try {
+            setInvite(createEnterpriseInvite(url, pairingCode, token));
+            setError("");
+          } catch {
+            setInvite("");
+            setError("Enter the hub address, pairing code and Enterprise token.");
+          }
+        }}
+      >
+        <Input
+          aria-label="Hub address"
+          value={url}
+          onChange={(event) => {
+            setUrl(event.target.value);
+            setInvite("");
+          }}
+          placeholder="https://hub.example.ts.net"
+          nativeInput
+          spellCheck={false}
+        />
+        <Input
+          aria-label="Hub pairing code"
+          value={pairingCode}
+          onChange={(event) => {
+            setPairingCode(event.target.value);
+            setInvite("");
+          }}
+          placeholder="Fresh pairing code"
+          nativeInput
+          spellCheck={false}
+        />
+        <Input
+          aria-label="Enterprise token"
+          type="password"
+          value={token}
+          onChange={(event) => {
+            setToken(event.target.value);
+            setInvite("");
+          }}
+          placeholder="Enterprise token"
+          nativeInput
+          spellCheck={false}
+        />
+        <Button size="xs" type="submit">
+          Create invite
+        </Button>
+      </form>
+      {error ? (
+        <p role="alert" className="mt-2 text-xs text-destructive-foreground">
+          {error}
+        </p>
+      ) : null}
+      {invite ? (
+        <div className="mt-3 flex items-center gap-2">
+          <Input
+            aria-label="Enterprise invite"
+            value={invite}
+            readOnly
+            nativeInput
+            spellCheck={false}
+          />
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => void navigator.clipboard.writeText(invite)}
+          >
+            Copy
+          </Button>
+        </div>
+      ) : null}
+    </SettingsRow>
   );
 }
 
@@ -345,33 +437,32 @@ function AuthorizeRow({
 }) {
   const { authorize, report } = useMemberCommands();
   const [email, setEmail] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [placement, setPlacement] = useState<{ teamId: string | null; role: TeamMemberRole }>({
-    teamId: null,
-    role: "member",
-  });
   const [busy, setBusy] = useState(false);
-  const ready = email.trim().length > 0 && displayName.trim().length > 0;
+  const ready = email.trim().length > 0;
+  const teamId = teams[0]?.id ?? null;
   const submit = async () => {
     if (!ready || busy) return;
+    const normalizedEmail = email.trim();
     setBusy(true);
     const ok = report(
       await authorize({
         environmentId,
-        input: { email: email.trim(), displayName: displayName.trim(), ...placement },
+        input: {
+          email: normalizedEmail,
+          displayName: normalizedEmail.split("@", 1)[0] || normalizedEmail,
+          teamId,
+          role: "member",
+        },
       }),
       "Could not authorize the email",
     );
     setBusy(false);
-    if (ok) {
-      setEmail("");
-      setDisplayName("");
-    }
+    if (ok) setEmail("");
   };
   return (
     <SettingsRow
-      title="Authorize an email"
-      description="Lets that person connect with the enterprise token."
+      title="Add a member"
+      description="Enter their email. They join the default team and can connect with a one-time Enterprise invite."
     >
       <form
         className="mt-3 flex flex-wrap items-center gap-2"
@@ -390,24 +481,8 @@ function AuthorizeRow({
           nativeInput
           spellCheck={false}
         />
-        <Input
-          aria-label="Name"
-          value={displayName}
-          onChange={(event) => setDisplayName(event.target.value)}
-          placeholder="name"
-          disabled={busy}
-          nativeInput
-          spellCheck={false}
-        />
-        <TeamRoleControls
-          teams={teams}
-          teamId={placement.teamId}
-          role={placement.role}
-          disabled={busy}
-          onChange={setPlacement}
-        />
         <Button size="xs" type="submit" disabled={busy || !ready}>
-          Authorize
+          Add member
         </Button>
       </form>
     </SettingsRow>
