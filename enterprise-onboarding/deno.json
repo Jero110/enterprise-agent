@@ -1,0 +1,15 @@
+{
+  "tasks": {
+    "start": "deno run --allow-net --allow-read --allow-write --allow-env src/main.ts",
+    "admin-link": "deno run --allow-read --allow-write --allow-env cli/admin-link.ts",
+    "join": "deno run --allow-net --allow-read --allow-write --allow-env cli/join.ts",
+    "test": "deno test --allow-read --allow-write --allow-env",
+    "check": "deno check src/main.ts cli/admin-link.ts cli/join.ts tests/"
+  },
+  "imports": {
+    "@simplewebauthn/server": "npm:@simplewebauthn/server@13.1.1"
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}

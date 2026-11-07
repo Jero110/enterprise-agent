@@ -6,6 +6,8 @@ import { cachedTestTasks } from "./scripts/lib/cached-tests.ts";
 
 const TEST_EXCLUDE = [
   "**/.repos/**",
+  // A standalone Deno service with its own `deno task test`.
+  "**/enterprise-onboarding/**",
   "**/.t3/**",
   "**/node_modules/**",
   "**/dist/**",
@@ -158,6 +160,7 @@ export default defineConfig({
   fmt: {
     ignorePatterns: [
       ".repos/**",
+      "enterprise-onboarding/**",
       "infra/task-cache/vendor/**",
       // Macroscope requires one glob per line; Markdown formatting corrupts it.
       ".macroscope/ignore.md",
@@ -193,6 +196,7 @@ export default defineConfig({
     ignorePatterns: [
       ".repos",
       ".repos/**",
+      "enterprise-onboarding/**",
       "infra/task-cache/vendor/**",
       "dist",
       "dist-electron",

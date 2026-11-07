@@ -1,0 +1,6 @@
+[
+  { "id": "general", "name": "Enterprise general", "restricted": false },
+  { "id": "cx", "name": "CX", "restricted": false },
+  { "id": "ai-core", "name": "AI Core", "restricted": false },
+  { "id": "finance", "name": "Finance", "restricted": true }
+]
