@@ -3,24 +3,14 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { dedupeProviderSkillsByName } from "@t3tools/client-runtime/providerSkills";
 import type {
   EnterpriseOrgTeam,
   EnvironmentId,
   ServerProviderSkill,
-  ThreadContextCard,
   ThreadId,
   ThreadKnowledgeScope,
 } from "@t3tools/contracts";
-import {
-  BookOpenIcon,
-  FileClockIcon,
-  GlobeIcon,
-  LayersIcon,
-  NetworkIcon,
-  UserIcon,
-  UsersIcon,
-} from "lucide-react";
+import { BookOpenIcon, FileClockIcon, UserRoundIcon, UsersIcon } from "lucide-react";
 import { memo, type ComponentType, type ReactNode } from "react";
 
 import {
@@ -34,11 +24,11 @@ import { cn } from "~/lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
+import { KnowledgeMap } from "../enterprise/KnowledgeMap";
 import { ContextChanges } from "../enterprise/ContextChanges";
 import { useState } from "react";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Radio, RadioGroup } from "../ui/radio-group";
-import { Switch } from "../ui/switch";
 import { toastManager } from "../ui/toast";
 import { Toggle } from "../ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -131,85 +121,6 @@ function OrgPanel({ environmentId }: { readonly environmentId: EnvironmentId }) 
   );
 }
 
-const CARD_COPY = {
-  general: { title: "General vault", hint: "Shared with everyone", icon: GlobeIcon },
-  area: { title: "Area vault", hint: "Your team and approved areas", icon: LayersIcon },
-} as const;
-
-function ContextCard(props: {
-  readonly card: ThreadContextCard;
-  readonly canToggle: boolean;
-  readonly onToggle: (scope: ThreadKnowledgeScope, enabled: boolean) => void;
-}) {
-  const { card } = props;
-  const copy = CARD_COPY[card.scope];
-  const Icon = copy.icon;
-  const loaded = card.documents.filter((document) => document.loaded);
-  return (
-    <section className="rounded-lg border border-border/60 p-3" data-scope={card.scope}>
-      <div className="flex items-center gap-2">
-        <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-medium">{copy.title}</h3>
-          <p className="text-xs text-muted-foreground">
-            {card.enabled
-              ? `${copy.hint} · ${loaded.length} of ${card.documents.length} loaded`
-              : "Off for this conversation"}
-          </p>
-        </div>
-        <Switch
-          aria-label={`${copy.title} for this conversation`}
-          checked={card.enabled}
-          disabled={!props.canToggle}
-          onCheckedChange={(checked) => props.onToggle(card.scope, checked)}
-        />
-      </div>
-      {card.enabled && loaded.length === 0 ? (
-        <p className="mt-2 text-xs text-muted-foreground">Nothing loaded yet.</p>
-      ) : null}
-      <ul className={cn("mt-2 space-y-1", !card.enabled && "opacity-50")}>
-        {card.documents.map((document) => (
-          <li className="flex items-center gap-2 text-xs" key={document.path}>
-            <span className="min-w-0 flex-1 truncate">{document.title}</span>
-            <Badge variant={document.loaded && card.enabled ? "success" : "outline"}>
-              {document.loaded && card.enabled ? "loaded" : "available"}
-            </Badge>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/** The person's own skills and the tools wired to this IDE; read-only, nothing here is hub knowledge. */
-function IndividualCard({ skills }: { readonly skills: ReadonlyArray<ServerProviderSkill> }) {
-  const enabled = dedupeProviderSkillsByName(skills.filter((skill) => skill.enabled));
-  if (enabled.length === 0) return null;
-  return (
-    <section className="rounded-lg border border-border/60 p-3" data-scope="individual">
-      <div className="flex items-center gap-2">
-        <UserIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-medium">Individual</h3>
-          <p className="text-xs text-muted-foreground">Your skills and connected tools</p>
-        </div>
-      </div>
-      <ul className="mt-2 space-y-1">
-        <li className="flex items-center gap-2 text-xs">
-          <span className="min-w-0 flex-1 truncate">Enterprise hub knowledge tools</span>
-          <Badge variant="success">connected</Badge>
-        </li>
-        {enabled.map((skill) => (
-          <li className="flex items-center gap-2 text-xs" key={skill.name}>
-            <span className="min-w-0 flex-1 truncate">{skill.displayName ?? skill.name}</span>
-            <Badge variant="outline">skill</Badge>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 function ContextPanel(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -241,29 +152,101 @@ function ContextPanel(props: {
   };
   const cards = context.data?.cards ?? [];
   return (
-    <div className="max-h-[70dvh] w-full space-y-2 overflow-y-auto bg-popover p-3">
-      <h2 className="text-sm font-medium">Context</h2>
-      <p className="text-xs text-muted-foreground">
-        What enterprise knowledge this conversation can use. Agents look documents up on demand.
-      </p>
-      {context.error ? (
-        <p className="text-xs text-muted-foreground">{context.error}</p>
-      ) : cards.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          {context.isPending ? "Loading context…" : "No knowledge available."}
-        </p>
-      ) : (
-        cards.map((card) => (
-          <ContextCard
-            canToggle={canToggle}
-            card={card}
-            key={card.scope}
-            onToggle={(scope, enabled) => void toggle(scope, enabled)}
-          />
-        ))
-      )}
-      <IndividualCard skills={props.skills} />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <KnowledgeMap
+        cards={cards}
+        environmentId={props.environmentId}
+        skills={props.skills}
+        canToggle={canToggle}
+        onToggle={(scope, enabled) => void toggle(scope, enabled)}
+      />
     </div>
+  );
+}
+
+function EnterpriseChangesDialog({ environmentId }: { readonly environmentId: EnvironmentId }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Context changes"
+              className="[-webkit-app-region:no-drag]"
+              onClick={() => setOpen(true)}
+            />
+          }
+        >
+          <FileClockIcon className="size-4" />
+        </TooltipTrigger>
+        <TooltipPopup side="bottom">Context changes</TooltipPopup>
+      </Tooltip>
+      <DialogPopup
+        className="flex h-[min(840px,90dvh)] w-[min(1050px,94vw)] max-w-none flex-col overflow-hidden"
+        bottomStickOnMobile={false}
+      >
+        <div className="shrink-0 border-b border-border/60 px-8 py-5">
+          <DialogTitle>Context changes</DialogTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pending proposals, file ingest and review history.
+          </p>
+        </div>
+        {open && <ContextChanges environmentId={environmentId} />}
+      </DialogPopup>
+    </Dialog>
+  );
+}
+
+function EnterpriseContextDialog(props: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+  readonly skills: ReadonlyArray<ServerProviderSkill>;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Conversation context"
+              className="[-webkit-app-region:no-drag]"
+              onClick={() => setOpen(true)}
+            />
+          }
+        >
+          <BookOpenIcon className="size-4" />
+        </TooltipTrigger>
+        <TooltipPopup side="bottom">Conversation context</TooltipPopup>
+      </Tooltip>
+      <DialogPopup
+        className="flex h-[min(840px,90dvh)] w-[min(1050px,94vw)] max-w-none flex-col overflow-hidden"
+        bottomStickOnMobile={false}
+      >
+        <div className="shrink-0 border-b border-border/60 px-8 py-5">
+          <DialogTitle>Current context</DialogTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Choose which knowledge this conversation can use.
+          </p>
+        </div>
+        {open && <ContextPanel {...props} />}
+      </DialogPopup>
+    </Dialog>
+  );
+}
+
+export function EnterpriseShareControl({ threadId }: { readonly threadId: ThreadId }) {
+  const { environmentId, identity } = useEnterpriseStatus();
+  if (environmentId === null || identity === null) return null;
+  return (
+    <HeaderPopover icon={UsersIcon} label="Share with team">
+      <SharePanel environmentId={environmentId} threadId={threadId} />
+    </HeaderPopover>
   );
 }
 
@@ -322,47 +305,24 @@ function SharePanel(props: { readonly environmentId: EnvironmentId; readonly thr
           </span>
         </label>
       </RadioGroup>
+      <div
+        className="flex items-start gap-2 border-t border-border/60 pt-3 text-sm opacity-50"
+        aria-disabled="true"
+      >
+        <span className="mt-1 size-4 shrink-0 rounded-full border border-current" />
+        <span>
+          All access
+          <span className="block text-xs text-muted-foreground">
+            Team collaboration · preview only, not available yet.
+          </span>
+        </span>
+      </div>
       {summary === undefined ? (
         <p className="text-xs text-muted-foreground">
           {threads.isPending ? "Checking with the hub…" : "The hub has not seen this thread yet."}
         </p>
       ) : null}
     </div>
-  );
-}
-
-function EnterpriseChangesDialog({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Context changes"
-              onClick={() => setOpen(true)}
-            />
-          }
-        >
-          <FileClockIcon className="size-4" />
-        </TooltipTrigger>
-        <TooltipPopup side="bottom">Context changes</TooltipPopup>
-      </Tooltip>
-      <DialogPopup
-        className="flex h-[min(840px,90dvh)] w-[min(1050px,94vw)] max-w-none flex-col overflow-hidden"
-        bottomStickOnMobile={false}
-      >
-        <div className="shrink-0 border-b border-border/60 px-8 py-5">
-          <DialogTitle>Context changes</DialogTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Pending proposals, file ingest and review history.
-          </p>
-        </div>
-        {open && <ContextChanges environmentId={environmentId} />}
-      </DialogPopup>
-    </Dialog>
   );
 }
 
@@ -376,22 +336,17 @@ export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(p
   if (environmentId === null || identity === null) return null;
   return (
     <>
-      <HeaderPopover icon={NetworkIcon} label="Organization">
+      <HeaderPopover icon={UserRoundIcon} label="Organization">
         <OrgPanel environmentId={environmentId} />
       </HeaderPopover>
       <EnterpriseChangesDialog environmentId={environmentId} />
       {props.isServerThread ? (
         <>
-          <HeaderPopover icon={BookOpenIcon} label="Conversation context">
-            <ContextPanel
-              environmentId={environmentId}
-              threadId={props.threadId}
-              skills={props.skills}
-            />
-          </HeaderPopover>
-          <HeaderPopover icon={UsersIcon} label="Share with team">
-            <SharePanel environmentId={environmentId} threadId={props.threadId} />
-          </HeaderPopover>
+          <EnterpriseContextDialog
+            environmentId={environmentId}
+            threadId={props.threadId}
+            skills={props.skills}
+          />
         </>
       ) : null}
     </>

@@ -143,9 +143,12 @@ function ProposalDetails({
       </p>
       <p>{proposal.reason}</p>
       {proposal.evidence.length > 0 && <p>Evidence: {proposal.evidence.join(", ")}</p>}
-      {proposal.path && proposal.kind !== "create" && proposal.kind !== "area-access" && (
-        <CurrentDocument environmentId={environmentId} path={proposal.path} />
-      )}
+      {proposal.path &&
+        proposal.kind !== "upload" &&
+        proposal.kind !== "create" &&
+        proposal.kind !== "area-access" && (
+          <CurrentDocument environmentId={environmentId} path={proposal.path} />
+        )}
       {proposal.content && (
         <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2">
           {proposal.content}

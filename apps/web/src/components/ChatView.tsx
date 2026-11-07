@@ -280,7 +280,7 @@ import { useSideChat } from "./chat/useSideChat";
 import { useRemoteOpenState } from "~/remoteOpen";
 import { shouldShowOpenInPicker } from "./chat/OpenInPicker.logic";
 import { useOpenFavoriteEditorShortcut } from "./chat/OpenInPickerShortcut";
-import { EnterpriseHeaderControls } from "./chat/EnterpriseHeaderControls";
+import { EnterpriseHeaderControls, EnterpriseShareControl } from "./chat/EnterpriseHeaderControls";
 import {
   PanelLayoutControls,
   type PanelLayoutControlsProps,
@@ -3747,6 +3747,11 @@ export default function ChatView(props: ChatViewProps) {
                           )}
                         </div>
                       </ComposerSurface.Host>
+                      {isServerThread && (
+                        <div className="flex justify-end px-2 pt-1">
+                          <EnterpriseShareControl threadId={activeThread.id} />
+                        </div>
+                      )}
                       <div className="min-h-0">
                         <div
                           data-terminal-open={terminalUiState.terminalOpen ? "true" : undefined}
