@@ -221,7 +221,8 @@ const make = Effect.gen(function* () {
     function* (input) {
       if ("hubUrl" in input) {
         const origin = yield* Effect.try({
-          try: () => resolveEnterpriseHubOrigin(input.hubUrl),
+          try: () =>
+            resolveEnterpriseHubOrigin(input.hubUrl, { tokenless: input.token === undefined }),
           catch: () =>
             new EnterpriseError({
               code: "access_denied",

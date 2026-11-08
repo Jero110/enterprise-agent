@@ -90,13 +90,16 @@ export function ConnectEnterpriseDialog({
   const submit = async () => {
     if (busy || !ready) return;
     let origin: string | undefined;
+    const tokenless = token.trim().length === 0;
     try {
       if (!configured) {
-        origin = resolveEnterpriseHubOrigin(knownHubUrl ?? hubUrl);
+        origin = resolveEnterpriseHubOrigin(knownHubUrl ?? hubUrl, { tokenless });
         if (knownHubUrl === undefined) {
           const destination = readEnvironment(environmentId)?.displayUrl;
-          if (destination?.startsWith("http")) resolveEnterpriseHubOrigin(destination);
-          else if (!window.desktopBridge) resolveEnterpriseHubOrigin(window.location.origin);
+          if (destination?.startsWith("http"))
+            resolveEnterpriseHubOrigin(destination, { tokenless });
+          else if (!window.desktopBridge)
+            resolveEnterpriseHubOrigin(window.location.origin, { tokenless });
         }
       }
     } catch (error) {

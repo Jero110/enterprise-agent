@@ -260,7 +260,11 @@ export const resolveRemotePairingTarget = (input: {
   };
 };
 
-export function resolveEnterpriseHubOrigin(input: string): string {
+// Plain HTTP is only allowed when no reusable token is sent over it.
+export function resolveEnterpriseHubOrigin(
+  input: string,
+  options?: { readonly tokenless?: boolean },
+): string {
   const url = URL.parse(input.trim());
   if (
     !url ||
@@ -272,6 +276,7 @@ export function resolveEnterpriseHubOrigin(input: string): string {
     throw new Error("Enter the Enterprise environment URL or its pairing URL.");
   }
   if (
+    options?.tokenless !== true &&
     url.protocol === "http:" &&
     !isLocalLoopbackHost(url.hostname) &&
     !isTailnetHost(url.hostname)
