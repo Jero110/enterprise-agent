@@ -2,17 +2,10 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import {
-  BearerConnectionRegistration,
-  BearerConnectionCredential,
-  BearerConnectionProfile,
-  BearerConnectionTarget,
-} from "@t3tools/client-runtime/connection";
 import { resolveEnterpriseHubOrigin } from "@t3tools/shared/remote";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useId, useState } from "react";
 
-import { environmentCatalog } from "~/connection/catalog";
 import {
   readEnvironment,
   useEnvironment,
@@ -55,7 +48,6 @@ export function ConnectEnterpriseDialog({
     label: "connect enterprise",
     reportFailure: false,
   });
-  const register = useAtomCommand(environmentCatalog.register, { reportFailure: false });
   const environment = useEnvironment(environmentId);
   const status = useEnvironmentQuery(enterpriseEnvironment.status({ environmentId, input: {} }));
   const configured =
@@ -117,34 +109,6 @@ export function ConnectEnterpriseDialog({
       },
     });
     if (result._tag === "Success") {
-      const access = result.value.environmentAccess;
-      if (access) {
-        const connectionId = `bearer:${access.environmentId}:${access.httpBaseUrl}`;
-        const saved = await register(
-          new BearerConnectionRegistration({
-            target: new BearerConnectionTarget({
-              environmentId: access.environmentId,
-              label: access.label,
-              connectionId,
-            }),
-            profile: new BearerConnectionProfile({
-              environmentId: access.environmentId,
-              label: access.label,
-              connectionId,
-              httpBaseUrl: `${access.httpBaseUrl}/`,
-              wsBaseUrl: `${access.httpBaseUrl.replace(/^http/, "ws")}/`,
-            }),
-            credential: new BearerConnectionCredential({ token: access.token }),
-          }),
-        );
-        if (saved._tag !== "Success") {
-          setBusy(false);
-          setError(
-            "Enterprise connected, but the environment could not be saved. Connect again to retry.",
-          );
-          return;
-        }
-      }
       setToken("");
       setBusy(false);
       toastManager.add({

@@ -42,15 +42,10 @@ const make = Effect.gen(function* () {
     });
     return yield* Effect.gen(function* () {
       yield* hub.enroll(mcp.sessionId, input);
-      const session = yield* auth.issueSession({ label: `Enterprise · ${identity.email}` });
-      yield* hub
-        .enroll(session.sessionId, input)
-        .pipe(Effect.onError(() => auth.revokeSession(session.sessionId).pipe(Effect.ignore)));
       return {
         identity,
         environmentId: descriptor.environmentId,
         label: descriptor.label,
-        environmentToken: session.token,
         mcpToken: mcp.token,
         mcpExpiresAt: DateTime.toUtc(mcp.expiresAt),
       };

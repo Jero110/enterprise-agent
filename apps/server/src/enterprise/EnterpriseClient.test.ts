@@ -160,7 +160,6 @@ it.live(
             teamName: "Ledger",
             hubEnvironmentId: hubDescriptor.environmentId,
           });
-          expect(result.environmentAccess?.token).toBeTruthy();
           expect((yield* member.client.status).identity?.email).toBe(email);
           // The same URL and reusable token work on another login.
           yield* member.client.connect({ hubUrl: hub.url, email, token: TOKEN });

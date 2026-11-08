@@ -307,12 +307,6 @@ const make = Effect.gen(function* () {
         return {
           ...issued.identity,
           hubEnvironmentId: issued.environmentId,
-          environmentAccess: {
-            environmentId: issued.environmentId,
-            label: issued.label,
-            httpBaseUrl: origin,
-            token: issued.environmentToken,
-          },
         };
       }
       if (!("link" in input)) {

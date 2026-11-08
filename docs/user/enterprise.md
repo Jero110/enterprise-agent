@@ -4,7 +4,7 @@ Ask your admin for an environment connection link and the reusable Enterprise to
 
 Add the environment using its pairing link or T3 Connect, then open **Connect Enterprise**. When the environment hosts your Enterprise, enter only your email and Enterprise token. Each connected client signs in independently; your name, team, permissions and personal conversation list follow your own identity. Disconnecting Enterprise signs out only your connection.
 
-For an IDE that does not host an Enterprise, open **Connect Enterprise** in the header or **Settings → Enterprise** and enter the hub URL, your email and Enterprise token. This also saves the hub as an environment.
+For an IDE that does not host an Enterprise, open **Connect Enterprise** in the header or **Settings → Enterprise** and enter the hub address and your email. The token is optional. Your conversations and files stay on your own environment; the hub is not added as an environment you can work in.
 
 You can paste an existing `/pair#token=…` URL. This flow uses the URL's machine address and does not consume its one-time pairing code. The Enterprise token can be reused across computers; it is not saved in the client. Each connection receives its own sessions.
 

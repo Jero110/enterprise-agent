@@ -57,7 +57,6 @@ export const EnterpriseBootstrapResult = Schema.Struct({
   identity: EnterpriseHubIdentity,
   environmentId: EnvironmentId,
   label: Schema.String,
-  environmentToken: TrimmedNonEmptyString,
   mcpToken: TrimmedNonEmptyString,
   mcpExpiresAt: Schema.DateTimeUtcFromString,
 });
@@ -65,14 +64,6 @@ export type EnterpriseBootstrapResult = typeof EnterpriseBootstrapResult.Type;
 
 export const EnterpriseConnectResult = Schema.Struct({
   ...EnterpriseIdentity.fields,
-  environmentAccess: Schema.optionalKey(
-    Schema.Struct({
-      environmentId: EnvironmentId,
-      label: Schema.String,
-      httpBaseUrl: TrimmedNonEmptyString,
-      token: TrimmedNonEmptyString,
-    }),
-  ),
 });
 export type EnterpriseConnectResult = typeof EnterpriseConnectResult.Type;
 
