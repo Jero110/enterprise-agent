@@ -25,6 +25,7 @@ const board: ProjectBoard = {
     task("t1", "armar demo PE", { status: "blocked", assignees: ["AM"], tags: ["pe"] }),
     task("t2", "medir error en estimación m2", { status: "in_progress", tags: ["catastro"] }),
     task("t3", "match de cuentas", { tags: ["catastro"] }),
+    task("t4", "modelo comparable renta", { tags: ["pe"] }),
   ],
 };
 
@@ -45,6 +46,11 @@ describe("projectBoardContextForMessage", () => {
       ["DS - PE: medir error en estimación m2", "DS - PE: match de cuentas"],
     ],
     ["only whole words", "pero sin catastros", []],
+    [
+      "only the task whose title holds a tag",
+      "en qué estado está armar demo PE?",
+      ["DS - PE: armar demo PE"],
+    ],
     ["the whole board by name", "resume DS - PE", ["Tablero DS - PE"]],
     ["the whole board by keyword", "qué hay en el tablero", ["Tablero DS - PE"]],
   ] as const)("attaches %s", (_case, text, expected) => {

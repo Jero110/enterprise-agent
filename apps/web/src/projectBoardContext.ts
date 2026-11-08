@@ -30,12 +30,14 @@ function escapeRegExp(text: string): string {
 }
 
 /** Whole-word, accent- and case-insensitive. */
-function mentions(foldedText: string, phrase: string): boolean {
+function mentionPattern(phrase: string): RegExp | null {
   const needle = fold(phrase).trim();
-  if (needle.length < 2) return false;
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(needle)}(?![\\p{L}\\p{N}])`, "u").test(
-    foldedText,
-  );
+  if (needle.length < 2) return null;
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(needle)}(?![\\p{L}\\p{N}])`, "gu");
+}
+
+function mentions(foldedText: string, phrase: string): boolean {
+  return mentionPattern(phrase)?.test(foldedText) ?? false;
 }
 
 function taskPayload(task: ProjectTask) {
@@ -94,6 +96,12 @@ export function projectBoardContextForMessage(
   const records: UnknownContextRecord[] = [];
   if (folded.trim().length === 0) return { references: "", records };
   const anyBoardKeyword = BOARD_KEYWORDS.some((keyword) => mentions(folded, keyword));
+  // A tag inside a mentioned title ("pe" in "armar demo PE") names that task, not the tag.
+  let outsideTitles = folded;
+  for (const task of boards.flatMap((board) => board.tasks)) {
+    const pattern = mentionPattern(task.title);
+    if (pattern) outsideTitles = outsideTitles.replace(pattern, " ");
+  }
   let taskRecords = 0;
   for (const board of boards) {
     if (mentions(folded, board.name) || anyBoardKeyword) {
@@ -104,7 +112,10 @@ export function projectBoardContextForMessage(
     }
     for (const task of board.tasks) {
       if (taskRecords >= MAX_TASK_RECORDS) break;
-      if (!mentions(folded, task.title) && !task.tags.some((tag) => mentions(folded, tag))) {
+      if (
+        !mentions(folded, task.title) &&
+        !task.tags.some((tag) => mentions(outsideTitles, tag))
+      ) {
         continue;
       }
       taskRecords++;
