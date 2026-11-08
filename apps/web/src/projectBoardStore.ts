@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { resolveStorage } from "./lib/storage";
+import { randomUUID } from "./lib/utils";
 
 export const PROJECT_BOARD_STORAGE_KEY = "t3code:project-boards:v1";
 
@@ -58,7 +59,7 @@ interface ProjectBoardState {
   deleteTask: (boardId: string, taskId: string) => void;
 }
 
-const newId = () => crypto.randomUUID();
+const newId = () => randomUUID();
 
 function seedTask(
   status: ProjectTaskStatus,

@@ -1,5 +1,5 @@
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { projectBoardContextForMessage } from "./projectBoardContext";
 import type { ProjectBoard, ProjectTask } from "./projectBoardStore";
@@ -39,7 +39,7 @@ describe("projectBoardContextForMessage", () => {
     ["only whole words", "pero sin catastros", []],
     ["the whole board by name", "resume DS - PE", ["Tablero DS - PE"]],
     ["the whole board by keyword", "qué hay en el tablero", ["Tablero DS - PE"]],
-  ])("attaches %s", (_case, text, expected) => {
+  ] as const)("attaches %s", (_case, text, expected) => {
     expect(titles(text)).toEqual(expected);
   });
 
