@@ -34,8 +34,16 @@ const titles = (text: string) =>
 describe("projectBoardContextForMessage", () => {
   it.each([
     ["nothing on the board", "arregla el bug del login", []],
-    ["a task title, ignoring case and accents", "cómo va MEDIR ERROR EN ESTIMACION M2?", ["DS - PE: medir error en estimación m2"]],
-    ["every task with a mentioned tag", "qué falta de catastro", ["DS - PE: medir error en estimación m2", "DS - PE: match de cuentas"]],
+    [
+      "a task title, ignoring case and accents",
+      "cómo va MEDIR ERROR EN ESTIMACION M2?",
+      ["DS - PE: medir error en estimación m2"],
+    ],
+    [
+      "every task with a mentioned tag",
+      "qué falta de catastro",
+      ["DS - PE: medir error en estimación m2", "DS - PE: match de cuentas"],
+    ],
     ["only whole words", "pero sin catastros", []],
     ["the whole board by name", "resume DS - PE", ["Tablero DS - PE"]],
     ["the whole board by keyword", "qué hay en el tablero", ["Tablero DS - PE"]],

@@ -86,7 +86,10 @@ import {
   buildMessageContext,
   previewAnnotationContextReference,
 } from "../../lib/composerContextRecords";
-import { isProjectBoardContextKind, projectBoardContextForMessage } from "../../projectBoardContext";
+import {
+  isProjectBoardContextKind,
+  projectBoardContextForMessage,
+} from "../../projectBoardContext";
 import { useProjectBoardStore } from "../../projectBoardStore";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { threadEnvironment } from "../../state/threads";

@@ -35,15 +35,15 @@ const STATUS_STYLE: Record<ProjectTaskStatus, { pill: string; column: string }> 
     pill: "border border-border bg-background text-muted-foreground",
     column: "bg-muted/60",
   },
-  in_progress: { pill: "bg-violet-600 text-white", column: "bg-violet-500/8" },
+  in_progress: { pill: "bg-fuchsia-600 text-white", column: "bg-fuchsia-500/8" },
   blocked: { pill: "bg-red-500 text-white", column: "bg-red-500/8" },
-  complete: { pill: "bg-emerald-600 text-white", column: "bg-emerald-500/8" },
+  complete: { pill: "bg-emerald-500 text-white", column: "bg-emerald-500/8" },
 };
 
 const PRIORITY_COLOR: Record<ProjectTaskPriority, string> = {
-  urgent: "text-red-600",
-  high: "text-amber-500",
-  normal: "text-blue-600",
+  urgent: "text-destructive",
+  high: "text-warning",
+  normal: "text-info",
   low: "text-muted-foreground",
 };
 
@@ -87,8 +87,7 @@ function Avatars({ initials }: { readonly initials: ReadonlyArray<string> }) {
       {initials.map((initial) => (
         <span
           key={initial}
-          title={initial}
-          className="flex size-6 items-center justify-center rounded-full text-[10px] font-medium text-white ring-2 ring-background"
+          className="flex size-6 items-center justify-center rounded-full text-3xs font-medium text-white ring-2 ring-background"
           style={{ backgroundColor: paletteColor(initial) }}
         >
           {initial.slice(0, 2).toUpperCase()}
@@ -106,7 +105,7 @@ function TaskCard(props: { readonly task: ProjectTask; readonly onOpen: () => vo
       draggable
       onDragStart={(event) => event.dataTransfer.setData("text/plain", task.id)}
       onClick={props.onOpen}
-      className="w-full cursor-pointer rounded-lg border border-border/70 bg-card p-3 text-left shadow-xs transition-colors hover:border-border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+      className="w-full cursor-pointer rounded-lg border border-border/70 bg-card p-3 text-left shadow-xs transition-colors hover:border-border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
       <p className="text-sm font-medium leading-snug text-foreground">{task.title}</p>
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
@@ -115,7 +114,7 @@ function TaskCard(props: { readonly task: ProjectTask; readonly onOpen: () => vo
           <span
             className={cn(
               "inline-flex items-center gap-1 rounded-md border border-border/70 px-1.5 py-0.5",
-              isOverdue(task) && "text-red-600",
+              isOverdue(task) && "text-destructive",
             )}
           >
             <CalendarIcon className="size-3" />
@@ -181,9 +180,7 @@ function BoardColumn(props: {
       onDrop={drop}
     >
       <header className="flex items-center gap-2 px-1 pb-2 pt-1">
-        <span
-          className={cn("rounded-md px-2 py-0.5 text-xs font-semibold uppercase", style.pill)}
-        >
+        <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold uppercase", style.pill)}>
           {PROJECT_TASK_STATUS_LABELS[props.status]}
         </span>
         <span className="text-xs text-muted-foreground">{props.tasks.length}</span>
@@ -486,8 +483,8 @@ export function ProjectsBoardButton() {
         <div className="shrink-0 border-b border-border/60 px-6 py-4">
           <DialogTitle>Proyectos</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Mention a board, task or tag in a message (or say "tablero" / "proyectos") and the
-            agent gets it as context.
+            Mention a board, task or tag in a message (or say "tablero" / "proyectos") and the agent
+            gets it as context.
           </p>
         </div>
         {open && <BoardView />}

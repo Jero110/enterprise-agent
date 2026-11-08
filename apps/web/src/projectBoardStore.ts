@@ -86,7 +86,11 @@ function seedBoards(): ProjectBoard[] {
       name: "DS - PE",
       tasks: [
         seedTask("backlog", "QA métricas asesores", { assignees: ["GG"], tags: ["asesores"] }),
-        seedTask("backlog", "data - panda", { assignees: ["AM"], priority: "normal", tags: ["pe"] }),
+        seedTask("backlog", "data - panda", {
+          assignees: ["AM"],
+          priority: "normal",
+          tags: ["pe"],
+        }),
         seedTask("backlog", "terrenos - costos", { assignees: ["AM"], tags: ["pe"] }),
         seedTask("backlog", "Agente: DB Explorer", { assignees: ["GG"], priority: "low" }),
         seedTask("backlog", "Score de Leads"),
@@ -105,7 +109,10 @@ function seedBoards(): ProjectBoard[] {
           priority: "high",
           tags: ["catastro"],
         }),
-        seedTask("in_progress", "liberación modelo lujo", { assignees: ["AM"], priority: "urgent" }),
+        seedTask("in_progress", "liberación modelo lujo", {
+          assignees: ["AM"],
+          priority: "urgent",
+        }),
         seedTask("in_progress", "continuación modelo de costos", {
           assignees: ["AM"],
           priority: "normal",
