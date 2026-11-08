@@ -281,6 +281,7 @@ import { useRemoteOpenState } from "~/remoteOpen";
 import { shouldShowOpenInPicker } from "./chat/OpenInPicker.logic";
 import { useOpenFavoriteEditorShortcut } from "./chat/OpenInPickerShortcut";
 import { EnterpriseHeaderControls, EnterpriseShareControl } from "./chat/EnterpriseHeaderControls";
+import { ProjectsBoardButton } from "./projects/ProjectsBoardDialog";
 import {
   PanelLayoutControls,
   type PanelLayoutControlsProps,
@@ -3259,11 +3260,13 @@ export default function ChatView(props: ChatViewProps) {
       {...panelToggleControlProps}
       showThreadPanelControl={!inlineRightPanelOwnsTitleBar}
       leadingControls={
-        <EnterpriseHeaderControls
-          threadId={activeThread.id}
-          isServerThread={isServerThread}
-          skills={timelineSkills}
-        />
+        <>
+          <ProjectsBoardButton
+            environmentId={activeThread.environmentId}
+            projectId={activeThread.projectId}
+          />
+          <EnterpriseHeaderControls threadId={activeThread.id} skills={timelineSkills} />
+        </>
       }
     />
   );
@@ -3592,6 +3595,14 @@ export default function ChatView(props: ChatViewProps) {
                               }
                               onMultipleModelSelectionsChange={setMultipleModelSelectionsStable}
                               composerRef={composerRef}
+                              footerAction={
+                                isServerThread ? (
+                                  <EnterpriseShareControl
+                                    environmentId={activeThread.environmentId}
+                                    threadId={activeThread.id}
+                                  />
+                                ) : null
+                              }
                               composerDraftTarget={composerDraftTarget}
                               environmentId={environmentId}
                               attachmentUploadsCapabilityKnown={attachmentUploadsCapabilityKnown}
@@ -3747,14 +3758,6 @@ export default function ChatView(props: ChatViewProps) {
                           )}
                         </div>
                       </ComposerSurface.Host>
-                      {isServerThread && (
-                        <div className="flex justify-end px-2 pt-1">
-                          <EnterpriseShareControl
-                            environmentId={activeThread.environmentId}
-                            threadId={activeThread.id}
-                          />
-                        </div>
-                      )}
                       <div className="min-h-0">
                         <div
                           data-terminal-open={terminalUiState.terminalOpen ? "true" : undefined}

@@ -26,6 +26,7 @@ import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import { RunRecords } from "./RunRecords.ts";
 import { EnterpriseHub } from "./EnterpriseHub.ts";
+import { HOST_AGENT_SESSION } from "./EnterpriseSession.ts";
 import { EnterpriseIngestion } from "./EnterpriseIngestion.ts";
 import { TeamPublication } from "../team/TeamPublication.ts";
 
@@ -179,7 +180,11 @@ const noSession = new EnterpriseError({
 /** The session the hub binds members to: the MCP client's, never an argument. */
 export const sessionId = McpInvocationContext.McpInvocationContext.pipe(
   Effect.flatMap((scope) =>
-    scope.client === undefined ? Effect.fail(noSession) : Effect.succeed(scope.client.sessionId),
+    scope.client !== undefined
+      ? Effect.succeed(scope.client.sessionId)
+      : scope.thread !== undefined
+        ? Effect.succeed(HOST_AGENT_SESSION)
+        : Effect.fail(noSession),
   ),
 );
 

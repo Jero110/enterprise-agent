@@ -180,6 +180,7 @@ const make = Effect.gen(function* () {
   });
 
   const members = Effect.fn("EnterpriseHub.members")(function* () {
+    const grants = yield* store.listAreaGrants;
     return {
       members: (yield* store.listMembers).map((member) => ({
         email: member.email,
@@ -187,6 +188,9 @@ const make = Effect.gen(function* () {
         teamId: member.teamId,
         role: member.role,
         active: member.authorized && !member.revoked,
+        areaIds: grants
+          .filter((grant) => grant.email === member.email)
+          .map((grant) => grant.areaId),
       })),
       teams: (yield* store.listTeams).map(({ id, name }) => ({ id, name })),
     } satisfies EnterpriseMembers;
@@ -237,6 +241,13 @@ const make = Effect.gen(function* () {
           code: "unknown_team",
           message: `There is no team "${input.teamId}".`,
         });
+      }
+      for (const areaId of input.areaIds ?? []) {
+        if ((yield* store.getTeam(areaId)) === null)
+          return yield* new EnterpriseError({
+            code: "unknown_team",
+            message: `There is no area "${areaId}".`,
+          });
       }
       yield* store.upsertMember({ ...input, authorizedBy: admin.email });
       return yield* members();

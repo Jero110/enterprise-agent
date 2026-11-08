@@ -1,3 +1,4 @@
+import { Tabs } from "@base-ui/react/tabs";
 import { useAtomValue } from "@effect/atom-react";
 import {
   isAtomCommandInterrupted,
@@ -10,8 +11,8 @@ import type {
   ThreadId,
   ThreadKnowledgeScope,
 } from "@t3tools/contracts";
-import { BookOpenIcon, FileClockIcon, UserRoundIcon, UsersIcon } from "lucide-react";
-import { memo, type ComponentType, type ReactNode } from "react";
+import { BrainCircuitIcon, UsersRoundIcon, UsersIcon } from "lucide-react";
+import { memo, useState, type ComponentType, type ReactNode } from "react";
 
 import {
   enterpriseEnvironment,
@@ -26,7 +27,6 @@ import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { KnowledgeMap } from "../enterprise/KnowledgeMap";
 import { ContextChanges } from "../enterprise/ContextChanges";
-import { useState } from "react";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Radio, RadioGroup } from "../ui/radio-group";
 import { toastManager } from "../ui/toast";
@@ -137,11 +137,19 @@ function ContextPanel(props: {
     label: "set conversation knowledge",
     reportFailure: false,
   });
-  const toggle = async (scope: ThreadKnowledgeScope, enabled: boolean) => {
+  const [busy, setBusy] = useState(false);
+  const toggle = async (scope: ThreadKnowledgeScope, enabled: boolean, areaId?: string) => {
+    setBusy(true);
     const result = await setContext({
       environmentId: props.environmentId,
-      input: { threadId: props.threadId, scope, enabled },
+      input: {
+        threadId: props.threadId,
+        scope,
+        enabled,
+        ...(areaId === undefined ? {} : { areaId }),
+      },
     });
+    setBusy(false);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add({
         type: "error",
@@ -157,46 +165,10 @@ function ContextPanel(props: {
         cards={cards}
         environmentId={props.environmentId}
         skills={props.skills}
-        canToggle={canToggle}
-        onToggle={(scope, enabled) => void toggle(scope, enabled)}
+        canToggle={canToggle && !busy}
+        onToggle={(scope, enabled, areaId) => void toggle(scope, enabled, areaId)}
       />
     </div>
-  );
-}
-
-function EnterpriseChangesDialog({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Context changes"
-              className="[-webkit-app-region:no-drag]"
-              onClick={() => setOpen(true)}
-            />
-          }
-        >
-          <FileClockIcon className="size-4" />
-        </TooltipTrigger>
-        <TooltipPopup side="bottom">Context changes</TooltipPopup>
-      </Tooltip>
-      <DialogPopup
-        className="flex h-[min(840px,90dvh)] w-[min(1050px,94vw)] max-w-none flex-col overflow-hidden"
-        bottomStickOnMobile={false}
-      >
-        <div className="shrink-0 border-b border-border/60 px-8 py-5">
-          <DialogTitle>Context changes</DialogTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Pending proposals, file ingest and review history.
-          </p>
-        </div>
-        {open && <ContextChanges environmentId={environmentId} />}
-      </DialogPopup>
-    </Dialog>
   );
 }
 
@@ -206,35 +178,64 @@ function EnterpriseContextDialog(props: {
   readonly skills: ReadonlyArray<ServerProviderSkill>;
 }) {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState("context");
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
-              size="icon-sm"
+              size="icon"
               variant="ghost"
-              aria-label="Conversation context"
+              aria-label="Conversation context and changes"
+              aria-haspopup="dialog"
+              aria-expanded={open}
+              data-pressed={open ? "" : undefined}
               className="[-webkit-app-region:no-drag]"
               onClick={() => setOpen(true)}
             />
           }
         >
-          <BookOpenIcon className="size-4" />
+          <BrainCircuitIcon className="size-5" />
         </TooltipTrigger>
-        <TooltipPopup side="bottom">Conversation context</TooltipPopup>
+        <TooltipPopup side="bottom">Conversation context and changes</TooltipPopup>
       </Tooltip>
       <DialogPopup
         className="flex h-[min(840px,90dvh)] w-[min(1050px,94vw)] max-w-none flex-col overflow-hidden"
         bottomStickOnMobile={false}
       >
         <div className="shrink-0 border-b border-border/60 px-8 py-5">
-          <DialogTitle>Current context</DialogTitle>
+          <DialogTitle>Conversation context</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Choose which knowledge this conversation can use.
+            Knowledge for this conversation, pending proposals and review history.
           </p>
         </div>
-        {open && <ContextPanel {...props} />}
+        <Tabs.Root
+          value={tab}
+          onValueChange={(value) => setTab(String(value))}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <Tabs.List aria-label="Conversation knowledge" className="flex shrink-0 gap-2 px-8 py-3">
+            <Tabs.Tab
+              value="context"
+              render={<Button size="sm" variant={tab === "context" ? "secondary" : "ghost"} />}
+            >
+              Context
+            </Tabs.Tab>
+            <Tabs.Tab
+              value="changes"
+              render={<Button size="sm" variant={tab === "changes" ? "secondary" : "ghost"} />}
+            >
+              Changes
+            </Tabs.Tab>
+          </Tabs.List>
+          <Tabs.Panel value="context" className="flex min-h-0 flex-1 flex-col">
+            {open && <ContextPanel {...props} />}
+          </Tabs.Panel>
+          <Tabs.Panel value="changes" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            {open && <ContextChanges environmentId={props.environmentId} />}
+          </Tabs.Panel>
+        </Tabs.Root>
       </DialogPopup>
     </Dialog>
   );
@@ -302,7 +303,7 @@ function SharePanel(props: {
       <h2 className="text-sm font-medium">Share with your team</h2>
       <RadioGroup
         aria-label="Team sharing"
-        disabled={!canPublish || summary === undefined}
+        disabled={!canPublish}
         value={summary?.publicationStatus ?? "unpublished"}
         onValueChange={(value) => void change(value as "unpublished" | "read-only")}
       >
@@ -311,37 +312,20 @@ function SharePanel(props: {
           <span>
             Not shared
             <span className="block text-xs text-muted-foreground">
-              Teammates see only the title, owner and status.
+              Only you can see this conversation.
             </span>
           </span>
         </label>
         <label className="flex items-start gap-2 text-sm">
           <Radio value="read-only" />
           <span>
-            Read-only
+            Team readable
             <span className="block text-xs text-muted-foreground">
               Your team can read this conversation and its subagents. Stop sharing any time.
             </span>
           </span>
         </label>
       </RadioGroup>
-      <div
-        className="flex items-start gap-2 border-t border-border/60 pt-3 text-sm opacity-50"
-        aria-disabled="true"
-      >
-        <span className="mt-1 size-4 shrink-0 rounded-full border border-current" />
-        <span>
-          All access
-          <span className="block text-xs text-muted-foreground">
-            Team collaboration · preview only, not available yet.
-          </span>
-        </span>
-      </div>
-      {summary === undefined ? (
-        <p className="text-xs text-muted-foreground">
-          {threads.isPending ? "Checking with the hub…" : "The hub has not seen this thread yet."}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -349,26 +333,21 @@ function SharePanel(props: {
 /** Org chart, conversation context and team sharing: only for an IDE linked to an enterprise hub. */
 export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(props: {
   readonly threadId: ThreadId;
-  readonly isServerThread: boolean;
   readonly skills: ReadonlyArray<ServerProviderSkill>;
 }) {
   const { environmentId, identity } = useEnterpriseStatus();
   if (environmentId === null || identity === null) return null;
   return (
     <>
-      <HeaderPopover icon={UserRoundIcon} label="Organization">
+      <HeaderPopover icon={UsersRoundIcon} label="Organization">
         <OrgPanel environmentId={environmentId} />
       </HeaderPopover>
-      <EnterpriseChangesDialog environmentId={environmentId} />
-      {props.isServerThread ? (
-        <>
-          <EnterpriseContextDialog
-            environmentId={environmentId}
-            threadId={props.threadId}
-            skills={props.skills}
-          />
-        </>
-      ) : null}
+      <EnterpriseContextDialog
+        key={`${environmentId}:${props.threadId}`}
+        environmentId={environmentId}
+        threadId={props.threadId}
+        skills={props.skills}
+      />
     </>
   );
 });

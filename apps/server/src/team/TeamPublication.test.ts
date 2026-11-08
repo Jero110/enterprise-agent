@@ -55,20 +55,16 @@ describe("TeamPublication hub", () => {
       yield* enroll;
       const pub = yield* TeamPublication.TeamPublication;
       yield* pub.report(hugo, { summaries: [summary("parent")], snapshots: [] });
-      expect(yield* pub.list(juan)).toEqual([
-        {
-          ...summary("parent"),
-          ownerEmail: hugo,
-          ownerDisplayName: "Hugo",
-          publicationStatus: "unpublished",
-        },
+      expect(yield* pub.list(juan)).toEqual([]);
+      expect(yield* pub.list(hugo)).toMatchObject([
+        { threadId: "parent", publicationStatus: "unpublished" },
       ]);
       expect(yield* pub.list(ana)).toEqual([]);
       expect(yield* denied(pub.get(juan, { ownerEmail: hugo, threadId: "parent" }))).toBe(true);
       expect(
         yield* denied(pub.report("unbound", { summaries: [summary("spoof")], snapshots: [] })),
       ).toBe(true);
-      expect((yield* pub.list("jeronimo.deli@gmail.com")).length).toBe(1);
+      expect(yield* pub.list("jeronimo.deli@gmail.com")).toEqual([]);
     }).pipe(Effect.provide(layer)),
   );
 
@@ -91,6 +87,7 @@ describe("TeamPublication hub", () => {
         summaries: [],
         snapshots: summaries.map(({ threadId }) => ({ threadId, messages })),
       });
+      expect(yield* pub.list(juan)).toHaveLength(3);
       for (const { threadId } of summaries) {
         expect((yield* pub.get(juan, { ownerEmail: hugo, threadId })).messages).toEqual(messages);
         expect(yield* denied(pub.get(ana, { ownerEmail: hugo, threadId }))).toBe(true);
@@ -117,9 +114,7 @@ describe("TeamPublication hub", () => {
       expect(
         yield* sql`SELECT thread_id FROM enterprise_team_threads WHERE snapshot_json IS NOT NULL`,
       ).toEqual([]);
-      expect(
-        (yield* pub.list(juan)).every((thread) => thread.publicationStatus === "unpublished"),
-      ).toBe(true);
+      expect(yield* pub.list(juan)).toEqual([]);
     }).pipe(Effect.provide(layer)),
   );
 

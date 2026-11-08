@@ -55,6 +55,7 @@ export interface EnterpriseAreaGrant {
 }
 
 export interface UpsertMemberInput {
+  readonly areaIds?: ReadonlyArray<string>;
   readonly email: string;
   readonly displayName: string;
   readonly teamId: string | null;
@@ -303,10 +304,11 @@ const make = Effect.gen(function* () {
 
   const upsertMember: EnterpriseStore["Service"]["upsertMember"] = Effect.fn(
     "EnterpriseStore.upsertMember",
-  )(function* (input) {
-    const email = normalizeEmail(input.email);
-    const now = yield* nowIso;
-    yield* sql`
+  )(
+    function* (input) {
+      const email = normalizeEmail(input.email);
+      const now = yield* nowIso;
+      yield* sql`
       INSERT INTO enterprise_members
         (email, display_name, team_id, role, authorized, revoked, authorized_at, authorized_by)
       VALUES (${email}, ${input.displayName}, ${input.teamId}, ${input.role}, 1, 0, ${now},
@@ -320,17 +322,34 @@ const make = Effect.gen(function* () {
         authorized_at = excluded.authorized_at,
         authorized_by = excluded.authorized_by
     `.pipe(Effect.orDie);
-    return toMember({
-      email,
-      display_name: input.displayName,
-      team_id: input.teamId,
-      role: input.role,
-      authorized: 1,
-      revoked: 0,
-      authorized_at: now,
-      authorized_by: input.authorizedBy,
-    });
-  });
+      if (input.areaIds !== undefined) {
+        const areas = new Set(input.areaIds);
+        const existing =
+          yield* sql<GrantRow>`SELECT * FROM enterprise_area_grants WHERE email = ${email}`;
+        for (const grant of existing) {
+          if (!areas.has(grant.area_id))
+            yield* sql`DELETE FROM enterprise_area_grants WHERE email = ${email} AND area_id = ${grant.area_id}`;
+        }
+        for (const areaId of areas) {
+          yield* sql`INSERT OR IGNORE INTO enterprise_area_grants
+          (email, area_id, role, granted_at, granted_by)
+          VALUES (${email}, ${areaId}, 'member', ${now}, ${input.authorizedBy})`;
+        }
+      }
+      return toMember({
+        email,
+        display_name: input.displayName,
+        team_id: input.teamId,
+        role: input.role,
+        authorized: 1,
+        revoked: 0,
+        authorized_at: now,
+        authorized_by: input.authorizedBy,
+      });
+    },
+    (effect) => sql.withTransaction(effect),
+    Effect.orDie,
+  );
 
   const revokeMember: EnterpriseStore["Service"]["revokeMember"] = (email) =>
     sql<{ email: string }>`

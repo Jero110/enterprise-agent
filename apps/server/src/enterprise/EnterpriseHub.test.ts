@@ -234,6 +234,60 @@ describe("EnterpriseHub", () => {
       }).pipe(Effect.provide(layer)),
   );
 
+  it.effect("admin assigns several areas without changing team or review privileges", () =>
+    Effect.gen(function* () {
+      const hub = yield* EnterpriseHub.EnterpriseHub;
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      yield* hub.enroll("admin", { email: JERO });
+      yield* hub.enroll("member", { email: ANA });
+      yield* store.grantArea({ email: ANA, areaId: "frontend", role: "lead", grantedBy: JERO });
+      const input = { email: ANA, displayName: "Ana", teamId: "ledger", role: "lead" } as const;
+      const assigned = yield* hub.authorize("admin", {
+        ...input,
+        areaIds: ["frontend", "risk", "risk"],
+      });
+      expect(assigned.members.find((member) => member.email === ANA)).toMatchObject({
+        teamId: "ledger",
+        role: "lead",
+        areaIds: ["frontend", "risk"],
+      });
+      expect((yield* store.listGrants(ANA)).map(({ areaId, role }) => ({ areaId, role }))).toEqual([
+        { areaId: "frontend", role: "lead" },
+        { areaId: "risk", role: "member" },
+      ]);
+      const paths = (yield* hub.knowledgeList("member")).documents.map((doc) => doc.id);
+      expect(paths).toContain("global/overview.md");
+      expect(paths).toContain("areas/ledger/README.md");
+      expect(paths).toContain("areas/frontend/README.md");
+      expect(paths).toContain("areas/risk/README.md");
+      expect(yield* codeOf(hub.authorize("member", { ...input, areaIds: [] }))).toBe(
+        "admin_required",
+      );
+      expect(
+        yield* codeOf(
+          hub.authorize("admin", {
+            ...input,
+            teamId: "risk",
+            areaIds: ["ghost"],
+          }),
+        ),
+      ).toBe("unknown_team");
+      expect((yield* hub.whoami("member")).teamId).toBe("ledger");
+      yield* hub.authorize("admin", input);
+      expect(yield* store.listGrants(ANA)).toHaveLength(2);
+      yield* hub.authorize("admin", { ...input, areaIds: [] });
+      expect(yield* store.listGrants(ANA)).toEqual([]);
+      expect(yield* codeOf(hub.knowledgeGet("member", { path: "areas/risk/README.md" }))).toBe(
+        "access_denied",
+      );
+      expect((yield* hub.knowledgeList("member")).documents.map((doc) => doc.id)).toContain(
+        "areas/ledger/README.md",
+      );
+      yield* hub.revoke("admin", { email: ANA });
+      expect(yield* codeOf(hub.knowledgeList("member"))).toBe("not_authorized");
+    }).pipe(Effect.provide(layer)),
+  );
+
   it.effect("non-admins cannot call admin methods", () =>
     Effect.gen(function* () {
       const hub = yield* EnterpriseHub.EnterpriseHub;

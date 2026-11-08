@@ -47,8 +47,11 @@ export const layer = Layer.effect(
       const identity = (yield* client.status).identity;
       if (identity === null) return null;
       const shell = yield* projections.getShellSnapshot().pipe(Effect.mapError(projectionError));
-      const ids = new Set(shell.threads.map((thread) => thread.id));
-      const summaries: TeamThreadReportSummary[] = shell.threads.map((thread) => ({
+      const owned = shell.threads.filter(
+        (thread) => thread.enterpriseOwnerEmail === identity.email,
+      );
+      const ids = new Set(owned.map((thread) => thread.id));
+      const summaries: TeamThreadReportSummary[] = owned.map((thread) => ({
         threadId: thread.id,
         parentThreadId:
           thread.lineage.relationshipToParent === "subagent" &&
@@ -103,8 +106,8 @@ export const layer = Layer.effect(
           });
         if (!local.ids.has(ThreadId.make(input.threadId)))
           return yield* new EnterpriseError({
-            code: "thread_not_found",
-            message: "Local thread not found.",
+            code: "access_denied",
+            message: "Only this Enterprise identity can share its conversations.",
           });
         const result = yield* client.teamPublish(input);
         if (input.status === "read-only") yield* upload(local);

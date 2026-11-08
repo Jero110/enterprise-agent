@@ -38,7 +38,7 @@ export function ConnectEnterpriseDialog({
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
-  const [hubUrl, setHubUrl] = useState("");
+  const [hubUrlInput, setHubUrlInput] = useState<string | null>(null);
   const [token, setToken] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -64,16 +64,19 @@ export function ConnectEnterpriseDialog({
       );
   const pairedHubBaseUrl = useEnvironmentHttpBaseUrl(pairedHub?.environmentId ?? null);
   const knownHubUrl = pairedHubBaseUrl ?? undefined;
-  const needsUrl = !configured && pairedHub === undefined;
-  const ready =
-    email.trim().length > 0 &&
-    (needsUrl ? hubUrl.trim().length > 0 : configured || knownHubUrl !== undefined);
+  const ownUrl = environment?.displayUrl?.startsWith("http")
+    ? environment.displayUrl
+    : window.desktopBridge
+      ? undefined
+      : window.location.origin;
+  const hubUrl = hubUrlInput ?? "";
+  const ready = email.trim().length > 0 && hubUrl.trim().length > 0;
 
   const handleOpenChange = (next: boolean) => {
     if (!next && busy) return;
     onOpenChange(next);
     if (!next) {
-      setHubUrl("");
+      setHubUrlInput(null);
       setToken("");
       setEmail("");
       setError(null);
@@ -84,8 +87,11 @@ export function ConnectEnterpriseDialog({
     let origin: string | undefined;
     const tokenless = token.trim().length === 0;
     try {
-      if (!configured) {
-        origin = resolveEnterpriseHubOrigin(knownHubUrl ?? hubUrl, { tokenless });
+      origin = resolveEnterpriseHubOrigin(hubUrl, { tokenless });
+      const isOwnHost = configured && ownUrl !== undefined && URL.parse(ownUrl)?.origin === origin;
+      if (isOwnHost) {
+        origin = undefined;
+      } else if (!configured) {
         if (knownHubUrl === undefined) {
           const destination = readEnvironment(environmentId)?.displayUrl;
           if (destination?.startsWith("http"))
@@ -130,9 +136,8 @@ export function ConnectEnterpriseDialog({
         <DialogHeader>
           <DialogTitle>Connect Enterprise</DialogTitle>
           <DialogDescription>
-            {configured || !needsUrl
-              ? "Sign in to this environment’s Enterprise with your work email. Your name, team and permissions load automatically."
-              : "Connect with your Enterprise environment URL and work email."}
+            Connect with your Enterprise host URL and work email. Your name, team and permissions
+            load automatically.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -145,26 +150,24 @@ export function ConnectEnterpriseDialog({
               void submit();
             }}
           >
-            {needsUrl && (
-              <label className="block space-y-1.5">
-                <span className="block text-xs font-medium text-foreground">Environment URL</span>
-                <Input
-                  type="url"
-                  value={hubUrl}
-                  onChange={(event) => setHubUrl(event.target.value)}
-                  placeholder="https://hub.example.com/pair#token=…"
-                  disabled={busy}
-                  autoFocus
-                  nativeInput
-                  spellCheck={false}
-                />
-              </label>
-            )}
+            <label className="block space-y-1.5">
+              <span className="block text-xs font-medium text-foreground">Host URL</span>
+              <Input
+                type="url"
+                value={hubUrl}
+                onChange={(event) => setHubUrlInput(event.target.value)}
+                placeholder="https://hub.example.com/pair#token=…"
+                disabled={busy}
+                autoFocus
+                nativeInput
+                spellCheck={false}
+              />
+            </label>
             <label className="block space-y-1.5">
               <span className="block text-xs font-medium text-foreground">Email</span>
               <Input
                 type="email"
-                autoFocus={!needsUrl}
+
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@company.com"

@@ -659,19 +659,29 @@ it.effect("guards team thread publication with the command permission", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const registry = yield* setup;
-      const publish = createCommandPermissions(runtime, WS_METHODS.teamThreadPublish);
+      const board = createCommandPermissions(runtime, WS_METHODS.projectBoardSave);
+      registry.set(sessions(env), AsyncResult.success(grant(false)));
+      expect(registry.get(board.permissionAtom(env))).toBe(false);
+      expect((yield* board.authorize(registry, env).pipe(Effect.flip)).requiredPermission).toBe(
+        AuthOrchestrationOperateScope,
+      );
       registry.set(sessions(env), AsyncResult.success(grant(true)));
+      expect(registry.get(board.permissionAtom(env))).toBe(true);
+      yield* board.authorize(registry, env);
+      const continuation = createCommandPermissions(runtime, WS_METHODS.teamThreadContinue);
+      registry.set(sessions(env), AsyncResult.success(grant(false)));
+      expect(registry.get(continuation.permissionAtom(env))).toBe(false);
+      expect(
+        (yield* continuation.authorize(registry, env).pipe(Effect.flip)).requiredPermission,
+      ).toBe(AuthOrchestrationOperateScope);
+      registry.set(sessions(env), AsyncResult.success(grant(true)));
+      expect(registry.get(continuation.permissionAtom(env))).toBe(true);
+      const publish = createCommandPermissions(runtime, WS_METHODS.teamThreadPublish);
+      registry.set(sessions(env), AsyncResult.success(grant(false)));
       expect(registry.get(publish.permissionAtom(env))).toBe(false);
       const denied = yield* publish.authorize(registry, env).pipe(Effect.flip);
-      expect(denied.requiredPermission).toBe(AuthAccessWriteScope);
-      registry.set(
-        sessions(env),
-        AsyncResult.success({
-          ...grant(false),
-          scopes: [AuthAccessWriteScope],
-          permissions: [AuthAccessWriteScope],
-        }),
-      );
+      expect(denied.requiredPermission).toBe(AuthOrchestrationOperateScope);
+      registry.set(sessions(env), AsyncResult.success(grant(true)));
       expect(registry.get(publish.permissionAtom(env))).toBe(true);
       yield* publish.authorize(registry, env);
     }),

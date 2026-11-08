@@ -15,6 +15,12 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | R, E>,
 ) {
   // Every read asks the hub, which is what makes a revoked email fail on its next use.
+  const projectBoard = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:project-board",
+    tag: WS_METHODS.projectBoardGet,
+    staleTimeMs: 0,
+    refreshIntervalMs: 10_000,
+  });
   const status = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:enterprise:status",
     tag: WS_METHODS.enterpriseStatus,
@@ -77,6 +83,15 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     registry.refresh(teamThreads({ environmentId, input: {} }));
   };
   return {
+    projectBoard,
+    saveProjectBoard: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:project-board-save",
+      tag: WS_METHODS.projectBoardSave,
+      onSettled: ({ environmentId, input }, registry) =>
+        Effect.sync(() =>
+          registry.refresh(projectBoard({ environmentId, input: { projectId: input.projectId } })),
+        ),
+    }),
     status,
     members,
     org,
@@ -113,6 +128,10 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     }),
     teamThreads,
     teamThread,
+    continueTeamThread: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:team-thread-continue",
+      tag: WS_METHODS.teamThreadContinue,
+    }),
     publishTeamThread: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:team-thread-publish",
       tag: WS_METHODS.teamThreadPublish,
@@ -176,6 +195,7 @@ export function groupTeamThreads(
   }
   const hasRoster = groups.size > 0;
   for (const summary of summaries) {
+    if (summary.publicationStatus !== "read-only") continue;
     const key = teamMemberKey(summary.ownerEmail);
     let group = groups.get(key);
     if (group === undefined) {
@@ -189,5 +209,7 @@ export function groupTeamThreads(
     }
     group.threads.push(summary);
   }
-  return [...groups].map(([key, member]) => ({ key, ...member }));
+  return [...groups]
+    .filter(([, member]) => member.threads.length > 0)
+    .map(([key, member]) => ({ key, ...member }));
 }

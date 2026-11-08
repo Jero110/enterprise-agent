@@ -1,4 +1,10 @@
 import {
+  ProjectBoardInput,
+  ProjectBoardSaveInput,
+  ProjectBoardSnapshot,
+  ProjectBoardError,
+} from "./projectBoard.ts";
+import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
@@ -53,6 +59,9 @@ import {
 import {
   TeamThreadSummary,
   TeamThreadSnapshot,
+  TeamThreadContinueInput,
+  TeamThreadContinueResult,
+  TeamContinuationError,
   TeamThreadReference,
   TeamThreadPublishInput,
   TeamPublicationResult,
@@ -545,7 +554,10 @@ export const WS_METHODS = {
   peerLinksAnswerRequest: "peerLinks.answerRequest",
   teamThreadsList: "team.threads.list",
   teamThreadGet: "team.thread.get",
+  teamThreadContinue: "team.thread.continue",
   teamThreadPublish: "team.thread.publish",
+  projectBoardGet: "projectBoard.get",
+  projectBoardSave: "projectBoard.save",
   enterpriseStatus: "enterprise.status",
   enterpriseConnect: "enterprise.connect",
   enterpriseDisconnect: "enterprise.disconnect",
@@ -916,12 +928,27 @@ const WsTeamThreadGetRpc = Rpc.make(WS_METHODS.teamThreadGet, {
   success: TeamThreadSnapshot,
   error: enterpriseError,
 });
+const WsTeamThreadContinueRpc = Rpc.make(WS_METHODS.teamThreadContinue, {
+  payload: TeamThreadContinueInput,
+  success: TeamThreadContinueResult,
+  error: Schema.Union([enterpriseError, TeamContinuationError]),
+});
 const WsTeamThreadPublishRpc = Rpc.make(WS_METHODS.teamThreadPublish, {
   payload: TeamThreadPublishInput,
   success: TeamPublicationResult,
   error: enterpriseError,
 });
 
+const WsProjectBoardGetRpc = Rpc.make(WS_METHODS.projectBoardGet, {
+  payload: ProjectBoardInput,
+  success: ProjectBoardSnapshot,
+  error: Schema.Union([ProjectBoardError, EnvironmentAuthorizationError]),
+});
+const WsProjectBoardSaveRpc = Rpc.make(WS_METHODS.projectBoardSave, {
+  payload: ProjectBoardSaveInput,
+  success: ProjectBoardSnapshot,
+  error: Schema.Union([ProjectBoardError, EnvironmentAuthorizationError]),
+});
 const WsEnterpriseStatusRpc = Rpc.make(WS_METHODS.enterpriseStatus, {
   payload: Schema.Struct({}),
   success: EnterpriseStatus,
@@ -2173,7 +2200,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsPeerLinksAnswerRequestRpc,
   WsTeamThreadsListRpc,
   WsTeamThreadGetRpc,
+  WsTeamThreadContinueRpc,
   WsTeamThreadPublishRpc,
+  WsProjectBoardGetRpc,
+  WsProjectBoardSaveRpc,
   WsEnterpriseStatusRpc,
   WsEnterpriseConnectRpc,
   WsEnterpriseDisconnectRpc,

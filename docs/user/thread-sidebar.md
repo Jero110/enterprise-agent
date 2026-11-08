@@ -241,14 +241,14 @@ thread** from its long-press menu on mobile.
 ## Share work with your team
 
 After connecting in **Settings → Enterprise**, web and desktop list your team's threads
-under **Team Agents**. Administrators can see threads across teams. Unpublished threads
-share only their title, owner, and status.
+under **CoWork Agents**, grouped by owner. Administrators can see shared threads across
+teams. Unshared conversations do not appear in teammates' lists.
 
-In your thread's menu, choose **Team publication → Read-only** to share its conversation
-and subagents. Teammates open a read-only snapshot; they cannot send messages or control
-your agent. Snapshots update after turns finish. Choose **Unpublished** on the parent
-thread to remove access to it and its subagents. Use **Reload team agents** to refresh
-the list after someone shares new work.
+Choose **Share with team → Read-only** in the conversation composer to share its
+conversation and subagents. Teammates open a read-only snapshot; they cannot send
+messages or control your agent. Snapshots update after turns finish. Choose **Not shared**
+to remove access to it and its subagents. Use **Reload CoWork Agents** to refresh the list
+after someone shares new work.
 
 ## Inspect agent work
 

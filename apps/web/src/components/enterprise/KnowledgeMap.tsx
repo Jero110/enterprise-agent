@@ -5,6 +5,8 @@ import { cn } from "~/lib/utils";
 import { enterpriseEnvironment } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 
+import { Checkbox } from "../ui/checkbox";
+
 const LAYERS = ["metrics", "business", "arch", "data"] as const;
 type KnowledgeNode = {
   id: string;
@@ -69,7 +71,7 @@ export function KnowledgeMap(props: {
   readonly cards: ReadonlyArray<ThreadContextCard>;
   readonly environmentId: EnvironmentId;
   readonly skills: ReadonlyArray<{ name: string; enabled: boolean }>;
-  readonly onToggle: (scope: ThreadKnowledgeScope, enabled: boolean) => void;
+  readonly onToggle: (scope: ThreadKnowledgeScope, enabled: boolean, areaId?: string) => void;
   readonly canToggle: boolean;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -129,6 +131,13 @@ export function KnowledgeMap(props: {
     })),
   );
   const nodes = [...previewNodes, ...documents];
+  const areaDocuments = props.cards.find((card) => card.scope === "area")?.documents ?? [];
+  const areas = [...new Map(areaDocuments.map((doc) => [doc.areaId, doc])).values()];
+  const nodeEnabled = (node: KnowledgeNode) =>
+    enabled(node.scope) &&
+    (node.scope !== "area" ||
+      !node.path ||
+      areaDocuments.find((doc) => doc.path === node.path)?.enabled !== false);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-5 sm:px-8">
@@ -195,6 +204,26 @@ export function KnowledgeMap(props: {
           );
         })}
       </div>
+      {areas.length > 0 && (
+        <fieldset
+          className="mb-4 flex flex-wrap gap-3"
+          disabled={!props.canToggle || !enabled("area")}
+        >
+          <legend className="mb-2 text-xs text-muted-foreground">
+            Areas for this conversation
+          </legend>
+          {areas.map((area) => (
+            <label key={area.areaId} className="flex items-center gap-2 text-xs">
+              <Checkbox
+                checked={area.enabled ?? true}
+                disabled={area.enabled === undefined}
+                onCheckedChange={(checked) => props.onToggle("area", checked === true, area.areaId)}
+              />
+              {area.areaId}
+            </label>
+          ))}
+        </fieldset>
+      )}
       <div className="flex items-center justify-between border-t border-border/60 py-3">
         <div>
           <h3 className="text-sm font-medium">Knowledge map</h3>
@@ -222,7 +251,7 @@ export function KnowledgeMap(props: {
               sync(scopes);
             }}
           />
-          {selected && enabled(selected.scope) && !hiddenLayers.includes(selected.layer) && (
+          {selected && nodeEnabled(selected) && !hiddenLayers.includes(selected.layer) && (
             <div className="absolute right-4 top-14 z-10 max-h-[min(350px,65%)] w-[min(260px,90%)] overflow-auto rounded-xl border border-border bg-background/95 p-4 shadow-lg">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -306,7 +335,7 @@ export function KnowledgeMap(props: {
                           <button
                             key={node.id}
                             type="button"
-                            disabled={!enabled(scope)}
+                            disabled={!nodeEnabled(node)}
                             className={cn(
                               "block w-full truncate rounded-md px-2 py-1 text-left text-xs hover:bg-muted",
                               selected?.id === node.id && "bg-muted font-medium",
@@ -334,7 +363,7 @@ export function KnowledgeMap(props: {
       </div>
       {documentOpen &&
         selected &&
-        enabled(selected.scope) &&
+        nodeEnabled(selected) &&
         !hiddenLayers.includes(selected.layer) && (
           <div className="absolute inset-0 z-10 flex flex-col bg-background px-5 py-5 sm:px-8">
             <div className="flex items-start justify-between gap-4 border-b border-border pb-4">

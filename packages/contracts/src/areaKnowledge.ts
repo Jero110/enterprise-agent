@@ -45,6 +45,23 @@ export type KnowledgeSearchResult = typeof KnowledgeSearchResult.Type;
 export const KnowledgeGetInput = Schema.Struct({ path: TrimmedNonEmptyString });
 export type KnowledgeGetInput = typeof KnowledgeGetInput.Type;
 
+const EnterpriseCliKnowledgeOffset = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+export const EnterpriseCliKnowledgeListInput = Schema.Struct({
+  cursor: Schema.optionalKey(EnterpriseCliKnowledgeOffset),
+});
+export const EnterpriseCliKnowledgeListResult = Schema.Struct({
+  ...KnowledgeDocumentList.fields,
+  nextCursor: Schema.NullOr(EnterpriseCliKnowledgeOffset),
+});
+export const EnterpriseCliKnowledgeGetInput = Schema.Struct({
+  ...KnowledgeGetInput.fields,
+  textOffset: Schema.optionalKey(EnterpriseCliKnowledgeOffset),
+});
+export const EnterpriseCliKnowledgeGetResult = Schema.Struct({
+  ...KnowledgeDocument.fields,
+  nextTextOffset: Schema.NullOr(EnterpriseCliKnowledgeOffset),
+});
+
 export const AreaMembership = Schema.Struct({
   email: TrimmedNonEmptyString,
   areaId: AreaId,

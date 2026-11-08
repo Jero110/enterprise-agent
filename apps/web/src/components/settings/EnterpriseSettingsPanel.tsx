@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -19,8 +20,8 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { ConnectEnterpriseDialog } from "../enterprise/ConnectEnterpriseDialog";
 import { createEnterpriseInvite } from "../enterprise/invite";
-import { ContextChanges } from "../enterprise/ContextChanges";
 import { Button } from "../ui/button";
+import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
@@ -39,72 +40,10 @@ export function EnterpriseSettingsPanel() {
           <IdentityRows environmentId={environmentId} identity={identity} error={error} />
         )}
       </SettingsSection>
-      {environmentId !== null && identity ? (
-        <>
-          <YourContextSection environmentId={environmentId} />
-          <ContextChanges environmentId={environmentId} />
-        </>
-      ) : null}
       {environmentId !== null && identity?.role === "admin" ? (
-        <>
-          <MembersSection environmentId={environmentId} />
-        </>
+        <MembersSection environmentId={environmentId} />
       ) : null}
     </SettingsPageContainer>
-  );
-}
-
-function YourContextSection({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const documents = useEnvironmentQuery(
-    enterpriseEnvironment.knowledgeList({ environmentId, input: {} }),
-  );
-  const [open, setOpen] = useState<string | null>(null);
-  return (
-    <SettingsSection title="Your context">
-      {documents.error ? (
-        <SettingsRow title="Could not load your context" description={documents.error} />
-      ) : !documents.data ? (
-        <SettingsRow title="Loading…" role="status" />
-      ) : documents.data.documents.length === 0 ? (
-        <SettingsRow title="No documents you can read yet" />
-      ) : (
-        documents.data.documents.map((doc) => (
-          <SettingsRow
-            key={doc.id}
-            title={doc.title}
-            description={`${doc.id} · ${doc.areaId}`}
-            control={
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => setOpen(open === doc.id ? null : doc.id)}
-              >
-                {open === doc.id ? "Hide" : "View"}
-              </Button>
-            }
-          >
-            {open === doc.id ? <DocumentBody environmentId={environmentId} path={doc.id} /> : null}
-          </SettingsRow>
-        ))
-      )}
-    </SettingsSection>
-  );
-}
-
-function DocumentBody({
-  environmentId,
-  path,
-}: {
-  readonly environmentId: EnvironmentId;
-  readonly path: string;
-}) {
-  const document = useEnvironmentQuery(
-    enterpriseEnvironment.knowledgeGet({ environmentId, input: { path } }),
-  );
-  return (
-    <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
-      {document.error ?? document.data?.content ?? "Loading…"}
-    </pre>
   );
 }
 
@@ -172,22 +111,28 @@ function MembersSection({ environmentId }: { readonly environmentId: Environment
   const members = useEnvironmentQuery(enterpriseEnvironment.members({ environmentId, input: {} }));
   return (
     <SettingsSection title="Members">
-      <InviteRow />
       <AuthorizeRow environmentId={environmentId} teams={members.data?.teams ?? []} />
-      {members.error ? (
-        <SettingsRow title="Could not load members" description={members.error} />
-      ) : !members.data ? (
-        <SettingsRow title="Loading members…" role="status" />
-      ) : (
-        members.data.members.map((member) => (
-          <MemberRow
-            key={member.email}
-            environmentId={environmentId}
-            member={member}
-            teams={members.data?.teams ?? []}
-          />
-        ))
-      )}
+      <details className="px-3 py-3 sm:px-4">
+        <summary className="cursor-pointer text-sm font-medium">Create an invite</summary>
+        <InviteRow />
+      </details>
+      <details className="px-3 py-3 sm:px-4">
+        <summary className="cursor-pointer text-sm font-medium">Manage existing members</summary>
+        {members.error ? (
+          <SettingsRow title="Could not load members" description={members.error} />
+        ) : !members.data ? (
+          <SettingsRow title="Loading members…" role="status" />
+        ) : (
+          members.data.members.map((member) => (
+            <MemberRow
+              key={member.email}
+              environmentId={environmentId}
+              member={member}
+              teams={members.data?.teams ?? []}
+            />
+          ))
+        )}
+      </details>
     </SettingsSection>
   );
 }
@@ -372,6 +317,7 @@ function MemberRow({
   readonly teams: ReadonlyArray<EnterpriseTeamSummary>;
 }) {
   const { authorize, revoke, report } = useMemberCommands();
+  const canAuthorize = useAtomValue(enterpriseEnvironment.authorize.permissionAtom(environmentId));
   const [busy, setBusy] = useState(false);
   const run = async (
     action: () => Promise<Awaited<ReturnType<typeof authorize>>>,
@@ -381,7 +327,11 @@ function MemberRow({
     report(await action(), title);
     setBusy(false);
   };
-  const save = (next: { teamId: string | null; role: TeamMemberRole }) =>
+  const save = (next: {
+    teamId: string | null;
+    role: TeamMemberRole;
+    areaIds?: ReadonlyArray<string>;
+  }) =>
     run(
       () =>
         authorize({
@@ -395,7 +345,7 @@ function MemberRow({
       title={member.displayName}
       description={member.active ? member.email : `${member.email} · revoked`}
       control={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <TeamRoleControls
             teams={teams}
             teamId={member.teamId}
@@ -403,6 +353,29 @@ function MemberRow({
             disabled={busy || !member.active}
             onChange={(next) => void save(next)}
           />
+          <fieldset
+            disabled={busy || !canAuthorize || !member.active || member.areaIds === undefined}
+            className="flex flex-wrap gap-2"
+          >
+            <legend className="text-xs text-muted-foreground">Additional areas</legend>
+            {teams.map((team) => (
+              <label key={team.id} className="flex items-center gap-1 text-xs">
+                <Checkbox
+                  checked={member.areaIds?.includes(team.id) ?? false}
+                  onCheckedChange={(checked) =>
+                    void save({
+                      teamId: member.teamId,
+                      role: member.role,
+                      areaIds: checked
+                        ? [...(member.areaIds ?? []), team.id]
+                        : (member.areaIds ?? []).filter((id) => id !== team.id),
+                    })
+                  }
+                />
+                {team.name}
+              </label>
+            ))}
+          </fieldset>
           {member.active ? (
             <Button
               size="xs"

@@ -190,7 +190,12 @@ export const layer = Layer.effect(
         const summaries: TeamThreadSummary[] = [];
         for (const owner of owners) {
           const rows = yield* ownerRows(owner.email);
-          summaries.push(...Array.from(rows.values(), (row) => toSummary(rows, row, owner)));
+          for (const row of rows.values()) {
+            const summary = toSummary(rows, row, owner);
+            if (owner.email === viewer.email || summary.publicationStatus === "read-only") {
+              summaries.push(summary);
+            }
+          }
         }
         return summaries.sort(
           (a, b) =>

@@ -20,7 +20,7 @@ it("keeps only the signed-in member's conversations in their personal list", () 
   expect(selectPersonalThreads(threads, null).map((thread) => thread.id)).toEqual(["legacy"]);
 });
 
-it("lists the whole team including yourself and members without conversations, keeping same-name owners separate", () => {
+it("lists only members with shared conversations, keeping same-name owners separate", () => {
   const members = [
     {
       memberKey: teamMemberKey("ana@example.com"),
@@ -60,16 +60,13 @@ it("lists the whole team including yourself and members without conversations, k
     members,
     "ana@example.com",
   );
-  expect(groups).toHaveLength(3);
+  expect(groups).toHaveLength(1);
   expect(groups[0]).toMatchObject({
     displayName: "Ana",
     isMe: true,
     threads: [{ ownerEmail: "ana@example.com", publicationStatus: "read-only" }],
   });
-  expect(groups[1]).toMatchObject({ displayName: "Bruno", isMe: false, threads: [] });
-  expect(groups[2]).toMatchObject({
-    displayName: "Ana",
-    isMe: false,
-    threads: [{ ownerEmail: "other-ana@example.com", publicationStatus: "unpublished" }],
-  });
+  expect(
+    groupTeamThreads([summary("ana@example.com", "unpublished")], members, "ana@example.com"),
+  ).toEqual([]);
 });

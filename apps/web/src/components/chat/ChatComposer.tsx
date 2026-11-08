@@ -55,6 +55,7 @@ import { createModelSelection, normalizeModelSlug } from "@t3tools/shared/model"
 import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
 import {
   memo,
+  type ReactNode,
   use,
   useEffect,
   useEffectEvent,
@@ -353,6 +354,7 @@ export interface ChatComposerProps {
   supportsQuestionAttachments: boolean;
   maxFileAttachmentBytes: number | null;
   routeKind: "server" | "draft";
+  footerAction?: ReactNode;
   routeThreadRef: ScopedThreadRef;
   draftId: DraftId | null;
   multipleModelSelections: ReadonlyArray<ModelSelection> | null;
@@ -3496,6 +3498,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     className="relative flex min-w-0 flex-1 items-center justify-end gap-0.5"
                   >
                     {composerControls}
+                    {props.footerAction}
                   </div>
                   <ComposerFooterPrimaryActions
                     compact={isComposerPrimaryActionsCompact}

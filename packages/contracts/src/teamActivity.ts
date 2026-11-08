@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
-import { TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { ProjectId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { ModelSelection } from "./modelSelection.ts";
 import { TeamMemberRole } from "./teamIdentity.ts";
 
 export const Team = Schema.Struct({
@@ -107,6 +108,25 @@ export const TeamThreadSnapshot = Schema.Struct({
 });
 export type TeamThreadSnapshot = typeof TeamThreadSnapshot.Type;
 
+const TeamReadOffset = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+export const EnterpriseCliThreadListInput = Schema.Struct({
+  cursor: Schema.optionalKey(TeamReadOffset),
+});
+export const EnterpriseCliThreadListResult = Schema.Struct({
+  threads: Schema.Array(TeamThreadSummary),
+  nextCursor: Schema.NullOr(TeamReadOffset),
+});
+export const EnterpriseCliThreadReadInput = Schema.Struct({
+  ...TeamThreadReference.fields,
+  messageOffset: Schema.optionalKey(TeamReadOffset),
+  textOffset: Schema.optionalKey(TeamReadOffset),
+});
+export const EnterpriseCliThreadReadResult = Schema.Struct({
+  ...TeamThreadSnapshot.fields,
+  nextMessageOffset: Schema.NullOr(TeamReadOffset),
+  nextTextOffset: Schema.NullOr(TeamReadOffset),
+});
+
 export const TeamThreadReport = Schema.Struct({
   summaries: Schema.Array(TeamThreadReportSummary),
   snapshots: Schema.Array(
@@ -142,3 +162,35 @@ export class TeamActivityError extends Schema.TaggedError<TeamActivityError>()(
     message: Schema.String,
   },
 ) {}
+
+export const TeamThreadContinueInput = Schema.Struct({
+  ...TeamThreadReference.fields,
+  projectId: Schema.optionalKey(ProjectId),
+  modelSelection: Schema.optionalKey(ModelSelection),
+});
+export type TeamThreadContinueInput = typeof TeamThreadContinueInput.Type;
+export const TeamThreadContinueResult = Schema.Struct({ threadId: ThreadId });
+export type TeamThreadContinueResult = typeof TeamThreadContinueResult.Type;
+
+export class TeamContinuationError extends Schema.TaggedError<TeamContinuationError>()(
+  "TeamContinuationError",
+  {
+    stage: Schema.Literals(["project", "settings", "model", "transcript", "launch"]),
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override get message(): string {
+    switch (this.stage) {
+      case "project":
+        return "Choose an existing project in this environment, or start without one.";
+      case "settings":
+        return "Could not read the destination project settings.";
+      case "model":
+        return "No model is available for the new thread. Set a default model or connect a provider first.";
+      case "transcript":
+        return "This transcript is too large to continue as text (maximum 100,000 characters).";
+      case "launch":
+        return "Could not start the continuation thread.";
+    }
+  }
+}

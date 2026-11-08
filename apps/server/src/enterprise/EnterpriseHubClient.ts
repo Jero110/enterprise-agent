@@ -9,7 +9,7 @@ import * as TeamPublication from "../team/TeamPublication.ts";
 import * as EnterpriseClient from "./EnterpriseClient.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
 import * as EnterpriseIngestion from "./EnterpriseIngestion.ts";
-import { EnterpriseSession } from "./EnterpriseSession.ts";
+import { EnterpriseSession, HOST_AGENT_SESSION } from "./EnterpriseSession.ts";
 import * as RunRecords from "./RunRecords.ts";
 
 const make = Effect.gen(function* () {
@@ -39,6 +39,19 @@ const make = Effect.gen(function* () {
 
   return EnterpriseClient.EnterpriseClient.of({
     status: identity().pipe(
+      Effect.tap((member) =>
+        member.role !== "admin"
+          ? Effect.void
+          : hub.whoami(HOST_AGENT_SESSION).pipe(
+              Effect.filterOrFail(
+                (current) => current.email === member.email,
+                () =>
+                  new EnterpriseError({ code: "not_connected", message: "Stale agent session." }),
+              ),
+              Effect.catch(() => hub.enroll(HOST_AGENT_SESSION, { email: member.email })),
+              Effect.ignore,
+            ),
+      ),
       Effect.map((identity) => ({ configured: true, identity })),
       Effect.catchIf(
         (error) => error.code === "not_connected",
@@ -50,12 +63,15 @@ const make = Effect.gen(function* () {
     connect: Effect.fn("EnterpriseHubClient.connect")(function* (input) {
       const id = yield* session;
       const member = yield* hub.enroll(id, input);
+      // Only an admin speaks for this hub's own agents; paired members must not become them.
+      if (member.role === "admin") yield* hub.enroll(HOST_AGENT_SESSION, { email: member.email });
       yield* PubSub.publish(changes, undefined);
       return { ...member, hubEnvironmentId: environmentId };
     }),
     disconnect: Effect.gen(function* () {
       const id = yield* EnterpriseSession;
       const disconnected = id !== null && (yield* hub.disconnect(id));
+      yield* hub.disconnect(HOST_AGENT_SESSION).pipe(Effect.ignore);
       yield* PubSub.publish(changes, undefined);
       return { disconnected };
     }),

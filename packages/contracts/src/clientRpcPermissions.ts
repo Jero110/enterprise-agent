@@ -15,6 +15,7 @@ import { WS_METHODS } from "./rpc.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
 export const CLIENT_GUARDED_RPC_SCOPES = {
+  [WS_METHODS.projectBoardSave]: AuthOrchestrationOperateScope,
   [WS_METHODS.previewClose]: AuthPreviewOperateScope,
   // Stopping a server signals its processes, as closing a terminal does.
   [WS_METHODS.previewStopLocalServer]: AuthTerminalOperateScope,
@@ -71,7 +72,8 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   // A link lets every agent here reach the other environment: Settings' bar.
   [WS_METHODS.peerLinksAnswerRequest]: AuthAccessWriteScope,
   // Connecting links this environment to the hub and replaces its enterprise identity.
-  [WS_METHODS.teamThreadPublish]: AuthAccessWriteScope,
+  [WS_METHODS.teamThreadContinue]: AuthOrchestrationOperateScope,
+  [WS_METHODS.teamThreadPublish]: AuthOrchestrationOperateScope,
   [WS_METHODS.enterpriseConnect]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseDisconnect]: AuthAccessWriteScope,
   // The hub decides on the member's role; this scope only lets the client ask.

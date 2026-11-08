@@ -71,6 +71,8 @@ export const EnterpriseDisconnectResult = Schema.Struct({ disconnected: Schema.B
 export type EnterpriseDisconnectResult = typeof EnterpriseDisconnectResult.Type;
 
 export const EnterpriseMemberSummary = Schema.Struct({
+  /** Additional areas; team membership continues to grant its own area. */
+  areaIds: Schema.optionalKey(Schema.Array(TrimmedNonEmptyString)),
   email: TrimmedNonEmptyString,
   displayName: TrimmedNonEmptyString,
   teamId: Schema.NullOr(TrimmedNonEmptyString),
@@ -94,6 +96,8 @@ export type EnterpriseMembers = typeof EnterpriseMembers.Type;
 
 /** Authorizes the email, or changes its display name, team and role, and un-revokes it. */
 export const EnterpriseAuthorizeMemberInput = Schema.Struct({
+  /** Omit to preserve grants; an empty array removes all additional areas. */
+  areaIds: Schema.optionalKey(Schema.Array(TrimmedNonEmptyString)),
   email: TrimmedNonEmptyString,
   displayName: TrimmedNonEmptyString,
   teamId: Schema.NullOr(TrimmedNonEmptyString),
@@ -143,6 +147,8 @@ export const ThreadContextCard = Schema.Struct({
       areaId: TrimmedNonEmptyString,
       /** True when an agent turn of this conversation read the document. */
       loaded: Schema.Boolean,
+      /** The area choice, independent of the whole-level switch. */
+      enabled: Schema.optionalKey(Schema.Boolean),
     }),
   ),
 });
@@ -152,6 +158,8 @@ export const ThreadContext = Schema.Struct({ cards: Schema.Array(ThreadContextCa
 export type ThreadContext = typeof ThreadContext.Type;
 
 export const ThreadContextSetInput = Schema.Struct({
+  /** Select one area within the area level; omit to switch the whole level. */
+  areaId: Schema.optionalKey(TrimmedNonEmptyString),
   threadId: TrimmedNonEmptyString,
   scope: ThreadKnowledgeScope,
   enabled: Schema.Boolean,

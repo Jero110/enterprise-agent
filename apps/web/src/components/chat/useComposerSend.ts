@@ -86,6 +86,12 @@ import {
   buildMessageContext,
   previewAnnotationContextReference,
 } from "../../lib/composerContextRecords";
+import {
+  isProjectBoardContextKind,
+  projectBoardContextForMessage,
+} from "../../projectBoardContext";
+import { AsyncResult } from "effect/reactivity";
+import { enterpriseEnvironment } from "../../state/enterprise";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { threadEnvironment } from "../../state/threads";
 import { runMobileComposerTransition } from "./draftHeroTransition";
@@ -889,8 +895,20 @@ export function useComposerSend(input: ComposerSendInput) {
     // Records bind attachments by the id each side knows: the local id for the optimistic
     // row, the upload id (or local id on the data-URL path) on the wire; the server
     // rebinds them to the persisted id.
-    const buildOutgoingMessageContext = (attachmentIds: ReadonlyArray<string>) =>
-      buildMessageContext({
+    const projectBoardContext = projectBoardContextForMessage(
+      messageTextForSend,
+      AsyncResult.getOrElse(
+        appAtomRegistry.get(
+          enterpriseEnvironment.projectBoard({
+            environmentId,
+            input: { projectId: activeThread.projectId },
+          }),
+        ),
+        () => null,
+      )?.boards ?? [],
+    );
+    const buildOutgoingMessageContext = (attachmentIds: ReadonlyArray<string>) => {
+      const context = buildMessageContext({
         terminalContexts: composerTerminalContextsSnapshot,
         reviewComments: composerReviewCommentsSnapshot,
         previewAnnotations: composerPreviewAnnotationsSnapshot,
@@ -901,6 +919,12 @@ export function useComposerSend(input: ComposerSendInput) {
           attachmentId: attachmentIds[index] ?? attachment.id,
         })),
       });
+      if (projectBoardContext.records.length === 0) return context;
+      return {
+        version: 1 as const,
+        records: [...(context?.records ?? []), ...projectBoardContext.records],
+      };
+    };
     const outgoingMessageContext = buildOutgoingMessageContext(
       composerAttachmentsSnapshot.map((attachment) => attachment.id),
     );
@@ -911,7 +935,9 @@ export function useComposerSend(input: ComposerSendInput) {
       model: ctxSelectedModel,
       models: ctxSelectedProviderModels,
       effort: ctxSelectedPromptEffort,
-      text: messageTextForSend || ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
+      text:
+        (messageTextForSend || ATTACHMENT_ONLY_BOOTSTRAP_PROMPT) +
+        (projectBoardContext.references ? `\n\n${projectBoardContext.references}` : ""),
     });
     if (composerRef.current?.validateProviderInput(outgoingMessageText) === false) {
       return;
@@ -1075,7 +1101,12 @@ export function useComposerSend(input: ComposerSendInput) {
         respondingRequestIdsRef.current.includes(approval.requestId),
       );
       if (approvalFeedbackTarget !== undefined) {
-        if (composerAttachmentsSnapshot.length > 0 || outgoingMessageContext !== undefined) {
+        if (
+          composerAttachmentsSnapshot.length > 0 ||
+          outgoingMessageContext?.records.some(
+            (record) => !isProjectBoardContextKind(record.kind),
+          ) === true
+        ) {
           setThreadError(
             threadIdForSend,
             "Send approval feedback without attachments or added context.",

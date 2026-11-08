@@ -105,11 +105,13 @@ describe("EnterpriseStore", () => {
           areaId: "ledger",
           grantedBy: "jeronimo.deli@gmail.com",
         });
-        yield* store.grantArea({
+        yield* store.upsertMember({
           email: "ent.test.ana@gmail.com",
-          areaId: "frontend",
-          role: "member",
-          grantedBy: "jeronimo.deli@gmail.com",
+          displayName: "Ana",
+          teamId: "ledger",
+          role: "lead",
+          areaIds: ["frontend", "risk"],
+          authorizedBy: "jeronimo.deli@gmail.com",
         });
       }).pipe(Effect.provide(layerStoreAt(dbPath)), Effect.scoped);
 
@@ -131,6 +133,7 @@ describe("EnterpriseStore", () => {
         ]);
         expect(yield* store.listGrants("ent.test.ana@gmail.com")).toMatchObject([
           { areaId: "frontend", role: "member" },
+          { areaId: "risk", role: "member" },
         ]);
         expect(yield* store.listProposals).toMatchObject([
           { id: "durable-request", status: "pending", evidence: ["thread:gerry/1"] },

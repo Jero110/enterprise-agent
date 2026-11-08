@@ -18,7 +18,7 @@ import * as EnterpriseIngestion from "./EnterpriseIngestion.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
 import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as RunRecords from "./RunRecords.ts";
-import { EnterpriseSession } from "./EnterpriseSession.ts";
+import { EnterpriseSession, HOST_AGENT_SESSION } from "./EnterpriseSession.ts";
 
 const environmentId = EnvironmentId.make("shared-enterprise-host");
 const layer = EnterpriseHubClient.layer.pipe(
@@ -60,6 +60,9 @@ it.effect(
       });
       expect((yield* as("jero", client.status)).identity?.email).toBe("jeronimo.deli@gmail.com");
       expect((yield* as("pablo", client.status)).identity?.email).toBe("ent.test.pablo@gmail.com");
+      expect((yield* store.getEnrollment(HOST_AGENT_SESSION))?.email).toBe(
+        "jeronimo.deli@gmail.com",
+      );
       expect(yield* as("anonymous", client.status)).toEqual({ configured: true, identity: null });
       const denied = yield* as("pablo", client.listMembers.pipe(Effect.result));
       expect(Result.isFailure(denied) && denied.failure.code).toBe("admin_required");

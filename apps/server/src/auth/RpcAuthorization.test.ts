@@ -1,6 +1,5 @@
 import {
   AuthEnvironmentMaintainScope,
-  AuthAccessWriteScope,
   AuthDiagnosticsReadScope,
   AuthFilesystemReadScope,
   AuthProvidersManageScope,
@@ -113,7 +112,7 @@ describe("RPC scope middleware", () => {
       missing: AuthDiagnosticsReadScope,
     },
   ])(
-    "rejects telemetry retry without $missing and publication without access permission",
+    "rejects telemetry retry without $missing and publication without operate permission",
     ({ scopes, missing }) =>
       Effect.gen(function* () {
         const handled: Array<string> = [];
@@ -145,7 +144,7 @@ describe("RPC scope middleware", () => {
           }).pipe(Effect.flip),
         ).toMatchObject({
           _tag: "EnvironmentAuthorizationError",
-          requiredPermission: AuthAccessWriteScope,
+          requiredPermission: AuthOrchestrationOperateScope,
         });
         expect(
           yield* client[WS_METHODS.serverRetryResourceTelemetry]({}).pipe(Effect.flip),

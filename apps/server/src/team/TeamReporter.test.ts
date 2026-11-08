@@ -111,7 +111,7 @@ it.effect(
         const now = DateTime.makeUnsafe("2026-11-05T00:00:00Z");
         const threadId = ThreadId.make("local-thread");
         const providerInstanceId = ProviderInstanceId.make("codex");
-        const created = createdThread(threadId);
+        const created = createdThread(threadId, email);
         yield* projection.apply(created);
         yield* reporter.start;
         yield* Queue.take(reports);
@@ -188,6 +188,28 @@ it.effect(
         expect((yield* pub.list(email))[0]?.title).toBe("Renamed");
         yield* reporter.publish({ threadId, status: "unpublished" });
         expect((yield* pub.list(email))[0]?.publicationStatus).toBe("unpublished");
+
+        const foreignThreadId = ThreadId.make("previous-enterprise-identity-thread");
+        yield* projection.apply(createdThread(foreignThreadId, "ent.test.ana@gmail.com"));
+        yield* projection.apply({
+          ...message,
+          id: EventId.make("foreign-message"),
+          threadId: foreignThreadId,
+          payload: {
+            ...message.payload,
+            id: MessageId.make("foreign-message"),
+            threadId: foreignThreadId,
+            text: "Private conversation from the previous identity",
+          },
+        });
+        expect(
+          yield* reporter
+            .publish({ threadId: foreignThreadId, status: "read-only" })
+            .pipe(Effect.result),
+        ).toMatchObject({ _tag: "Failure", failure: { code: "access_denied" } });
+        expect((yield* pub.list(email)).some((thread) => thread.threadId === foreignThreadId)).toBe(
+          false,
+        );
       }).pipe(Effect.provide(local), Effect.scoped);
     }).pipe(
       Effect.scoped,
@@ -240,8 +262,6 @@ it.effect(
       ).toMatchObject({ code: "access_denied" });
       yield* reporter.publish({ threadId: anaThread, status: "unpublished" }, anaSession);
       expect(yield* pub.list(bruno)).toMatchObject([
-        { ownerEmail: ana, threadId: childThread, publicationStatus: "unpublished" },
-        { ownerEmail: ana, threadId: anaThread, publicationStatus: "unpublished" },
         { ownerEmail: bruno, threadId: brunoThread, publicationStatus: "unpublished" },
       ]);
       expect(

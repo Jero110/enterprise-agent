@@ -64,6 +64,7 @@ export const layer = Layer.effect(
             title: document.title,
             areaId: document.areaId,
             loaded: read.has(document.id),
+            enabled: !off.has(`area:${document.areaId}`),
           })),
       });
       const area = card("area");
@@ -72,20 +73,37 @@ export const layer = Layer.effect(
 
     const set: ThreadKnowledge["Service"]["set"] = Effect.fn("ThreadKnowledge.set")(
       function* (input) {
-        yield* client.knowledgeList;
+        const { documents } = yield* client.knowledgeList;
+        if (
+          input.areaId !== undefined &&
+          (input.scope !== "area" ||
+            input.areaId === "general" ||
+            !documents.some((document) => document.areaId === input.areaId))
+        ) {
+          return yield* new EnterpriseError({
+            code: "access_denied",
+            message: "This area is not available to this conversation.",
+          });
+        }
+        const key = input.areaId === undefined ? input.scope : `area:${input.areaId}`;
         yield* (
           input.enabled
             ? sql`DELETE FROM enterprise_thread_knowledge_off
-                WHERE thread_id = ${input.threadId} AND scope = ${input.scope}`
+                WHERE thread_id = ${input.threadId} AND scope = ${key}`
             : sql`INSERT OR IGNORE INTO enterprise_thread_knowledge_off (thread_id, scope)
-                VALUES (${input.threadId}, ${input.scope})`
+                VALUES (${input.threadId}, ${key})`
         ).pipe(Effect.orDie);
         return yield* get({ threadId: input.threadId });
       },
     );
 
     const allows: ThreadKnowledge["Service"]["allows"] = (threadId, areaId) =>
-      switchedOff(threadId).pipe(Effect.map((off) => !off.has(scopeOf(areaId))));
+      switchedOff(threadId).pipe(
+        Effect.map(
+          (off) =>
+            !off.has(scopeOf(areaId)) && (areaId === "general" || !off.has(`area:${areaId}`)),
+        ),
+      );
 
     return ThreadKnowledge.of({ get, set, allows });
   }),

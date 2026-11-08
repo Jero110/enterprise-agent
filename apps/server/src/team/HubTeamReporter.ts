@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
+import { HOST_AGENT_SESSION } from "../enterprise/EnterpriseSession.ts";
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 import * as EnterpriseThreadAuthor from "../enterprise/EnterpriseThreadAuthor.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
@@ -31,6 +32,15 @@ const make = Effect.gen(function* () {
     changed?: ReadonlySet<string>,
     onlyOwner?: string,
   ) {
+    // Agents on the hub itself carry no client session; they speak for an admin of this hub.
+    const hostEnrollment = yield* store.getEnrollment(HOST_AGENT_SESSION);
+    if (hostEnrollment === null || !(yield* store.canEnter(hostEnrollment.email))) {
+      const admin = (yield* store.listMembers).find(
+        (member) => member.role === "admin" && member.authorized && !member.revoked,
+      );
+      if (admin !== undefined)
+        yield* store.enroll({ environmentId: HOST_AGENT_SESSION, email: admin.email });
+    }
     const shell = yield* projections.getShellSnapshot().pipe(Effect.mapError(projectionError));
     const byOwner = new Map<string, TeamThreadReportSummary[]>();
     for (const thread of shell.threads) {

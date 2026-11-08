@@ -82,6 +82,8 @@ import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
 import * as EnterpriseIngestion from "./enterprise/EnterpriseIngestion.ts";
 import * as EnterpriseStore from "./enterprise/EnterpriseStore.ts";
 import * as EnterpriseToolkit from "./enterprise/EnterpriseToolkit.ts";
+import * as EnterpriseCliToolkit from "./enterprise/EnterpriseCliToolkit.ts";
+import * as EnterpriseTeamToolkit from "./enterprise/EnterpriseTeamToolkit.ts";
 import * as KnowledgeToolkit from "./enterprise/KnowledgeToolkit.ts";
 import * as KnowledgeProposals from "./enterprise/KnowledgeProposals.ts";
 import * as AreaKnowledge from "./knowledge/AreaKnowledge.ts";
@@ -89,6 +91,9 @@ import * as KnowledgeRepo from "./knowledge/KnowledgeRepo.ts";
 import * as RunRecords from "./enterprise/RunRecords.ts";
 import * as RunReporter from "./enterprise/RunReporter.ts";
 import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
+import * as ProjectBoards from "./project/ProjectBoards.ts";
+import * as ProjectBoardToolkit from "./project/ProjectBoardToolkit.ts";
+import * as TeamContinuation from "./team/TeamContinuation.ts";
 import * as TeamPublication from "./team/TeamPublication.ts";
 import * as HubTeamReporter from "./team/HubTeamReporter.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
@@ -777,7 +782,13 @@ const layerCommandReadiness = HttpRouter.middleware(
 );
 
 const layerMemberMcp = McpHttpServer.layerMcpTransport(
-  Layer.mergeAll(McpHttpServer.layerTools, KnowledgeToolkit.layerMemberRegistration),
+  Layer.mergeAll(
+    McpHttpServer.layerTools,
+    KnowledgeToolkit.layerMemberRegistration,
+    EnterpriseCliToolkit.layerRegistration,
+    EnterpriseTeamToolkit.layerRegistration,
+    ProjectBoardToolkit.layerRegistration,
+  ),
 );
 
 const layerHubMcp = Layer.mergeAll(
@@ -786,6 +797,7 @@ const layerHubMcp = Layer.mergeAll(
     Layer.mergeAll(
       McpHttpServer.layerTools,
       EnterpriseToolkit.layerRegistration,
+      ProjectBoardToolkit.layerRegistration,
       KnowledgeToolkit.layerHubRegistration,
     ),
   ),
@@ -914,6 +926,8 @@ const layerMakeRoutes = Layer.mergeAll(
   ),
   Layer.provide(PreviewBrowser.layer),
   Layer.provide(EnterpriseThreadAuthor.layer),
+  Layer.provide(TeamContinuation.layer),
+  Layer.provide(ProjectBoards.layer),
   // Links to other environments, shared by Settings (WebSocket) and agents (/mcp).
   Layer.provide(
     PeerForwarding.layer.pipe(

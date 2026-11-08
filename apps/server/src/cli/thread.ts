@@ -129,7 +129,7 @@ const isThreadCliError = Schema.is(ThreadCliError);
  * These errors are expected outcomes for a script, so they print as one line
  * on stderr instead of the runtime's logged stack trace.
  */
-const reportThreadErrors = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+export const reportThreadErrors = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
     Effect.tapError((error) =>
       isThreadCliError(error) ? Console.error(error.message) : Effect.void,
@@ -199,12 +199,17 @@ const makeThreadTools = (session: McpToolSession, origin: string) => {
 export type ThreadTools = ReturnType<typeof makeThreadTools>;
 
 /**
- * Signs in as a short-lived MCP client of the running server, the same way an
- * outside agent does, and revokes that session when the command ends.
+ * Uses a standard MCP session, revoked on scoped exit. An unclean process exit
+ * can leave it valid until the normal session expiry.
  */
-const withThreadTools = Effect.fn("cli.thread.withThreadTools")(function* <A, E, R>(
+export const withThreadTools = Effect.fn("cli.thread.withThreadTools")(function* <A, E, R>(
   flags: { readonly baseDir: Option.Option<string> },
   run: (tools: ThreadTools) => Effect.Effect<A, E, R>,
+  client: {
+    readonly label: string;
+    readonly name: string;
+    readonly access: "read-only" | "full-access";
+  } = { label: "t3 thread cli", name: "t3-thread-cli", access: "full-access" },
 ) {
   const logLevel = yield* GlobalFlag.LogLevel;
   const config = yield* resolveCliAuthConfig(flags, logLevel);
@@ -217,10 +222,10 @@ const withThreadTools = Effect.fn("cli.thread.withThreadTools")(function* <A, E,
     const environmentAuth = yield* EnvironmentAuth.EnvironmentAuth;
     const issued = yield* Effect.acquireRelease(
       environmentAuth.issueMcpClientSession({
-        label: "t3 thread cli",
+        label: client.label,
         // The CLI runs as the machine's owner. New threads still start at
         // the project's default mode, never at this ceiling by default.
-        access: "full-access",
+        access: client.access,
         peerLink: false,
         client: { deviceType: "bot" },
       }),
@@ -230,7 +235,7 @@ const withThreadTools = Effect.fn("cli.thread.withThreadTools")(function* <A, E,
     const session = yield* mcpToolSession({
       endpoint: new URL("/mcp", origin).href,
       authorization: `Bearer ${issued.token}`,
-      clientName: "t3-thread-cli",
+      clientName: client.name,
     }).pipe(Effect.mapError((cause) => new ThreadServerUnreachableError({ origin, cause })));
     return yield* run(makeThreadTools(session, origin));
   }).pipe(

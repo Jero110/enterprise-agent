@@ -4,6 +4,8 @@ import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as EnterpriseThreadAuthor from "./enterprise/EnterpriseThreadAuthor.ts";
+import * as ProjectBoards from "./project/ProjectBoards.ts";
+import * as TeamContinuation from "./team/TeamContinuation.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import { EnterpriseSession } from "./enterprise/EnterpriseSession.ts";
 import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
@@ -1484,6 +1486,8 @@ export const layerWsRpc = (
       const secretResolver = yield* SecretResolver.SecretResolver;
       const peerLinks = yield* PeerLinks.PeerLinks;
       const enterprise = yield* EnterpriseClient.EnterpriseClient;
+      const teamContinuation = yield* TeamContinuation.TeamContinuation;
+      const projectBoards = yield* ProjectBoards.ProjectBoards;
       const teamReporter = yield* TeamReporter.TeamReporter;
       const threadKnowledge = yield* ThreadKnowledge.ThreadKnowledge;
       const peerLinkRequests = yield* PeerLinkRequests.PeerLinkRequests;
@@ -2665,7 +2669,10 @@ export const layerWsRpc = (
           ),
         [WS_METHODS.teamThreadsList]: () => enterprise.teamList,
         [WS_METHODS.teamThreadGet]: (input) => enterprise.teamGet(input),
+        [WS_METHODS.teamThreadContinue]: (input) => teamContinuation.continue(input),
         [WS_METHODS.teamThreadPublish]: (input) => teamReporter.publish(input, currentSession),
+        [WS_METHODS.projectBoardGet]: (input) => projectBoards.get(input),
+        [WS_METHODS.projectBoardSave]: (input) => projectBoards.save(input),
         [WS_METHODS.enterpriseStatus]: () => enterprise.status,
         [WS_METHODS.enterpriseConnect]: (input) => enterprise.connect(input),
         [WS_METHODS.enterpriseDisconnect]: () => enterprise.disconnect,
@@ -3482,6 +3489,8 @@ export const layer = Layer.unwrap(
     const reviewGuides = yield* PullRequestReviewGuideService.PullRequestReviewGuideService;
     const peerLinks = yield* PeerLinks.PeerLinks;
     const enterprise = yield* EnterpriseClient.EnterpriseClient;
+    const teamContinuation = yield* TeamContinuation.TeamContinuation;
+    const projectBoards = yield* ProjectBoards.ProjectBoards;
     const threadAuthor = yield* Effect.serviceOption(EnterpriseThreadAuthor.EnterpriseThreadAuthor);
     const teamReporter = yield* TeamReporter.TeamReporter;
     const threadKnowledge = yield* ThreadKnowledge.ThreadKnowledge;
@@ -3576,6 +3585,8 @@ export const layer = Layer.unwrap(
               ),
               Layer.provide(Layer.succeed(PeerLinks.PeerLinks, peerLinks)),
               Layer.provide(Layer.succeed(EnterpriseClient.EnterpriseClient, enterprise)),
+              Layer.provide(Layer.succeed(TeamContinuation.TeamContinuation, teamContinuation)),
+              Layer.provide(Layer.succeed(ProjectBoards.ProjectBoards, projectBoards)),
               Layer.provide(Layer.succeed(TeamReporter.TeamReporter, teamReporter)),
               Layer.provide(Layer.succeed(ThreadKnowledge.ThreadKnowledge, threadKnowledge)),
               Layer.provide(Layer.succeed(PeerLinkRequests.PeerLinkRequests, peerLinkRequests)),
