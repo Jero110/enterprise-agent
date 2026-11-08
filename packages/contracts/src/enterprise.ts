@@ -34,7 +34,10 @@ export const EnterpriseIngestStartResult = Schema.Struct({
 });
 export type EnterpriseIngestStartResult = typeof EnterpriseIngestStartResult.Type;
 
-export const EnterpriseStatus = Schema.Struct({ identity: Schema.NullOr(EnterpriseIdentity) });
+export const EnterpriseStatus = Schema.Struct({
+  identity: Schema.NullOr(EnterpriseIdentity),
+  configured: Schema.optionalKey(Schema.Boolean),
+});
 export type EnterpriseStatus = typeof EnterpriseStatus.Type;
 
 export const EnterpriseLoginInput = Schema.Struct({
@@ -46,6 +49,7 @@ export type EnterpriseLoginInput = typeof EnterpriseLoginInput.Type;
 export const EnterpriseConnectInput = Schema.Union([
   Schema.Struct({ link: PeerLinkCreateInput, ...EnterpriseLoginInput.fields }),
   Schema.Struct({ hubUrl: TrimmedNonEmptyString, ...EnterpriseLoginInput.fields }),
+  EnterpriseLoginInput,
 ]);
 export type EnterpriseConnectInput = typeof EnterpriseConnectInput.Type;
 

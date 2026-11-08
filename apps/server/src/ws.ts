@@ -5,6 +5,7 @@ import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as EnterpriseThreadAuthor from "./enterprise/EnterpriseThreadAuthor.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
+import { EnterpriseSession } from "./enterprise/EnterpriseSession.ts";
 import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
@@ -3456,8 +3457,12 @@ export const layerWsRpc = (
       const otherHandlers: Pick<typeof handlers, Exclude<ServerWsRpc, SplitWsRpc>["_tag"]> =
         handlers;
       return Context.merge(
-        yield* SplitWsRpcGroup.toHandlers(splitHandlers),
-        yield* OtherWsRpcGroup.toHandlers(otherHandlers),
+        yield* SplitWsRpcGroup.toHandlers(splitHandlers).pipe(
+          Effect.provideService(EnterpriseSession, currentSessionId),
+        ),
+        yield* OtherWsRpcGroup.toHandlers(otherHandlers).pipe(
+          Effect.provideService(EnterpriseSession, currentSessionId),
+        ),
       );
     }),
   );

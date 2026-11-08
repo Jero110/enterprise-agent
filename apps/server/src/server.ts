@@ -77,6 +77,7 @@ import * as EnterpriseBootstrap from "./enterprise/EnterpriseBootstrap.ts";
 import * as EnterpriseBootstrapHttp from "./enterprise/EnterpriseBootstrapHttp.ts";
 import * as EnterpriseThreadAuthor from "./enterprise/EnterpriseThreadAuthor.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
+import * as EnterpriseHubClient from "./enterprise/EnterpriseHubClient.ts";
 import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
 import * as EnterpriseIngestion from "./enterprise/EnterpriseIngestion.ts";
 import * as EnterpriseStore from "./enterprise/EnterpriseStore.ts";
@@ -821,6 +822,30 @@ const layerHubTeamReporter = HubTeamReporter.layer.pipe(
   Layer.provide(TeamPublication.layer),
   Layer.provide(EnterpriseStore.layerHub),
 );
+const layerEnterpriseHubClient = EnterpriseHubClient.layer.pipe(
+  Layer.provide(EnterpriseIngestion.layer),
+  Layer.provide(EnterpriseHub.layer),
+  Layer.provide(TeamPublication.layer),
+  Layer.provide(RunRecords.layer),
+  Layer.provide(AreaKnowledge.layer),
+  Layer.provide(KnowledgeProposals.layer),
+  Layer.provide(KnowledgeRepo.layer),
+  Layer.provide(ProcessRunner.layer),
+  Layer.provide(EnterpriseStore.layerHub),
+);
+const layerEnterpriseClient = Layer.unwrap(
+  Effect.map(
+    ServerConfig.ServerConfig,
+    (
+      config,
+    ): Layer.Layer<
+      EnterpriseClient.EnterpriseClient,
+      Layer.Error<typeof layerEnterpriseHubClient> | Layer.Error<typeof EnterpriseClient.layer>,
+      | Layer.Services<typeof layerEnterpriseHubClient>
+      | Layer.Services<typeof EnterpriseClient.layer>
+    > => (config.enterpriseHub === true ? layerEnterpriseHubClient : EnterpriseClient.layer),
+  ),
+);
 const layerTeamReporter = Layer.unwrap(
   Effect.map(
     ServerConfig.ServerConfig,
@@ -892,7 +917,7 @@ const layerMakeRoutes = Layer.mergeAll(
   // Links to other environments, shared by Settings (WebSocket) and agents (/mcp).
   Layer.provide(
     PeerForwarding.layer.pipe(
-      Layer.provideMerge(EnterpriseClient.layer),
+      Layer.provideMerge(layerEnterpriseClient),
       Layer.provideMerge(PeerMcpClient.layer),
       Layer.provideMerge(PeerLinks.layer),
     ),

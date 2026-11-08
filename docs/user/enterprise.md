@@ -1,8 +1,10 @@
 # Connect to Enterprise
 
-Ask your admin for the Enterprise hub's environment URL and reusable Enterprise token. The admin must authorize your work email first.
+Ask your admin for an environment connection link and the reusable Enterprise token. The admin must authorize your email and assign your team first.
 
-In the desktop app or a web client connected to your IDE, open **Connect Enterprise** in the header or **Settings → Enterprise**. Enter the hub URL, your email and the Enterprise token, then select **Connect**. This connects Enterprise and saves the hub as an environment. Your team, role and knowledge access come from the hub automatically.
+Add the environment using its pairing link or T3 Connect, then open **Connect Enterprise**. When the environment hosts your Enterprise, enter only your email and Enterprise token. Each connected client signs in independently; your name, team, permissions and personal conversation list follow your own identity. Disconnecting Enterprise signs out only your connection.
+
+For an IDE that does not host an Enterprise, open **Connect Enterprise** in the header or **Settings → Enterprise** and enter the hub URL, your email and Enterprise token. This also saves the hub as an environment.
 
 You can paste an existing `/pair#token=…` URL. This flow uses the URL's machine address and does not consume its one-time pairing code. The Enterprise token can be reused across computers; it is not saved in the client. Each connection receives its own sessions.
 

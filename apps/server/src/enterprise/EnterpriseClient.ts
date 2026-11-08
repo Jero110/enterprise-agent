@@ -314,6 +314,13 @@ const make = Effect.gen(function* () {
           },
         };
       }
+      if (!("link" in input)) {
+        return yield* new EnterpriseError({
+          code: "not_connected",
+          message:
+            "This environment has no Enterprise configured. Connect to your company's environment first, or enter its Enterprise URL.",
+        });
+      }
       const before = new Set((yield* links.list).map((link) => link.environmentId));
       const link = yield* links.link(input.link);
       const hub = link.environmentId;

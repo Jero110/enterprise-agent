@@ -15,6 +15,7 @@ import { useId, useState } from "react";
 import { environmentCatalog } from "~/connection/catalog";
 import { readEnvironment } from "~/state/environments";
 import { enterpriseEnvironment, enterpriseFailureMessage } from "~/state/enterprise";
+import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Button } from "../ui/button";
 import {
@@ -50,7 +51,10 @@ export function ConnectEnterpriseDialog({
     reportFailure: false,
   });
   const register = useAtomCommand(environmentCatalog.register, { reportFailure: false });
-  const ready = email.trim().length > 0 && token.trim().length > 0 && hubUrl.trim().length > 0;
+  const status = useEnvironmentQuery(enterpriseEnvironment.status({ environmentId, input: {} }));
+  const configured = status.data?.configured === true;
+  const ready =
+    email.trim().length > 0 && token.trim().length > 0 && (configured || hubUrl.trim().length > 0);
 
   const handleOpenChange = (next: boolean) => {
     if (!next && busy) return;
@@ -64,12 +68,14 @@ export function ConnectEnterpriseDialog({
   };
   const submit = async () => {
     if (busy || !ready) return;
-    let origin: string;
+    let origin: string | undefined;
     try {
-      origin = resolveEnterpriseHubOrigin(hubUrl);
-      const destination = readEnvironment(environmentId)?.displayUrl;
-      if (destination?.startsWith("http")) resolveEnterpriseHubOrigin(destination);
-      else if (!window.desktopBridge) resolveEnterpriseHubOrigin(window.location.origin);
+      if (!configured) {
+        origin = resolveEnterpriseHubOrigin(hubUrl);
+        const destination = readEnvironment(environmentId)?.displayUrl;
+        if (destination?.startsWith("http")) resolveEnterpriseHubOrigin(destination);
+        else if (!window.desktopBridge) resolveEnterpriseHubOrigin(window.location.origin);
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : "Enter a secure environment URL.");
       return;
@@ -79,7 +85,7 @@ export function ConnectEnterpriseDialog({
     const result = await connect({
       environmentId,
       input: {
-        hubUrl: origin,
+        ...(origin === undefined ? {} : { hubUrl: origin }),
         email: email.trim(),
         token: token.trim(),
       },
@@ -134,9 +140,9 @@ export function ConnectEnterpriseDialog({
         <DialogHeader>
           <DialogTitle>Connect Enterprise</DialogTitle>
           <DialogDescription>
-            Connect your environment and Enterprise together. Use the environment URL, your work
-            email and the reusable Enterprise token from your admin. Your team and permissions load
-            automatically.
+            {configured
+              ? "Sign in to this environment’s Enterprise with your email and Enterprise token. Your name, team and permissions load automatically."
+              : "Connect with your Enterprise environment URL, email and Enterprise token."}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -149,23 +155,26 @@ export function ConnectEnterpriseDialog({
               void submit();
             }}
           >
-            <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Environment URL</span>
-              <Input
-                type="url"
-                value={hubUrl}
-                onChange={(event) => setHubUrl(event.target.value)}
-                placeholder="https://hub.example.com/pair#token=…"
-                disabled={busy}
-                autoFocus
-                nativeInput
-                spellCheck={false}
-              />
-            </label>
+            {!configured && (
+              <label className="block space-y-1.5">
+                <span className="block text-xs font-medium text-foreground">Environment URL</span>
+                <Input
+                  type="url"
+                  value={hubUrl}
+                  onChange={(event) => setHubUrl(event.target.value)}
+                  placeholder="https://hub.example.com/pair#token=…"
+                  disabled={busy}
+                  autoFocus
+                  nativeInput
+                  spellCheck={false}
+                />
+              </label>
+            )}
             <label className="block space-y-1.5">
               <span className="block text-xs font-medium text-foreground">Email</span>
               <Input
                 type="email"
+                autoFocus={configured}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@company.com"
