@@ -112,10 +112,7 @@ export function projectBoardContextForMessage(
     }
     for (const task of board.tasks) {
       if (taskRecords >= MAX_TASK_RECORDS) break;
-      if (
-        !mentions(folded, task.title) &&
-        !task.tags.some((tag) => mentions(outsideTitles, tag))
-      ) {
+      if (!mentions(folded, task.title) && !task.tags.some((tag) => mentions(outsideTitles, tag))) {
         continue;
       }
       taskRecords++;
