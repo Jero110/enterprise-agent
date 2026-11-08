@@ -13,7 +13,7 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import { useId, useState } from "react";
 
 import { environmentCatalog } from "~/connection/catalog";
-import { readEnvironment } from "~/state/environments";
+import { readEnvironment, useEnvironment } from "~/state/environments";
 import { enterpriseEnvironment, enterpriseFailureMessage } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -51,8 +51,11 @@ export function ConnectEnterpriseDialog({
     reportFailure: false,
   });
   const register = useAtomCommand(environmentCatalog.register, { reportFailure: false });
+  const environment = useEnvironment(environmentId);
   const status = useEnvironmentQuery(enterpriseEnvironment.status({ environmentId, input: {} }));
-  const configured = status.data?.configured === true;
+  const configured =
+    environment?.serverConfig?.environment.capabilities.enterpriseOnboarding === true ||
+    status.data?.configured === true;
   const ready =
     email.trim().length > 0 && token.trim().length > 0 && (configured || hubUrl.trim().length > 0);
 
