@@ -281,6 +281,7 @@ import { useRemoteOpenState } from "~/remoteOpen";
 import { shouldShowOpenInPicker } from "./chat/OpenInPicker.logic";
 import { useOpenFavoriteEditorShortcut } from "./chat/OpenInPickerShortcut";
 import { EnterpriseHeaderControls, EnterpriseShareControl } from "./chat/EnterpriseHeaderControls";
+import { ProjectsBoardButton } from "./projects/ProjectsBoardDialog";
 import {
   PanelLayoutControls,
   type PanelLayoutControlsProps,
@@ -3259,11 +3260,14 @@ export default function ChatView(props: ChatViewProps) {
       {...panelToggleControlProps}
       showThreadPanelControl={!inlineRightPanelOwnsTitleBar}
       leadingControls={
-        <EnterpriseHeaderControls
-          threadId={activeThread.id}
-          isServerThread={isServerThread}
-          skills={timelineSkills}
-        />
+        <>
+          <ProjectsBoardButton />
+          <EnterpriseHeaderControls
+            threadId={activeThread.id}
+            isServerThread={isServerThread}
+            skills={timelineSkills}
+          />
+        </>
       }
     />
   );
