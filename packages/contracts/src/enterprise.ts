@@ -37,13 +37,40 @@ export type EnterpriseIngestStartResult = typeof EnterpriseIngestStartResult.Typ
 export const EnterpriseStatus = Schema.Struct({ identity: Schema.NullOr(EnterpriseIdentity) });
 export type EnterpriseStatus = typeof EnterpriseStatus.Type;
 
-export const EnterpriseConnectInput = Schema.Struct({
-  /** Links this environment to the hub's `/mcp` (T0: peer links carry member↔hub). */
-  link: PeerLinkCreateInput,
+export const EnterpriseLoginInput = Schema.Struct({
   email: TrimmedNonEmptyString,
   token: TrimmedNonEmptyString,
 });
+export type EnterpriseLoginInput = typeof EnterpriseLoginInput.Type;
+
+export const EnterpriseConnectInput = Schema.Union([
+  Schema.Struct({ link: PeerLinkCreateInput, ...EnterpriseLoginInput.fields }),
+  Schema.Struct({ hubUrl: TrimmedNonEmptyString, ...EnterpriseLoginInput.fields }),
+]);
 export type EnterpriseConnectInput = typeof EnterpriseConnectInput.Type;
+
+export const EnterpriseBootstrapResult = Schema.Struct({
+  identity: EnterpriseHubIdentity,
+  environmentId: EnvironmentId,
+  label: Schema.String,
+  environmentToken: TrimmedNonEmptyString,
+  mcpToken: TrimmedNonEmptyString,
+  mcpExpiresAt: Schema.DateTimeUtcFromString,
+});
+export type EnterpriseBootstrapResult = typeof EnterpriseBootstrapResult.Type;
+
+export const EnterpriseConnectResult = Schema.Struct({
+  ...EnterpriseIdentity.fields,
+  environmentAccess: Schema.optionalKey(
+    Schema.Struct({
+      environmentId: EnvironmentId,
+      label: Schema.String,
+      httpBaseUrl: TrimmedNonEmptyString,
+      token: TrimmedNonEmptyString,
+    }),
+  ),
+});
+export type EnterpriseConnectResult = typeof EnterpriseConnectResult.Type;
 
 export const EnterpriseDisconnectResult = Schema.Struct({ disconnected: Schema.Boolean });
 export type EnterpriseDisconnectResult = typeof EnterpriseDisconnectResult.Type;
@@ -84,6 +111,7 @@ export type EnterpriseRevokeMemberInput = typeof EnterpriseRevokeMemberInput.Typ
 
 /** The org chart any enrolled member may read: names and roles, no emails. */
 export const EnterpriseOrgMember = Schema.Struct({
+  memberKey: Schema.optionalKey(TrimmedNonEmptyString),
   displayName: TrimmedNonEmptyString,
   role: TeamMemberRole,
   isMe: Schema.Boolean,

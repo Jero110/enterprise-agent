@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import { isLocalLoopbackHost, isTailnetHost } from "./hostClassification.ts";
 
 const PAIRING_TOKEN_PARAM = "token";
 const HOSTED_PAIRING_HOST_PARAM = "host";
@@ -258,3 +259,26 @@ export const resolveRemotePairingTarget = (input: {
     wsBaseUrl: toWsBaseUrl(normalizedHost),
   };
 };
+
+export function resolveEnterpriseHubOrigin(input: string): string {
+  const url = URL.parse(input.trim());
+  if (
+    !url ||
+    url.username ||
+    url.password ||
+    (url.pathname !== "/" && url.pathname !== "/pair") ||
+    (url.protocol !== "https:" && url.protocol !== "http:")
+  ) {
+    throw new Error("Enter the Enterprise environment URL or its pairing URL.");
+  }
+  if (
+    url.protocol === "http:" &&
+    !isLocalLoopbackHost(url.hostname) &&
+    !isTailnetHost(url.hostname)
+  ) {
+    throw new Error(
+      "Enterprise sign-in requires HTTPS or a Tailscale address. A plain HTTP LAN URL would expose your reusable token.",
+    );
+  }
+  return url.origin;
+}

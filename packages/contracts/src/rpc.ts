@@ -31,7 +31,7 @@ import {
   EnterpriseConnectInput,
   EnterpriseDisconnectResult,
   EnterpriseError,
-  EnterpriseIdentity,
+  EnterpriseConnectResult,
   EnterpriseIngestStartInput,
   EnterpriseIngestStartResult,
   EnterpriseMembers,
@@ -930,7 +930,7 @@ const WsEnterpriseStatusRpc = Rpc.make(WS_METHODS.enterpriseStatus, {
 
 const WsEnterpriseConnectRpc = Rpc.make(WS_METHODS.enterpriseConnect, {
   payload: EnterpriseConnectInput,
-  success: EnterpriseIdentity,
+  success: EnterpriseConnectResult,
   error: Schema.Union([EnterpriseError, PeerLinkError, EnvironmentAuthorizationError]),
 });
 

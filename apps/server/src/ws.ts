@@ -3,6 +3,7 @@ import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
+import * as EnterpriseThreadAuthor from "./enterprise/EnterpriseThreadAuthor.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
@@ -1352,10 +1353,24 @@ export const layerWsRpc = (
   serverBrowser: ServerBrowser.ServerBrowser["Service"],
   reportProfiles: ServerBrowser.ProfileReporter,
   settingsClient: { readonly secretReferences: boolean },
+  threadAuthor?: EnterpriseThreadAuthor.EnterpriseThreadAuthor["Service"],
 ) =>
   Layer.effectContext(
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
+      const clientCreationProvenance = (
+        threadAuthor?.author(currentSession) ?? Effect.succeed(null)
+      ).pipe(
+        Effect.map((member) => ({
+          createdFromClientLabel:
+            member?.displayName ??
+            (currentSession.client.label &&
+            !["T3 Code Desktop", "T3 Code Web"].includes(currentSession.client.label)
+              ? currentSession.client.label
+              : `${currentSession.client.label ?? "Client"} (${currentSession.sessionId.slice(-6)})`),
+          ...(member === null ? {} : { enterpriseOwnerEmail: member.email }),
+        })),
+      );
       const sql = yield* SqlClient.SqlClient;
       const threadManagement = yield* ThreadManagementService.ThreadManagementService;
       const intakeContext = yield* Effect.context<
@@ -2025,12 +2040,21 @@ export const layerWsRpc = (
                 .enqueueCommand(
                   (command.type === "prepared-run.retry"
                     ? threadLaunch.retryPreparation(command)
-                    : ThreadMessageIntake.dispatchCommand(
-                        ThreadManagementService.withCreationProvenance(command, {
-                          createdBy: "user",
-                          creationSource:
-                            "creationSource" in command ? command.creationSource : "web",
-                        }),
+                    : Effect.gen(function* () {
+                        return command.type === "thread.create"
+                          ? yield* clientCreationProvenance
+                          : {};
+                      }).pipe(
+                        Effect.flatMap((provenance) =>
+                          ThreadMessageIntake.dispatchCommand(
+                            ThreadManagementService.withCreationProvenance(command, {
+                              createdBy: "user",
+                              creationSource:
+                                "creationSource" in command ? command.creationSource : "web",
+                              ...provenance,
+                            }),
+                          ),
+                        ),
                       )
                   ).pipe(Effect.provide(intakeContext)),
                 )
@@ -2176,38 +2200,44 @@ export const layerWsRpc = (
             Effect.andThen(
               startup
                 .enqueueCommand(
-                  ThreadMessageIntake.launchThread({
-                    commandId: input.commandId,
-                    ...(input.threadId === undefined ? {} : { threadId: input.threadId }),
-                    ...(input.reuseExistingThread === undefined
-                      ? {}
-                      : { reuseExistingThread: input.reuseExistingThread }),
-                    projectId: input.projectId,
-                    title: input.title,
-                    ...(input.generateTitle === undefined
-                      ? {}
-                      : { generateTitle: input.generateTitle }),
-                    modelSelection: input.modelSelection,
-                    runtimeMode: input.runtimeMode,
-                    interactionMode: input.interactionMode,
-                    workspaceStrategy: input.workspaceStrategy,
-                    ...(input.initialMessage === undefined
-                      ? {}
-                      : {
-                          initialMessage: {
-                            ...(input.initialMessage.messageId === undefined
-                              ? {}
-                              : { messageId: input.initialMessage.messageId }),
-                            text: input.initialMessage.text,
-                            attachments: input.initialMessage.attachments,
-                            ...(input.initialMessage.context === undefined
-                              ? {}
-                              : { context: input.initialMessage.context }),
-                          },
-                        }),
-                    createdBy: "user",
-                    creationSource: input.creationSource ?? "web",
-                  }).pipe(Effect.provide(intakeContext)),
+                  clientCreationProvenance.pipe(
+                    Effect.flatMap((provenance) =>
+                      ThreadMessageIntake.launchThread({
+                        commandId: input.commandId,
+                        ...(input.threadId === undefined ? {} : { threadId: input.threadId }),
+                        ...(input.reuseExistingThread === undefined
+                          ? {}
+                          : { reuseExistingThread: input.reuseExistingThread }),
+                        projectId: input.projectId,
+                        title: input.title,
+                        ...(input.generateTitle === undefined
+                          ? {}
+                          : { generateTitle: input.generateTitle }),
+                        modelSelection: input.modelSelection,
+                        runtimeMode: input.runtimeMode,
+                        interactionMode: input.interactionMode,
+                        workspaceStrategy: input.workspaceStrategy,
+                        ...(input.initialMessage === undefined
+                          ? {}
+                          : {
+                              initialMessage: {
+                                ...(input.initialMessage.messageId === undefined
+                                  ? {}
+                                  : { messageId: input.initialMessage.messageId }),
+                                text: input.initialMessage.text,
+                                attachments: input.initialMessage.attachments,
+                                ...(input.initialMessage.context === undefined
+                                  ? {}
+                                  : { context: input.initialMessage.context }),
+                              },
+                            }),
+                        createdBy: "user",
+                        ...provenance,
+                        creationSource: input.creationSource ?? "web",
+                      }),
+                    ),
+                    Effect.provide(intakeContext),
+                  ),
                 )
                 .pipe(
                   // A resumed launch is a retry of one already counted.
@@ -2634,7 +2664,7 @@ export const layerWsRpc = (
           ),
         [WS_METHODS.teamThreadsList]: () => enterprise.teamList,
         [WS_METHODS.teamThreadGet]: (input) => enterprise.teamGet(input),
-        [WS_METHODS.teamThreadPublish]: (input) => teamReporter.publish(input),
+        [WS_METHODS.teamThreadPublish]: (input) => teamReporter.publish(input, currentSession),
         [WS_METHODS.enterpriseStatus]: () => enterprise.status,
         [WS_METHODS.enterpriseConnect]: (input) => enterprise.connect(input),
         [WS_METHODS.enterpriseDisconnect]: () => enterprise.disconnect,
@@ -3447,6 +3477,7 @@ export const layer = Layer.unwrap(
     const reviewGuides = yield* PullRequestReviewGuideService.PullRequestReviewGuideService;
     const peerLinks = yield* PeerLinks.PeerLinks;
     const enterprise = yield* EnterpriseClient.EnterpriseClient;
+    const threadAuthor = yield* Effect.serviceOption(EnterpriseThreadAuthor.EnterpriseThreadAuthor);
     const teamReporter = yield* TeamReporter.TeamReporter;
     const threadKnowledge = yield* ThreadKnowledge.ThreadKnowledge;
     const peerLinkRequests = yield* PeerLinkRequests.PeerLinkRequests;
@@ -3519,6 +3550,7 @@ export const layer = Layer.unwrap(
               serverBrowser,
               reportProfiles,
               readSettingsClient(url.value),
+              Option.getOrUndefined(threadAuthor),
             ).pipe(
               Layer.provideMerge(RpcSerialization.layerJson),
               // Handler-context reporters see only request defects, not server-wide defects.

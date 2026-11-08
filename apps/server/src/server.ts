@@ -73,6 +73,9 @@ import * as ProviderInstanceRegistryHydration from "./provider/ProviderInstanceR
 import * as ProjectSettingsOverrideSweep from "./provider/ProjectSettingsOverrideSweep.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as McpHttpServer from "./mcp/McpHttpServer.ts";
+import * as EnterpriseBootstrap from "./enterprise/EnterpriseBootstrap.ts";
+import * as EnterpriseBootstrapHttp from "./enterprise/EnterpriseBootstrapHttp.ts";
+import * as EnterpriseThreadAuthor from "./enterprise/EnterpriseThreadAuthor.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
 import * as EnterpriseIngestion from "./enterprise/EnterpriseIngestion.ts";
@@ -86,6 +89,7 @@ import * as RunRecords from "./enterprise/RunRecords.ts";
 import * as RunReporter from "./enterprise/RunReporter.ts";
 import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
 import * as TeamPublication from "./team/TeamPublication.ts";
+import * as HubTeamReporter from "./team/HubTeamReporter.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
 import * as PeerForwarding from "./peer/PeerForwarding.ts";
 import * as RemoteDelegation from "./peer/RemoteDelegation.ts";
@@ -775,11 +779,14 @@ const layerMemberMcp = McpHttpServer.layerMcpTransport(
   Layer.mergeAll(McpHttpServer.layerTools, KnowledgeToolkit.layerMemberRegistration),
 );
 
-const layerHubMcp = McpHttpServer.layerMcpTransport(
-  Layer.mergeAll(
-    McpHttpServer.layerTools,
-    EnterpriseToolkit.layerRegistration,
-    KnowledgeToolkit.layerHubRegistration,
+const layerHubMcp = Layer.mergeAll(
+  EnterpriseBootstrapHttp.layer.pipe(Layer.provide(EnterpriseBootstrap.layer)),
+  McpHttpServer.layerMcpTransport(
+    Layer.mergeAll(
+      McpHttpServer.layerTools,
+      EnterpriseToolkit.layerRegistration,
+      KnowledgeToolkit.layerHubRegistration,
+    ),
   ),
 ).pipe(
   Layer.provide(EnterpriseIngestion.layer),
@@ -807,6 +814,23 @@ type McpLayer = Layer.Layer<
 const layerMcp = Layer.unwrap(
   Effect.map(ServerConfig.ServerConfig, (config): McpLayer =>
     config.enterpriseHub === true ? layerHubMcp : layerMemberMcp,
+  ),
+);
+
+const layerHubTeamReporter = HubTeamReporter.layer.pipe(
+  Layer.provide(TeamPublication.layer),
+  Layer.provide(EnterpriseStore.layerHub),
+);
+const layerTeamReporter = Layer.unwrap(
+  Effect.map(
+    ServerConfig.ServerConfig,
+    (
+      config,
+    ): Layer.Layer<
+      TeamReporter.TeamReporter,
+      never,
+      Layer.Services<typeof TeamReporter.layer> | Layer.Services<typeof layerHubTeamReporter>
+    > => (config.enterpriseHub === true ? layerHubTeamReporter : TeamReporter.layer),
   ),
 );
 
@@ -845,7 +869,7 @@ const layerMakeRoutes = Layer.mergeAll(
     RemoteDelegation.RemoteDelegation.pipe(Effect.flatMap((remote) => remote.start())),
   ),
 ).pipe(
-  Layer.provide(TeamReporter.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+  Layer.provide(layerTeamReporter.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provide(RunReporter.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provide(ThreadKnowledge.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provide(
@@ -864,6 +888,7 @@ const layerMakeRoutes = Layer.mergeAll(
     ),
   ),
   Layer.provide(PreviewBrowser.layer),
+  Layer.provide(EnterpriseThreadAuthor.layer),
   // Links to other environments, shared by Settings (WebSocket) and agents (/mcp).
   Layer.provide(
     PeerForwarding.layer.pipe(

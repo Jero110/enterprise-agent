@@ -14,7 +14,9 @@ import {
   type EnterpriseAuthorizeMemberInput,
   type EnterpriseConnectInput,
   EnterpriseHubIdentity,
-  type EnterpriseIdentity,
+  type EnterpriseConnectResult,
+  EnterpriseBootstrapResult,
+  ExecutionEnvironmentDescriptor,
   EnterpriseMembers,
   EnterpriseOrg,
   type EnterpriseRevokeMemberInput,
@@ -34,6 +36,10 @@ import {
   type TeamThreadReference,
   type TeamThreadReport,
 } from "@t3tools/contracts";
+import { resolveEnterpriseHubOrigin } from "@t3tools/shared/remote";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -47,6 +53,12 @@ import * as ServerConfig from "../config.ts";
 import * as PeerLinks from "../peer/PeerLinks.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
 import { hubResult } from "./EnterpriseToolkit.ts";
+
+const decodeEnvironmentDescriptor = Schema.decodeUnknownEffect(ExecutionEnvironmentDescriptor);
+const decodeBootstrapResult = Schema.decodeUnknownEffect(EnterpriseBootstrapResult);
+const decodeBootstrapError = Schema.decodeUnknownEffect(
+  Schema.Struct({ code: EnterpriseError.fields.code, message: Schema.String }),
+);
 
 /**
  * A member IDE's side of the enterprise: it links to the hub, binds that link's
@@ -93,7 +105,7 @@ export class EnterpriseClient extends Context.Service<
     ) => Effect.Effect<TeamPublicationResult, EnterpriseError>;
     readonly connect: (
       input: EnterpriseConnectInput,
-    ) => Effect.Effect<EnterpriseIdentity, EnterpriseError | PeerLinkError>;
+    ) => Effect.Effect<EnterpriseConnectResult, EnterpriseError | PeerLinkError>;
     readonly disconnect: Effect.Effect<{ readonly disconnected: boolean }>;
     readonly listMembers: Effect.Effect<EnterpriseMembers, EnterpriseError>;
     readonly org: Effect.Effect<EnterpriseOrg, EnterpriseError>;
@@ -207,6 +219,101 @@ const make = Effect.gen(function* () {
 
   const connect: EnterpriseClient["Service"]["connect"] = Effect.fn("EnterpriseClient.connect")(
     function* (input) {
+      if ("hubUrl" in input) {
+        const origin = yield* Effect.try({
+          try: () => resolveEnterpriseHubOrigin(input.hubUrl),
+          catch: () =>
+            new EnterpriseError({
+              code: "access_denied",
+              message:
+                "Enterprise sign-in requires an HTTPS, Tailscale or loopback environment URL. Plain HTTP LAN would expose the reusable token.",
+            }),
+        });
+        const issued = yield* Effect.gen(function* () {
+          const http = yield* HttpClient.HttpClient;
+          const descriptorResponse = yield* http.get(`${origin}/.well-known/t3/environment`);
+          const descriptor = yield* descriptorResponse.json.pipe(
+            Effect.flatMap(decodeEnvironmentDescriptor),
+          );
+          if (descriptor.capabilities.enterpriseOnboarding !== true) {
+            return yield* new EnterpriseError({
+              code: "hub_unreachable",
+              message:
+                "This server does not support unified Enterprise sign-in. Update and restart the Enterprise hub.",
+            });
+          }
+          const request = yield* HttpClientRequest.bodyJson(
+            HttpClientRequest.post(`${origin}/api/enterprise/connect`),
+            { email: input.email, token: input.token },
+          );
+          const response = yield* http.execute(request);
+          const body = yield* response.json;
+          if (response.status === 403) {
+            const error = yield* decodeBootstrapError(body);
+            return yield* new EnterpriseError(error);
+          }
+          if (response.status !== 200) {
+            return yield* new EnterpriseError({
+              code: "hub_unreachable",
+              message:
+                "The Enterprise hub could not complete sign-in. Update and restart it, then try again.",
+            });
+          }
+          return yield* decodeBootstrapResult(body);
+        }).pipe(
+          Effect.provide(FetchHttpClient.layer),
+          Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
+          Effect.timeout("15 seconds"),
+          Effect.catchTags({
+            HttpClientError: () =>
+              Effect.fail(
+                new EnterpriseError({
+                  code: "hub_unreachable",
+                  message: "Could not reach the Enterprise hub.",
+                }),
+              ),
+            HttpBodyError: () =>
+              Effect.fail(
+                new EnterpriseError({
+                  code: "hub_unreachable",
+                  message: "Could not prepare Enterprise sign-in.",
+                }),
+              ),
+            SchemaError: () =>
+              Effect.fail(
+                new EnterpriseError({
+                  code: "hub_unreachable",
+                  message: "The hub does not support this sign-in protocol. Update and restart it.",
+                }),
+              ),
+            TimeoutError: () =>
+              Effect.fail(
+                new EnterpriseError({
+                  code: "hub_unreachable",
+                  message: "The Enterprise hub did not answer in time.",
+                }),
+              ),
+          }),
+        );
+        yield* links.adoptEnterprise({
+          url: origin,
+          environmentId: issued.environmentId,
+          token: issued.mcpToken,
+          expiresAt: issued.mcpExpiresAt,
+        });
+        yield* writeConnection(issued.environmentId);
+        yield* PubSub.publish(changes, undefined);
+        return {
+          ...issued.identity,
+          hubEnvironmentId: issued.environmentId,
+          environmentAccess: {
+            environmentId: issued.environmentId,
+            label: issued.label,
+            httpBaseUrl: origin,
+            token: issued.environmentToken,
+          },
+        };
+      }
       const before = new Set((yield* links.list).map((link) => link.environmentId));
       const link = yield* links.link(input.link);
       const hub = link.environmentId;

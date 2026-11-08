@@ -56,6 +56,8 @@ it("stamps authoritative provenance on commands that create threads or messages"
     branch: null,
     worktreePath: null,
     // A client cannot claim a linked environment's origin, or a parent there.
+    createdFromClientLabel: "Forged client",
+    enterpriseOwnerEmail: "bruno@example.com",
     linkOrigin: { sessionId: "forged", label: "Somewhere else" },
     delegatedFrom: {
       environmentId: EnvironmentId.make("environment:elsewhere"),
@@ -67,10 +69,14 @@ it("stamps authoritative provenance on commands that create threads or messages"
   const stamped = ThreadManagementService.withCreationProvenance(command, {
     createdBy: "user",
     creationSource: "web",
+    createdFromClientLabel: "Authenticated desktop",
+    enterpriseOwnerEmail: "ana@example.com",
   });
   expect(stamped).toMatchObject({
     createdBy: "user",
     creationSource: "web",
+    createdFromClientLabel: "Authenticated desktop",
+    enterpriseOwnerEmail: "ana@example.com",
   });
   expect(stamped).not.toHaveProperty("linkOrigin");
   expect(stamped).not.toHaveProperty("delegatedFrom");

@@ -1511,9 +1511,17 @@ it.effect("replays a server-allocated launch", () =>
         message: "Only once",
         workspace: { type: "worktree", baseRef: "main" },
       });
-      const first = yield* launches.launch(rest);
+      const input = {
+        ...rest,
+        createdFromClientLabel: "Ana",
+        enterpriseOwnerEmail: "ent.test.ana@gmail.com",
+      };
+      const first = yield* launches.launch(input);
+      assert.equal(first.projection.thread.createdFromClientLabel, "Ana");
+      assert.equal(first.projection.thread.enterpriseOwnerEmail, "ent.test.ana@gmail.com");
       yield* Deferred.await(setupEntered);
-      const retry = yield* launches.launch(rest);
+      const retry = yield* launches.launch({ ...input, createdFromClientLabel: "Bruno" });
+      assert.equal(retry.projection.thread.createdFromClientLabel, "Ana");
       assert.equal(first.threadId, retry.threadId);
       assert.isFalse(first.resumed);
       assert.isTrue(retry.resumed);

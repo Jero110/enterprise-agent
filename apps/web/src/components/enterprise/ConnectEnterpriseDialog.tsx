@@ -2,9 +2,18 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
+import {
+  BearerConnectionRegistration,
+  BearerConnectionCredential,
+  BearerConnectionProfile,
+  BearerConnectionTarget,
+} from "@t3tools/client-runtime/connection";
+import { resolveEnterpriseHubOrigin } from "@t3tools/shared/remote";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useId, useState } from "react";
 
+import { environmentCatalog } from "~/connection/catalog";
+import { readEnvironment } from "~/state/environments";
 import { enterpriseEnvironment, enterpriseFailureMessage } from "~/state/enterprise";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Button } from "../ui/button";
@@ -20,7 +29,6 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { toastManager } from "../ui/toast";
-import { parseEnterpriseInvite } from "./invite";
 
 export function ConnectEnterpriseDialog({
   environmentId,
@@ -31,7 +39,8 @@ export function ConnectEnterpriseDialog({
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
-  const [invite, setInvite] = useState("");
+  const [hubUrl, setHubUrl] = useState("");
+  const [token, setToken] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,22 +49,29 @@ export function ConnectEnterpriseDialog({
     label: "connect enterprise",
     reportFailure: false,
   });
-  const ready = email.trim().length > 0 && invite.trim().length > 0;
+  const register = useAtomCommand(environmentCatalog.register, { reportFailure: false });
+  const ready = email.trim().length > 0 && token.trim().length > 0 && hubUrl.trim().length > 0;
 
   const handleOpenChange = (next: boolean) => {
     if (!next && busy) return;
     onOpenChange(next);
     if (!next) {
-      setInvite("");
+      setHubUrl("");
+      setToken("");
       setEmail("");
       setError(null);
     }
   };
   const submit = async () => {
     if (busy || !ready) return;
-    const credentials = parseEnterpriseInvite(invite);
-    if (credentials === null) {
-      setError("Invalid Enterprise invite. Ask an admin for a fresh one.");
+    let origin: string;
+    try {
+      origin = resolveEnterpriseHubOrigin(hubUrl);
+      const destination = readEnvironment(environmentId)?.displayUrl;
+      if (destination?.startsWith("http")) resolveEnterpriseHubOrigin(destination);
+      else if (!window.desktopBridge) resolveEnterpriseHubOrigin(window.location.origin);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Enter a secure environment URL.");
       return;
     }
     setBusy(true);
@@ -63,21 +79,52 @@ export function ConnectEnterpriseDialog({
     const result = await connect({
       environmentId,
       input: {
-        link: credentials.link,
+        hubUrl: origin,
         email: email.trim(),
-        token: credentials.token,
+        token: token.trim(),
       },
     });
-    setBusy(false);
     if (result._tag === "Success") {
+      const access = result.value.environmentAccess;
+      if (access) {
+        const connectionId = `bearer:${access.environmentId}:${access.httpBaseUrl}`;
+        const saved = await register(
+          new BearerConnectionRegistration({
+            target: new BearerConnectionTarget({
+              environmentId: access.environmentId,
+              label: access.label,
+              connectionId,
+            }),
+            profile: new BearerConnectionProfile({
+              environmentId: access.environmentId,
+              label: access.label,
+              connectionId,
+              httpBaseUrl: `${access.httpBaseUrl}/`,
+              wsBaseUrl: `${access.httpBaseUrl.replace(/^http/, "ws")}/`,
+            }),
+            credential: new BearerConnectionCredential({ token: access.token }),
+          }),
+        );
+        if (saved._tag !== "Success") {
+          setBusy(false);
+          setError(
+            "Enterprise connected, but the environment could not be saved. Connect again to retry.",
+          );
+          return;
+        }
+      }
+      setToken("");
+      setBusy(false);
       toastManager.add({
         type: "success",
         title: `Connected as ${result.value.displayName}`,
         description: [result.value.teamName, result.value.role].filter(Boolean).join(" · "),
       });
       handleOpenChange(false);
-    } else if (!isAtomCommandInterrupted(result)) {
-      setError(enterpriseFailureMessage(squashAtomCommandFailure(result)));
+    } else {
+      setBusy(false);
+      if (!isAtomCommandInterrupted(result))
+        setError(enterpriseFailureMessage(squashAtomCommandFailure(result)));
     }
   };
 
@@ -87,8 +134,9 @@ export function ConnectEnterpriseDialog({
         <DialogHeader>
           <DialogTitle>Connect Enterprise</DialogTitle>
           <DialogDescription>
-            Enter your work email and the Enterprise invite from your admin. Each invite works for
-            one connection. Linked environments must be on in Settings → Labs.
+            Connect your environment and Enterprise together. Use the environment URL, your work
+            email and the reusable Enterprise token from your admin. Your team and permissions load
+            automatically.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -102,12 +150,12 @@ export function ConnectEnterpriseDialog({
             }}
           >
             <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Email</span>
+              <span className="block text-xs font-medium text-foreground">Environment URL</span>
               <Input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@company.com"
+                type="url"
+                value={hubUrl}
+                onChange={(event) => setHubUrl(event.target.value)}
+                placeholder="https://hub.example.com/pair#token=…"
                 disabled={busy}
                 autoFocus
                 nativeInput
@@ -115,11 +163,23 @@ export function ConnectEnterpriseDialog({
               />
             </label>
             <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Enterprise invite</span>
+              <span className="block text-xs font-medium text-foreground">Email</span>
+              <Input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@company.com"
+                disabled={busy}
+                nativeInput
+                spellCheck={false}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-xs font-medium text-foreground">Enterprise token</span>
               <Input
                 type="password"
-                value={invite}
-                onChange={(event) => setInvite(event.target.value)}
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
                 disabled={busy}
                 nativeInput
                 spellCheck={false}

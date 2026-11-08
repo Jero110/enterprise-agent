@@ -1,4 +1,10 @@
-import { type EnvironmentId, WS_METHODS } from "@t3tools/contracts";
+import {
+  type EnterpriseOrgMember,
+  type TeamThreadSummary,
+  type EnvironmentId,
+  WS_METHODS,
+} from "@t3tools/contracts";
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
 import * as Effect from "effect/Effect";
 import { Atom, type AtomRegistry } from "effect/reactivity";
 
@@ -52,6 +58,7 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     label: "environment-data:enterprise:team-threads",
     tag: WS_METHODS.teamThreadsList,
     staleTimeMs: 0,
+    refreshIntervalMs: 10_000,
   });
   const teamThread = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:enterprise:team-thread",
@@ -138,4 +145,49 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
         Effect.sync(() => refreshAll(registry, environmentId)),
     }),
   };
+}
+
+export function selectPersonalThreads<
+  T extends { readonly enterpriseOwnerEmail?: string | undefined },
+>(threads: ReadonlyArray<T>, email: string | null) {
+  return threads.filter((thread) =>
+    email === null
+      ? thread.enterpriseOwnerEmail === undefined
+      : thread.enterpriseOwnerEmail === email,
+  );
+}
+
+export function groupTeamThreads(
+  summaries: ReadonlyArray<TeamThreadSummary>,
+  members: ReadonlyArray<EnterpriseOrgMember>,
+  ownEmail: string | null,
+) {
+  const groups = new Map<
+    string,
+    { displayName: string; isMe: boolean; threads: TeamThreadSummary[] }
+  >();
+  for (const member of members) {
+    if (member.memberKey !== undefined)
+      groups.set(member.memberKey, {
+        displayName: member.displayName,
+        isMe: member.isMe,
+        threads: [],
+      });
+  }
+  const hasRoster = groups.size > 0;
+  for (const summary of summaries) {
+    const key = teamMemberKey(summary.ownerEmail);
+    let group = groups.get(key);
+    if (group === undefined) {
+      if (hasRoster) continue;
+      group = {
+        displayName: summary.ownerDisplayName,
+        isMe: summary.ownerEmail === ownEmail,
+        threads: [],
+      };
+      groups.set(key, group);
+    }
+    group.threads.push(summary);
+  }
+  return [...groups].map(([key, member]) => ({ key, ...member }));
 }

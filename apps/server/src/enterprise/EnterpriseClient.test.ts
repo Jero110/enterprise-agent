@@ -17,6 +17,8 @@ import {
   servePeer,
   type ServedPeer,
 } from "../peer/PeerLinks.testkit.ts";
+import * as EnterpriseBootstrap from "./EnterpriseBootstrap.ts";
+import * as EnterpriseBootstrapHttp from "./EnterpriseBootstrapHttp.ts";
 import * as EnterpriseClient from "./EnterpriseClient.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
 import * as EnterpriseIngestion from "./EnterpriseIngestion.ts";
@@ -28,29 +30,33 @@ import * as KnowledgeToolkit from "./KnowledgeToolkit.ts";
 import { layerKnowledge } from "../knowledge/KnowledgeRepo.testkit.ts";
 
 const TOKEN = "ACME-BANK-DEV-2026";
-const hubDescriptor = descriptorOf("environment-hub", "Hub");
+const hubDescriptor = descriptorOf("environment-hub", "Hub", { enterpriseOnboarding: true });
 
 const serveHub = Effect.gen(function* () {
-  const registrations = Layer.mergeAll(
-    McpHttpServer.toolkitRegistration(EnterpriseToolkit.EnterpriseToolkit, EnterpriseToolkit.layer),
-    KnowledgeToolkit.layerHubRegistration,
-  ).pipe(
-    Layer.provide(
-      Layer.succeed(EnterpriseIngestion.EnterpriseIngestion, {
-        start: () => Effect.die("unused"),
-      }),
-    ),
-    Layer.provide(EnterpriseHub.layer),
-    Layer.provide(layerKnowledge),
-    Layer.provide(TeamPublication.layer),
-    Layer.provide(RunRecords.layer),
-    Layer.provide(layerSeededStore),
+  const services = EnterpriseHub.layer.pipe(
+    Layer.provideMerge(TeamPublication.layer),
+    Layer.provideMerge(RunRecords.layer),
+    Layer.provideMerge(layerKnowledge),
+    Layer.provideMerge(layerSeededStore),
     Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-enterprise-hub-" })),
     Layer.provide(
       Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto),
     ),
   );
-  return yield* servePeer(hubDescriptor, registrations);
+  const registrations = Layer.mergeAll(
+    McpHttpServer.toolkitRegistration(EnterpriseToolkit.EnterpriseToolkit, EnterpriseToolkit.layer),
+    KnowledgeToolkit.layerHubRegistration,
+  ).pipe(
+    Layer.provide(
+      Layer.succeed(EnterpriseIngestion.EnterpriseIngestion, { start: () => Effect.die("unused") }),
+    ),
+    Layer.provide(services),
+  );
+  const routes = EnterpriseBootstrapHttp.layer.pipe(
+    Layer.provide(EnterpriseBootstrap.layer),
+    Layer.provide(services),
+  );
+  return yield* servePeer(hubDescriptor, registrations, routes);
 });
 
 /** A member IDE: its own peer links and its own state dir. */
@@ -130,6 +136,52 @@ it.live("logs in over a peer link and shows name, team and role", () =>
       ).toEqual(messages);
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.live(
+  "connects an environment and Enterprise with reusable credentials and no pairing code",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const hub = yield* serveHub;
+        const ana = yield* makeMember("unified-ana");
+        const bruno = yield* makeMember("unified-bruno");
+        for (const [member, email] of [
+          [ana, "ent.test.ana@gmail.com"],
+          [bruno, "ent.test.bruno@gmail.com"],
+        ] as const) {
+          const result = yield* member.client.connect({
+            hubUrl: `${hub.url}/pair#token=unused`,
+            email,
+            token: TOKEN,
+          });
+          expect(result).toMatchObject({
+            email,
+            teamName: "Ledger",
+            hubEnvironmentId: hubDescriptor.environmentId,
+          });
+          expect(result.environmentAccess?.token).toBeTruthy();
+          expect((yield* member.client.status).identity?.email).toBe(email);
+          // The same URL and reusable token work on another login.
+          yield* member.client.connect({ hubUrl: hub.url, email, token: TOKEN });
+        }
+        expect(
+          yield* failureOf(
+            ana.client.connect({
+              hubUrl: "http://192.168.1.10/pair#token=unused",
+              email: "ent.test.ana@gmail.com",
+              token: TOKEN,
+            }),
+          ),
+        ).toMatchObject({ code: "access_denied" });
+        expect(
+          yield* failureOf(
+            ana.client.connect({ hubUrl: hub.url, email: "unknown@example.com", token: TOKEN }),
+          ),
+        ).toMatchObject({ code: "not_authorized" });
+        expect((yield* ana.client.status).identity?.email).toBe("ent.test.ana@gmail.com");
+      }),
+    ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
 it.live("rejects an unauthorized email and a wrong token, leaving no link behind", () =>

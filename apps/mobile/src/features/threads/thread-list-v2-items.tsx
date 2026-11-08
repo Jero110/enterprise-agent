@@ -1141,6 +1141,11 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         >
           {thread.title}
         </Text>
+        {thread.createdFromClientLabel ? (
+          <Text className="max-w-28 text-xs text-muted-foreground" numberOfLines={1}>
+            {thread.createdFromClientLabel}
+          </Text>
+        ) : null}
         <View className="flex-row items-center gap-1.5" style={{ minHeight: titleLineHeight }}>
           {props.hasQueuedMessages ? <QueuedMessageIcon selected={selected} /> : null}
           {pinnedRow ? (
@@ -1429,6 +1434,11 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
             >
               {thread.title}
             </Text>
+            {thread.createdFromClientLabel ? (
+              <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                {thread.createdFromClientLabel}
+              </Text>
+            ) : null}
             {props.searchMatch ? (
               <ThreadSearchMatchExcerpt
                 sidebar={sidebarPane}

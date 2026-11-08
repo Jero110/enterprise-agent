@@ -240,19 +240,35 @@ function EnterpriseContextDialog(props: {
   );
 }
 
-export function EnterpriseShareControl({ threadId }: { readonly threadId: ThreadId }) {
-  const { environmentId, identity } = useEnterpriseStatus();
-  if (environmentId === null || identity === null) return null;
+export function EnterpriseShareControl({
+  environmentId,
+  threadId,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+}) {
+  const { environmentId: queryEnvironmentId, identity } = useEnterpriseStatus();
+  if (queryEnvironmentId === null || identity === null) return null;
   return (
     <HeaderPopover icon={UsersIcon} label="Share with team">
-      <SharePanel environmentId={environmentId} threadId={threadId} />
+      <SharePanel
+        environmentId={environmentId}
+        queryEnvironmentId={queryEnvironmentId}
+        threadId={threadId}
+        ownerEmail={identity.email}
+      />
     </HeaderPopover>
   );
 }
 
-function SharePanel(props: { readonly environmentId: EnvironmentId; readonly threadId: ThreadId }) {
+function SharePanel(props: {
+  readonly environmentId: EnvironmentId;
+  readonly queryEnvironmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+  readonly ownerEmail: string;
+}) {
   const threads = useEnvironmentQuery(
-    enterpriseEnvironment.teamThreads({ environmentId: props.environmentId, input: {} }),
+    enterpriseEnvironment.teamThreads({ environmentId: props.queryEnvironmentId, input: {} }),
   );
   const canPublish = useAtomValue(
     enterpriseEnvironment.publishTeamThread.permissionAtom(props.environmentId),
@@ -262,13 +278,17 @@ function SharePanel(props: { readonly environmentId: EnvironmentId; readonly thr
     reportFailure: false,
   });
   const summary = threads.data?.find(
-    (thread) => thread.threadId === props.threadId && thread.parentThreadId === null,
+    (thread) =>
+      thread.threadId === props.threadId &&
+      thread.parentThreadId === null &&
+      thread.ownerEmail === props.ownerEmail,
   );
   const change = async (status: "unpublished" | "read-only") => {
     const result = await publish({
       environmentId: props.environmentId,
       input: { threadId: props.threadId, status },
     });
+    if (result._tag === "Success") threads.refresh();
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add({
         type: "error",

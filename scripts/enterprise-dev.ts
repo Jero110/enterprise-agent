@@ -45,6 +45,7 @@ const { values } = NodeUtil.parseArgs({
   options: {
     members: { type: "string", default: "jero,ana,gerry,rosa" },
     desktop: { type: "boolean", default: false },
+    prefix: { type: "string", default: "" },
   },
 });
 const members = [...new Set(values.members.split(",").map((m) => m.trim().toLowerCase()))].filter(
@@ -57,6 +58,8 @@ type Instance = {
   email: string;
   child: ChildProcessSpawner.ChildProcessHandle;
   url?: string;
+  ready: Deferred.Deferred<void>;
+  serverPort?: string;
 };
 const instances: Instance[] = [];
 let stopping = false;
@@ -80,20 +83,28 @@ const start = Effect.fn("enterprise-dev.start")(function* (
       stdin: "ignore",
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, ...env, T3CODE_DEV_INSTANCE: name, T3CODE_DEV_SEED: "0" },
+      env: {
+        ...process.env,
+        ...env,
+        T3CODE_DEV_INSTANCE: `${values.prefix}${name}`,
+        T3CODE_DEV_SEED: "0",
+      },
       extendEnv: false,
       forceKillAfter: "10 seconds",
     },
   );
-  const instance: Instance = { name, email, child };
+  const ready = yield* Deferred.make<void>();
+  const instance: Instance = { name, email, child, ready };
   instances.push(instance);
   const onLine = Effect.fn("enterprise-dev.onLine")(function* (line: string) {
     const match = LINE.exec(line);
     if (match && !instance.url) {
       const port = mode === "dev:server" ? match[1] : match[2];
       instance.url = `http://localhost:${port}`;
+      instance.serverPort = match[1]!;
       yield* Console.log(`[${name}] pid=${child.pid} ${instance.url} home=${match[3]}`);
     }
+    if (/Local:.*http/.test(line)) yield* Deferred.succeed(ready, undefined);
     if (/error|failed/i.test(line)) yield* Console.error(`[${name}] ${line}`);
   });
   for (const stream of [child.stdout, child.stderr]) {
@@ -165,12 +176,12 @@ const decodeSettings = Schema.decodeEffect(SettingsJson);
 const encodeSettings = Schema.encodeUnknownEffect(SettingsJson);
 const enableHubLinks = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
-  const file = `${root}.t3/instances/hub/userdata/settings.json`;
+  const file = `${root}.t3/instances/${values.prefix}hub/userdata/settings.json`;
   const current = (yield* fs.readFileString(file).pipe(Effect.orElseSucceed(() => "{}"))) || "{}";
   const settings = yield* decodeSettings(current).pipe(
     Effect.orElseSucceed((): Record<string, unknown> => ({})),
   );
-  yield* fs.makeDirectory(`${root}.t3/instances/hub/userdata`, { recursive: true });
+  yield* fs.makeDirectory(`${root}.t3/instances/${values.prefix}hub/userdata`, { recursive: true });
   yield* fs.writeFileString(
     file,
     yield* encodeSettings({
@@ -191,6 +202,15 @@ const main = Effect.gen(function* () {
   yield* Effect.gen(function* () {
     const stopped = yield* Deferred.make<number>();
     yield* enableHubLinks;
+    if (values.desktop) {
+      const build = yield* ChildProcess.make(
+        `${root}node_modules/.bin/vp`,
+        ["run", "--filter", "@t3tools/desktop", "build"],
+        { cwd: root, stdout: "ignore", stderr: "inherit" },
+      );
+      const code = yield* build.exitCode;
+      if (code !== 0) return yield* Effect.die(`Desktop build failed (${code}).`);
+    }
     yield* start(
       "hub",
       "-",
@@ -202,7 +222,44 @@ const main = Effect.gen(function* () {
       stopped,
     );
     for (const name of members) {
-      yield* start(name, EMAILS[name]!, values.desktop ? "dev:desktop" : "dev", {}, stopped);
+      const instance = yield* start(
+        name,
+        EMAILS[name]!,
+        values.desktop ? "dev:web" : "dev",
+        {},
+        stopped,
+      );
+      if (values.desktop) {
+        yield* Deferred.await(instance.ready);
+        const child = yield* ChildProcess.make(
+          process.execPath,
+          [`${root}apps/desktop/scripts/start-electron.mjs`],
+          {
+            cwd: root,
+            detached: true,
+            stdin: "ignore",
+            stdout: "ignore",
+            stderr: "inherit",
+            env: {
+              ...process.env,
+              VITE_DEV_SERVER_URL: instance.url!,
+              T3CODE_DEV_INSTANCE: `${values.prefix}${name}`,
+              T3CODE_HOME: `${root}.t3/instances/${values.prefix}${name}`,
+              T3CODE_PORT: instance.serverPort!,
+              T3CODE_DEV_SEED: "0",
+              T3CODE_TELEMETRY_ENABLED: "false",
+            },
+            extendEnv: false,
+          },
+        );
+        instances.push({
+          name: `${name}-desktop`,
+          email: EMAILS[name]!,
+          child,
+          url: instance.url!,
+          ready: instance.ready,
+        });
+      }
     }
     yield* printTable().pipe(Effect.forkScoped);
     process.exitCode = yield* Deferred.await(stopped);

@@ -3749,7 +3749,10 @@ export default function ChatView(props: ChatViewProps) {
                       </ComposerSurface.Host>
                       {isServerThread && (
                         <div className="flex justify-end px-2 pt-1">
-                          <EnterpriseShareControl threadId={activeThread.id} />
+                          <EnterpriseShareControl
+                            environmentId={activeThread.environmentId}
+                            threadId={activeThread.id}
+                          />
                         </div>
                       )}
                       <div className="min-h-0">

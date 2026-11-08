@@ -106,6 +106,12 @@ const OrchestrationV2CreationFields = {
   creationSource: OrchestrationV2CreationSource,
 } as const;
 
+const OrchestrationV2ThreadOriginFields = {
+  /** The authenticated client label that created this thread; absent on legacy threads. */
+  createdFromClientLabel: Schema.optional(TrimmedNonEmptyString),
+  enterpriseOwnerEmail: Schema.optional(TrimmedNonEmptyString),
+} as const;
+
 /**
  * The linked environment whose agent started this work here: the MCP client
  * session it signed in with, that session's label, and the access it was
@@ -443,6 +449,7 @@ const LenientThreadOpens = Schema.NullOr(OrchestrationV2ThreadOpens).pipe(
 
 export const OrchestrationV2AppThread = Schema.Struct({
   ...OrchestrationV2CreationFields,
+  ...OrchestrationV2ThreadOriginFields,
   id: ThreadId,
   projectId: ProjectId,
   title: TrimmedNonEmptyString,
@@ -2071,6 +2078,7 @@ export type OrchestrationV2LatestVisibleMessageSummary =
 
 export const OrchestrationV2ThreadShell = Schema.Struct({
   ...OrchestrationV2CreationFields,
+  ...OrchestrationV2ThreadOriginFields,
   id: ThreadId,
   projectId: ProjectId,
   title: Schema.String,
@@ -2907,6 +2915,7 @@ export const OrchestrationV2Command = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("thread.create"),
     ...OrchestrationV2CreationFields,
+    ...OrchestrationV2ThreadOriginFields,
     commandId: CommandId,
     threadId: ThreadId,
     projectId: ProjectId,

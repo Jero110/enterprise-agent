@@ -2825,6 +2825,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     const thread: OrchestrationV2AppThread = {
       createdBy: command.createdBy,
       creationSource: command.creationSource,
+      ...(command.enterpriseOwnerEmail === undefined
+        ? {}
+        : { enterpriseOwnerEmail: command.enterpriseOwnerEmail }),
+      ...(command.createdFromClientLabel === undefined
+        ? {}
+        : { createdFromClientLabel: command.createdFromClientLabel }),
       id: command.threadId,
       projectId: command.projectId,
       title: command.title,

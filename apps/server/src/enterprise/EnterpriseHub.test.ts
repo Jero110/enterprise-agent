@@ -228,7 +228,7 @@ describe("EnterpriseHub", () => {
         const ledger = teams.find((team) => team.id === "ledger");
         expect(ledger?.members).toHaveLength(6);
         expect(ledger?.members.filter((member) => member.isMe)).toEqual([
-          { displayName: "Ana", role: "lead", isMe: true },
+          { memberKey: expect.any(String), displayName: "Ana", role: "lead", isMe: true },
         ]);
         expect(JSON.stringify(teams)).not.toContain("@");
       }).pipe(Effect.provide(layer)),

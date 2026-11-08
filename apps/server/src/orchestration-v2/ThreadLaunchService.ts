@@ -99,6 +99,8 @@ export interface ThreadLaunchInput {
   };
   readonly createdBy: OrchestrationV2Actor;
   readonly creationSource: OrchestrationV2CreationSource;
+  readonly createdFromClientLabel?: string;
+  readonly enterpriseOwnerEmail?: string;
   /** The linked environment this launch is for, if one asked for it. */
   readonly linkOrigin?: OrchestrationV2LinkOrigin;
   /** The parent there, when that environment's agent delegated this as a task. */
@@ -948,8 +950,14 @@ const make = Effect.gen(function* () {
                 ...(input.delegatedFrom === undefined
                   ? {}
                   : { delegatedFrom: input.delegatedFrom }),
+                ...(input.enterpriseOwnerEmail === undefined
+                  ? {}
+                  : { enterpriseOwnerEmail: input.enterpriseOwnerEmail }),
                 createdBy: input.createdBy,
                 creationSource: input.creationSource,
+                ...(input.createdFromClientLabel === undefined
+                  ? {}
+                  : { createdFromClientLabel: input.createdFromClientLabel }),
               });
         const claimed = yield* claimDispatch.pipe(
           Effect.mapError(

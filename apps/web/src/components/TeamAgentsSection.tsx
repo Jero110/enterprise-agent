@@ -1,3 +1,4 @@
+import { groupTeamThreads } from "@t3tools/client-runtime/state/enterprise";
 import type { TeamThreadSummary } from "@t3tools/contracts";
 import { RefreshCwIcon, UsersIcon } from "lucide-react";
 import { useState } from "react";
@@ -17,22 +18,14 @@ import {
 } from "./ui/dialog";
 import { ScrollArea } from "./ui/scroll-area";
 
-function groupByOwner(summaries: readonly TeamThreadSummary[]) {
-  const groups = new Map<string, TeamThreadSummary[]>();
-  for (const summary of summaries) {
-    const owner = `${summary.ownerEmail}:${summary.ownerDisplayName}`;
-    const threads = groups.get(owner);
-    if (threads === undefined) groups.set(owner, [summary]);
-    else threads.push(summary);
-  }
-  return groups;
-}
-
 export function TeamAgentsSection() {
   const environmentId = usePrimaryEnvironmentId();
   const { identity, isPending: enterpriseStatusPending } = useEnterpriseStatus();
   const summariesQuery = useEnvironmentQuery(
     environmentId === null ? null : enterpriseEnvironment.teamThreads({ environmentId, input: {} }),
+  );
+  const rosterQuery = useEnvironmentQuery(
+    environmentId === null ? null : enterpriseEnvironment.org({ environmentId, input: {} }),
   );
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<TeamThreadSummary | null>(null);
@@ -42,7 +35,9 @@ export function TeamAgentsSection() {
   }
 
   const summaries = summariesQuery.isSuccess ? (summariesQuery.data ?? []) : [];
-  const groups = groupByOwner(summaries);
+  const team = rosterQuery.data?.teams.find((team) => team.id === identity?.teamId);
+  const groups = groupTeamThreads(summaries, team?.members ?? [], identity?.email ?? null);
+  const error = summariesQuery.error ?? rosterQuery.error;
   return (
     <div className="border-b border-sidebar-border px-2 py-2">
       <div className="flex items-center gap-2 px-2 pb-1 text-xs font-medium text-muted-foreground">
@@ -52,24 +47,37 @@ export function TeamAgentsSection() {
           aria-label="Reload team agents"
           size="icon-xs"
           variant="ghost-muted"
-          onClick={() => summariesQuery.refresh()}
+          onClick={() => {
+            summariesQuery.refresh();
+            rosterQuery.refresh();
+          }}
         >
           <RefreshCwIcon className="size-3" aria-hidden />
         </Button>
       </div>
-      {summariesQuery.error !== null ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">
-          {summariesQuery.error ?? "Team threads are unavailable."}
-        </p>
-      ) : summariesQuery.isPending || enterpriseStatusPending ? (
+      {error !== null ? (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{error}</p>
+      ) : summariesQuery.isPending || rosterQuery.isPending || enterpriseStatusPending ? (
         <p className="px-2 py-2 text-xs text-muted-foreground">Loading team threads…</p>
-      ) : summaries.length === 0 ? (
+      ) : groups.length === 0 ? (
         <p className="px-2 py-2 text-xs text-muted-foreground">No team threads yet.</p>
       ) : null}
-      {[...groups].map(([owner, threads]) => (
-        <div key={owner} className="mt-1">
-          <div className="px-2 text-2xs text-muted-foreground">{threads[0]?.ownerDisplayName}</div>
-          {threads.map((summary) => (
+      {groups.map((owner) => (
+        <div key={owner.key} className="mt-1">
+          <div className="flex items-center justify-between gap-2 px-2 text-2xs text-muted-foreground">
+            <span>
+              {owner.displayName}
+              {owner.isMe ? " (you)" : ""}
+            </span>
+            <span>
+              {owner.threads.filter((thread) => thread.publicationStatus === "read-only").length}{" "}
+              shared
+            </span>
+          </div>
+          {owner.threads.length === 0 ? (
+            <p className="px-2 py-1 text-xs text-muted-foreground">No conversations yet.</p>
+          ) : null}
+          {owner.threads.map((summary) => (
             <button
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:cursor-default disabled:opacity-60"
               disabled={summary.publicationStatus !== "read-only"}
@@ -82,7 +90,9 @@ export function TeamAgentsSection() {
               type="button"
             >
               <span className="min-w-0 flex-1 truncate">{summary.title}</span>
-              <span className="text-3xs text-muted-foreground">{summary.status}</span>
+              <span className="text-3xs text-muted-foreground">
+                {summary.publicationStatus === "unpublished" ? "Not shared" : summary.status}
+              </span>
             </button>
           ))}
         </div>

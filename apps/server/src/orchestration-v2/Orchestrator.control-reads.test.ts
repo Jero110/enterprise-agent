@@ -1448,9 +1448,15 @@ it.effect("replays a thread.create receipt without changing the thread", () =>
       worktreePath: null,
       createdBy: "user",
       creationSource: "web",
+      createdFromClientLabel: "Friend's Mac",
     } as const;
     const original = yield* orchestrator.dispatch(create);
     const before = yield* projections.getThread(threadId);
+    assert.equal(before.createdFromClientLabel, "Friend's Mac");
+    assert.equal(
+      (yield* projections.getThreadShell(threadId))?.createdFromClientLabel,
+      "Friend's Mac",
+    );
     const replayed = yield* orchestrator.dispatch(create);
     assert.equal(replayed.sequence, original.sequence);
     // Marked so client analytics do not count the retry again.

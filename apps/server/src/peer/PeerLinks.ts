@@ -73,6 +73,12 @@ export class PeerLinks extends Context.Service<
     /** Whether the Linked environments beta (Settings → Labs) is on here. */
     readonly enabled: Effect.Effect<boolean>;
     readonly link: (input: PeerLinkCreateInput) => Effect.Effect<PeerLink, PeerLinkError>;
+    readonly adoptEnterprise: (input: {
+      readonly url: string;
+      readonly environmentId: EnvironmentId;
+      readonly token: string;
+      readonly expiresAt: DateTime.Utc;
+    }) => Effect.Effect<PeerLink, PeerLinkError>;
     /**
      * The environment answering at `url`, or nothing when it is not a usable
      * address or does not answer as T3 Code. Sends no credential.
@@ -408,8 +414,11 @@ const make = Effect.gen(function* () {
     return { primary, peer: descriptor.value, origins };
   });
 
-  const link: PeerLinks["Service"]["link"] = Effect.fn("PeerLinks.link")(function* (input) {
-    if (!(yield* enabled)) {
+  const link = Effect.fn("PeerLinks.link")(function* (
+    input: PeerLinkCreateInput,
+    credential?: { readonly access_token: string; readonly expiresAt: DateTime.Utc },
+  ) {
+    if (credential === undefined && !(yield* enabled)) {
       return yield* new PeerLinkError({ reason: "disabled", message: LINKED_ENVIRONMENTS_OFF });
     }
     const urls = [input.url, ...(input.alternateUrls ?? [])];
@@ -436,7 +445,7 @@ const make = Effect.gen(function* () {
         message: `${peer.label} runs a T3 Code version that cannot keep a linked agent's limits. Update it, then link again.`,
       });
     }
-    const issued = yield* signIn(primary, input, `T3 Code · ${self.label}`);
+    const issued = credential ?? (yield* signIn(primary, input, `T3 Code · ${self.label}`));
     const now = yield* DateTime.now;
     const linked: PeerLink = {
       environmentId: peer.environmentId,
@@ -444,7 +453,10 @@ const make = Effect.gen(function* () {
       urls: origins,
       access: input.access,
       linkedAt: now,
-      expiresAt: DateTime.add(now, { seconds: issued.expires_in }),
+      expiresAt:
+        "expiresAt" in issued
+          ? issued.expiresAt
+          : DateTime.add(now, { seconds: issued.expires_in }),
       lastReachedAt: now,
       lastError: null,
     };
@@ -636,6 +648,17 @@ const make = Effect.gen(function* () {
   return PeerLinks.of({
     enabled,
     link,
+    adoptEnterprise: Effect.fn("PeerLinks.adoptEnterprise")((input) =>
+      link(
+        {
+          url: input.url,
+          expectedEnvironmentId: input.environmentId,
+          pairingCode: "unused",
+          access: "read-only",
+        },
+        { access_token: input.token, expiresAt: input.expiresAt },
+      ),
+    ),
     describe: describeUrl,
     list,
     get,

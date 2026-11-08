@@ -2,6 +2,7 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import {
+  AuthSessionId,
   EnvironmentId,
   EventId,
   MessageId,
@@ -26,7 +27,44 @@ import { layerSeededStore } from "../enterprise/EnterpriseStore.testkit.ts";
 import * as ApplicationEvents from "../persistence/OrchestrationEventStore.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as TeamPublication from "./TeamPublication.ts";
+import * as HubTeamReporter from "./HubTeamReporter.ts";
+import * as EnterpriseThreadAuthor from "../enterprise/EnterpriseThreadAuthor.ts";
 import * as TeamReporter from "./TeamReporter.ts";
+
+function createdThread(threadId: ThreadId, enterpriseOwnerEmail?: string) {
+  const now = DateTime.makeUnsafe("2026-11-05T00:00:00Z");
+  const providerInstanceId = ProviderInstanceId.make("codex");
+  return {
+    id: EventId.make(`created:${threadId}`),
+    type: "thread.created",
+    threadId,
+    occurredAt: now,
+    payload: {
+      ...(enterpriseOwnerEmail === undefined ? {} : { enterpriseOwnerEmail }),
+      createdBy: "user",
+      creationSource: "web",
+      id: threadId,
+      projectId: ProjectId.make("project"),
+      title: "Original",
+      providerInstanceId,
+      modelSelection: { instanceId: providerInstanceId, model: "test" },
+      runtimeMode: "approval-required",
+      interactionMode: "default",
+      branch: null,
+      worktreePath: null,
+      activeProviderThreadId: null,
+      lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+      forkedFrom: null,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
+      settledOverride: null,
+      settledAt: null,
+      lastVisitedAt: null,
+      deletedAt: null,
+    },
+  } satisfies OrchestrationV2DomainEvent;
+}
 
 it.effect(
   "reports committed metadata and uploads compact snapshots on publish and subsequent commits",
@@ -73,35 +111,7 @@ it.effect(
         const now = DateTime.makeUnsafe("2026-11-05T00:00:00Z");
         const threadId = ThreadId.make("local-thread");
         const providerInstanceId = ProviderInstanceId.make("codex");
-        const created: OrchestrationV2DomainEvent = {
-          id: EventId.make("created"),
-          type: "thread.created",
-          threadId,
-          occurredAt: now,
-          payload: {
-            createdBy: "user",
-            creationSource: "web",
-            id: threadId,
-            projectId: ProjectId.make("project"),
-            title: "Original",
-            providerInstanceId,
-            modelSelection: { instanceId: providerInstanceId, model: "test" },
-            runtimeMode: "approval-required",
-            interactionMode: "default",
-            branch: null,
-            worktreePath: null,
-            activeProviderThreadId: null,
-            lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
-            forkedFrom: null,
-            createdAt: now,
-            updatedAt: now,
-            archivedAt: null,
-            settledOverride: null,
-            settledAt: null,
-            lastVisitedAt: null,
-            deletedAt: null,
-          },
-        };
+        const created = createdThread(threadId);
         yield* projection.apply(created);
         yield* reporter.start;
         yield* Queue.take(reports);
@@ -186,4 +196,93 @@ it.effect(
       ),
     );
   },
+);
+
+it.effect(
+  "hub conversations stay attributed to their owner and only that owner can share them",
+  () =>
+    Effect.gen(function* () {
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      const pub = yield* TeamPublication.TeamPublication;
+      const projection = yield* ProjectionStore.ProjectionStoreV2;
+      const reporter = yield* TeamReporter.TeamReporter;
+      const ana = "ent.test.ana@gmail.com";
+      const bruno = "ent.test.bruno@gmail.com";
+      const hugo = "ent.test.hugo@gmail.com";
+      for (const email of [ana, bruno, hugo]) yield* store.enroll({ environmentId: email, email });
+      const anaSession = {
+        sessionId: AuthSessionId.make(ana),
+        subject: "test",
+        client: { deviceType: "desktop" as const },
+      };
+      const brunoSession = { ...anaSession, sessionId: AuthSessionId.make(bruno) };
+      const anaThread = ThreadId.make("ana-on-hub");
+      const brunoThread = ThreadId.make("bruno-on-hub");
+      const childThread = ThreadId.make("ana-child-on-hub");
+      yield* projection.apply(createdThread(anaThread, ana));
+      yield* projection.apply(createdThread(brunoThread, bruno));
+      const child = createdThread(childThread, ana);
+      yield* projection.apply({
+        ...child,
+        payload: {
+          ...child.payload,
+          lineage: {
+            parentThreadId: anaThread,
+            relationshipToParent: "subagent",
+            rootThreadId: anaThread,
+          },
+        },
+      });
+      expect(
+        yield* reporter
+          .publish({ threadId: anaThread, status: "read-only" }, brunoSession)
+          .pipe(Effect.flip),
+      ).toMatchObject({ code: "access_denied" });
+      yield* reporter.publish({ threadId: anaThread, status: "unpublished" }, anaSession);
+      expect(yield* pub.list(bruno)).toMatchObject([
+        { ownerEmail: ana, threadId: childThread, publicationStatus: "unpublished" },
+        { ownerEmail: ana, threadId: anaThread, publicationStatus: "unpublished" },
+        { ownerEmail: bruno, threadId: brunoThread, publicationStatus: "unpublished" },
+      ]);
+      expect(
+        yield* pub.get(bruno, { ownerEmail: ana, threadId: anaThread }).pipe(Effect.flip),
+      ).toMatchObject({ code: "access_denied" });
+      expect(yield* pub.list(hugo)).toEqual([]);
+      yield* reporter.publish({ threadId: anaThread, status: "read-only" }, anaSession);
+      expect(
+        (yield* pub.get(bruno, { ownerEmail: ana, threadId: anaThread })).summary,
+      ).toMatchObject({ ownerDisplayName: "Ana", publicationStatus: "read-only" });
+      expect(
+        (yield* pub.get(bruno, { ownerEmail: ana, threadId: childThread })).summary
+          .publicationStatus,
+      ).toBe("read-only");
+      yield* reporter.publish({ threadId: anaThread, status: "unpublished" }, anaSession);
+      expect(
+        yield* pub.get(bruno, { ownerEmail: ana, threadId: childThread }).pipe(Effect.flip),
+      ).toMatchObject({ code: "access_denied" });
+      expect(
+        yield* pub.get(bruno, { ownerEmail: ana, threadId: anaThread }).pipe(Effect.flip),
+      ).toMatchObject({ code: "access_denied" });
+    }).pipe(
+      Effect.provide(
+        HubTeamReporter.layer.pipe(
+          Layer.provideMerge(
+            Layer.mergeAll(ProjectionStore.layer, ApplicationEvents.layer, TeamPublication.layer),
+          ),
+          Layer.provide(
+            Layer.succeed(EnterpriseThreadAuthor.EnterpriseThreadAuthor, {
+              author: (session) =>
+                Effect.succeed({
+                  email: session.sessionId,
+                  displayName: session.sessionId === "ent.test.ana@gmail.com" ? "Ana" : "Bruno",
+                }),
+            }),
+          ),
+          Layer.provideMerge(layerSeededStore),
+          Layer.provide(
+            Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto),
+          ),
+        ),
+      ),
+    ),
 );

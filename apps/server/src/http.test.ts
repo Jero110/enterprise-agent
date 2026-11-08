@@ -86,6 +86,7 @@ describe("member proposal file HTTP routes", () => {
               sessionId: AuthSessionId.make("test"),
               subject: "test",
               method: "browser-session-cookie" as const,
+              client: { deviceType: "unknown" as const },
               scopes: [AuthOrchestrationOperateScope, AuthOrchestrationReadScope],
             };
           }),

@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./teamMemberKey": {
+      "types": "./src/teamMemberKey.ts",
+      "import": "./src/teamMemberKey.ts"
+    },
     "./changedFileKind": {
       "types": "./src/changedFileKind.ts",
       "import": "./src/changedFileKind.ts"

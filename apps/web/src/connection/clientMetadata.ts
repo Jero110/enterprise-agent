@@ -73,11 +73,14 @@ export function clientPresentationMetadata(input: {
   readonly appVersion: string;
   readonly hosted: boolean;
   readonly identity: BrowserIdentity;
-  readonly desktopBridge: Pick<DesktopBridge, "getClientPlatform"> | undefined;
+  readonly desktopBridge:
+    | Pick<DesktopBridge, "getClientPlatform" | "getClientHostname">
+    | undefined;
 }): AuthClientPresentationMetadata {
   if (input.desktopBridge !== undefined) {
+    const hostname = input.desktopBridge.getClientHostname?.().trim();
     return {
-      label: "T3 Code Desktop",
+      label: hostname || "T3 Code Desktop",
       deviceType: "desktop",
       os: clientOsFromElectronPlatform(input.desktopBridge.getClientPlatform()),
       surface: "desktop",

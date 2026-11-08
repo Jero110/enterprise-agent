@@ -139,6 +139,8 @@ export interface EnvironmentThreadShell {
   readonly id: ThreadId;
   readonly projectId: ProjectId;
   readonly title: string;
+  readonly createdFromClientLabel?: string;
+  readonly enterpriseOwnerEmail?: string;
   readonly providerInstanceId: ProviderInstanceId;
   readonly modelSelection: OrchestrationV2ThreadShell["modelSelection"];
   readonly runtimeMode: OrchestrationV2ThreadShell["runtimeMode"];
@@ -285,6 +287,12 @@ export function presentThreadShell(
       thread.lineage.relationshipToParent === "subagent"
         ? formatSubagentDisplayTitle(thread.title)
         : thread.title,
+    ...(thread.enterpriseOwnerEmail === undefined
+      ? {}
+      : { enterpriseOwnerEmail: thread.enterpriseOwnerEmail }),
+    ...(thread.createdFromClientLabel === undefined
+      ? {}
+      : { createdFromClientLabel: thread.createdFromClientLabel }),
     providerInstanceId: thread.providerInstanceId,
     modelSelection: thread.modelSelection,
     runtimeMode: thread.runtimeMode,

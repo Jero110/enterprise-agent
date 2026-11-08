@@ -1,7 +1,11 @@
-import { createEnterpriseEnvironmentAtoms } from "@t3tools/client-runtime/state/enterprise";
+import {
+  createEnterpriseEnvironmentAtoms,
+  selectPersonalThreads,
+} from "@t3tools/client-runtime/state/enterprise";
 import { createEnterpriseFileCommands } from "@t3tools/client-runtime/state/enterpriseFiles";
 
 import { connectionAtomRuntime } from "../connection/runtime";
+import { useQuietThreadShells } from "./entities";
 import { usePrimaryEnvironmentId } from "./environments";
 import { useEnvironmentQuery } from "./query";
 
@@ -27,4 +31,10 @@ export function enterpriseFailureMessage(failure: unknown): string {
   return failure instanceof Error && failure.message.length > 0
     ? failure.message
     : "The enterprise hub request failed.";
+}
+
+export function useOwnThreadShells() {
+  const threads = useQuietThreadShells();
+  const { identity, isPending } = useEnterpriseStatus();
+  return isPending ? [] : selectPersonalThreads(threads, identity?.email ?? null);
 }

@@ -19,6 +19,7 @@ import {
   type KnowledgeSearchInput,
   type KnowledgeSearchResult,
 } from "@t3tools/contracts";
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -70,6 +71,10 @@ export class EnterpriseHub extends Context.Service<
       sessionId: string,
       input: KnowledgeProposalDecision,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
+    readonly authenticate: (input: {
+      readonly email: string;
+      readonly token: string;
+    }) => Effect.Effect<EnterpriseHubIdentity, EnterpriseError>;
     readonly enroll: (
       sessionId: string,
       input: { readonly email: string; readonly token: string },
@@ -139,16 +144,21 @@ const make = Effect.gen(function* () {
     },
   );
 
+  const authenticate: EnterpriseHub["Service"]["authenticate"] = Effect.fn(
+    "EnterpriseHub.authenticate",
+  )(function* (input) {
+    if (!(yield* store.verifyToken(input.token))) {
+      return yield* new EnterpriseError({
+        code: "invalid_token",
+        message: "The enterprise token is wrong.",
+      });
+    }
+    return yield* identityOf(input.email);
+  });
+
   const enroll: EnterpriseHub["Service"]["enroll"] = Effect.fn("EnterpriseHub.enroll")(
     function* (sessionId, input) {
-      // The token is checked first so a stranger cannot probe which emails exist.
-      if (!(yield* store.verifyToken(input.token))) {
-        return yield* new EnterpriseError({
-          code: "invalid_token",
-          message: "The enterprise token is wrong.",
-        });
-      }
-      const identity = yield* identityOf(input.email);
+      const identity = yield* authenticate(input);
       yield* store.enroll({ environmentId: sessionId, email: identity.email });
       return identity;
     },
@@ -209,6 +219,7 @@ const make = Effect.gen(function* () {
             .filter((member) => member.teamId === team.id)
             .map((member) => ({
               displayName: member.displayName,
+              memberKey: teamMemberKey(member.email),
               role: member.role,
               isMe: member.email === me.email,
             })),
@@ -354,6 +365,7 @@ const make = Effect.gen(function* () {
     proposalDecide: Effect.fn("EnterpriseHub.proposalDecide")(function* (sessionId, input) {
       return yield* proposals.decide((yield* whoami(sessionId)).email, input);
     }),
+    authenticate,
     enroll,
     whoami,
     disconnect,

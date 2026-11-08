@@ -17,6 +17,7 @@ import {
 import { PROJECT_FAVICON_EXTENSIONS } from "@t3tools/shared/projectFavicon";
 import { resolveEditorCommand } from "@t3tools/shared/editor";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as NodeOS from "node:os";
 import { isRelayTracingEnabled } from "@t3tools/shared/otelEnvironment";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -96,6 +97,12 @@ export const installRelayTelemetryEnabled = Effect.fn("desktop.ipc.window.instal
     );
   },
 );
+
+export const getClientHostname = DesktopIpc.makeSyncIpcMethod({
+  channel: IpcChannels.GET_CLIENT_HOSTNAME_CHANNEL,
+  result: Schema.String,
+  handler: () => Effect.succeed(NodeOS.hostname()),
+});
 
 export const getSystemLocale = DesktopIpc.makeSyncIpcMethod({
   channel: IpcChannels.GET_SYSTEM_LOCALE_CHANNEL,

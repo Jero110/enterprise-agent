@@ -13,6 +13,7 @@ import type * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
+import type * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as EnterpriseClient from "../enterprise/EnterpriseClient.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ApplicationEvents from "../persistence/OrchestrationEventStore.ts";
@@ -23,6 +24,7 @@ export class TeamReporter extends Context.Service<
   {
     readonly publish: (
       input: TeamThreadPublishInput,
+      session?: Pick<EnvironmentAuth.AuthenticatedSession, "sessionId" | "subject" | "client">,
     ) => Effect.Effect<{ readonly updated: boolean }, EnterpriseError>;
     readonly start: Effect.Effect<void, never, Scope.Scope>;
   }
