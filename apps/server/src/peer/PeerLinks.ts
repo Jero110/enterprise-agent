@@ -30,7 +30,11 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpApi from "effect/http-api/HttpApi";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
-import { isLocalLoopbackHost, isTailnetHost } from "@t3tools/shared/hostClassification";
+import {
+  isLocalLoopbackHost,
+  isPrivateNetworkHost,
+  isTailnetHost,
+} from "@t3tools/shared/hostClassification";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
@@ -143,8 +147,9 @@ const failStorage = (cause: unknown) =>
  * The base URL a peer is reached at, normalised to its origin. The pairing
  * code and then the link's token travel to it, so plain http is accepted only
  * where the network already encrypts: this machine, or a Tailscale address.
+ * Enterprise sign-in sends no pairing code, so it may also use a private LAN address.
  */
-const peerOrigin = (url: string) => {
+const peerOrigin = (url: string, allowPrivateHttp = false) => {
   const parsed = URL.parse(url);
   if (parsed === null || (parsed.protocol !== "https:" && parsed.protocol !== "http:")) {
     return Effect.fail(
@@ -157,7 +162,8 @@ const peerOrigin = (url: string) => {
   if (
     parsed.protocol === "http:" &&
     !isLocalLoopbackHost(parsed.hostname) &&
-    !isTailnetHost(parsed.hostname)
+    !isTailnetHost(parsed.hostname) &&
+    !(allowPrivateHttp && isPrivateNetworkHost(parsed.hostname))
   ) {
     return Effect.fail(
       new PeerLinkError({
@@ -365,12 +371,13 @@ const make = Effect.gen(function* () {
     urls: ReadonlyArray<string>,
     environmentId: EnvironmentId,
     name: string,
+    allowPrivateHttp = false,
   ) {
     const checked = yield* Effect.forEach(
       urls,
       (url) =>
         Effect.gen(function* () {
-          const origin = yield* peerOrigin(url);
+          const origin = yield* peerOrigin(url, allowPrivateHttp);
           return { origin, descriptor: yield* describe(origin) };
         }).pipe(Effect.result),
       { concurrency: "unbounded" },
@@ -401,8 +408,11 @@ const make = Effect.gen(function* () {
   });
 
   /** The peer at `url`, with every address checked for credentials first. */
-  const answeringAt = Effect.fn("PeerLinks.answeringAt")(function* (urls: ReadonlyArray<string>) {
-    const origins = yield* Effect.forEach(urls, peerOrigin);
+  const answeringAt = Effect.fn("PeerLinks.answeringAt")(function* (
+    urls: ReadonlyArray<string>,
+    allowPrivateHttp = false,
+  ) {
+    const origins = yield* Effect.forEach(urls, (url) => peerOrigin(url, allowPrivateHttp));
     const primary = origins[0]!;
     const descriptor = yield* describe(primary);
     if (Option.isNone(descriptor)) {
@@ -426,11 +436,12 @@ const make = Effect.gen(function* () {
     // be it, so a reused LAN address never receives the pairing code.
     const { primary, peer, origins } =
       input.expectedEnvironmentId === undefined
-        ? yield* answeringAt(urls)
+        ? yield* answeringAt(urls, credential !== undefined)
         : yield* answeringAs(
             urls,
             input.expectedEnvironmentId,
             input.expectedLabel ?? input.expectedEnvironmentId,
+            credential !== undefined,
           );
     const self = yield* environment.getDescriptor;
     if (peer.environmentId === self.environmentId) {
