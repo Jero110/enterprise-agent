@@ -73,11 +73,11 @@ export class EnterpriseHub extends Context.Service<
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
     readonly authenticate: (input: {
       readonly email: string;
-      readonly token: string;
+      readonly token?: string | undefined;
     }) => Effect.Effect<EnterpriseHubIdentity, EnterpriseError>;
     readonly enroll: (
       sessionId: string,
-      input: { readonly email: string; readonly token: string },
+      input: { readonly email: string; readonly token?: string | undefined },
     ) => Effect.Effect<EnterpriseHubIdentity, EnterpriseError>;
     readonly whoami: (sessionId: string) => Effect.Effect<EnterpriseHubIdentity, EnterpriseError>;
     readonly disconnect: (sessionId: string) => Effect.Effect<boolean>;
@@ -147,7 +147,8 @@ const make = Effect.gen(function* () {
   const authenticate: EnterpriseHub["Service"]["authenticate"] = Effect.fn(
     "EnterpriseHub.authenticate",
   )(function* (input) {
-    if (!(yield* store.verifyToken(input.token))) {
+    // Email membership is the gate; a token is only checked when one is sent.
+    if (input.token !== undefined && !(yield* store.verifyToken(input.token))) {
       return yield* new EnterpriseError({
         code: "invalid_token",
         message: "The enterprise token is wrong.",

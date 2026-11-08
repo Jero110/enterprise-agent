@@ -13,7 +13,12 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import { useId, useState } from "react";
 
 import { environmentCatalog } from "~/connection/catalog";
-import { readEnvironment, useEnvironment } from "~/state/environments";
+import {
+  readEnvironment,
+  useEnvironment,
+  useEnvironmentHttpBaseUrl,
+  useEnvironments,
+} from "~/state/environments";
 import { enterpriseEnvironment, enterpriseFailureMessage } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -56,8 +61,21 @@ export function ConnectEnterpriseDialog({
   const configured =
     environment?.serverConfig?.environment.capabilities.enterpriseOnboarding === true ||
     status.data?.configured === true;
+  // A hub you reached through a pair link already is the environment: no URL to ask for.
+  const { environments } = useEnvironments();
+  const pairedHub = configured
+    ? undefined
+    : environments.find(
+        (candidate) =>
+          candidate.environmentId !== environmentId &&
+          candidate.serverConfig?.environment.capabilities.enterpriseOnboarding === true,
+      );
+  const pairedHubBaseUrl = useEnvironmentHttpBaseUrl(pairedHub?.environmentId ?? null);
+  const knownHubUrl = pairedHubBaseUrl ?? undefined;
+  const needsUrl = !configured && pairedHub === undefined;
   const ready =
-    email.trim().length > 0 && token.trim().length > 0 && (configured || hubUrl.trim().length > 0);
+    email.trim().length > 0 &&
+    (needsUrl ? hubUrl.trim().length > 0 : configured || knownHubUrl !== undefined);
 
   const handleOpenChange = (next: boolean) => {
     if (!next && busy) return;
@@ -74,10 +92,12 @@ export function ConnectEnterpriseDialog({
     let origin: string | undefined;
     try {
       if (!configured) {
-        origin = resolveEnterpriseHubOrigin(hubUrl);
-        const destination = readEnvironment(environmentId)?.displayUrl;
-        if (destination?.startsWith("http")) resolveEnterpriseHubOrigin(destination);
-        else if (!window.desktopBridge) resolveEnterpriseHubOrigin(window.location.origin);
+        origin = resolveEnterpriseHubOrigin(knownHubUrl ?? hubUrl);
+        if (knownHubUrl === undefined) {
+          const destination = readEnvironment(environmentId)?.displayUrl;
+          if (destination?.startsWith("http")) resolveEnterpriseHubOrigin(destination);
+          else if (!window.desktopBridge) resolveEnterpriseHubOrigin(window.location.origin);
+        }
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : "Enter a secure environment URL.");
@@ -90,7 +110,7 @@ export function ConnectEnterpriseDialog({
       input: {
         ...(origin === undefined ? {} : { hubUrl: origin }),
         email: email.trim(),
-        token: token.trim(),
+        ...(token.trim().length > 0 ? { token: token.trim() } : {}),
       },
     });
     if (result._tag === "Success") {
@@ -143,9 +163,9 @@ export function ConnectEnterpriseDialog({
         <DialogHeader>
           <DialogTitle>Connect Enterprise</DialogTitle>
           <DialogDescription>
-            {configured
-              ? "Sign in to this environment’s Enterprise with your email and Enterprise token. Your name, team and permissions load automatically."
-              : "Connect with your Enterprise environment URL, email and Enterprise token."}
+            {configured || !needsUrl
+              ? "Sign in to this environment’s Enterprise with your work email. Your name, team and permissions load automatically."
+              : "Connect with your Enterprise environment URL and work email."}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -158,7 +178,7 @@ export function ConnectEnterpriseDialog({
               void submit();
             }}
           >
-            {!configured && (
+            {needsUrl && (
               <label className="block space-y-1.5">
                 <span className="block text-xs font-medium text-foreground">Environment URL</span>
                 <Input
@@ -177,7 +197,7 @@ export function ConnectEnterpriseDialog({
               <span className="block text-xs font-medium text-foreground">Email</span>
               <Input
                 type="email"
-                autoFocus={configured}
+                autoFocus={!needsUrl}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@company.com"
@@ -187,7 +207,9 @@ export function ConnectEnterpriseDialog({
               />
             </label>
             <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Enterprise token</span>
+              <span className="block text-xs font-medium text-foreground">
+                Enterprise token (optional)
+              </span>
               <Input
                 type="password"
                 value={token}

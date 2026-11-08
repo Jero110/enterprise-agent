@@ -7,6 +7,8 @@
     "dev": "node scripts/dev-runner.ts dev",
     "profile:startup": "node scripts/profile-startup.mjs",
     "dev:enterprise": "node scripts/enterprise-dev.ts",
+    "dev:hub:desktop": "T3CODE_ENTERPRISE_HUB=true T3CODE_ENTERPRISE_SEED=$PWD/apps/server/src/enterprise/fixtures/acme-bank.seed.json node scripts/dev-runner.ts dev:desktop --home-dir $HOME/.t3-hub",
+    "dev:hub": "T3CODE_ENTERPRISE_HUB=true T3CODE_ENTERPRISE_SEED=$PWD/apps/server/src/enterprise/fixtures/acme-bank.seed.json node scripts/dev-runner.ts dev --home-dir $HOME/.t3-hub",
     "dev:share": "node scripts/dev-runner.ts dev --share",
     "dev:server": "node scripts/dev-runner.ts dev:server",
     "dev:web": "node scripts/dev-runner.ts dev:web",

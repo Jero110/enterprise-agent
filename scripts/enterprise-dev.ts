@@ -12,6 +12,11 @@ import { ChildProcess, type ChildProcessSpawner } from "effect/process";
 import * as NodeURL from "node:url";
 import * as NodeUtil from "node:util";
 
+import { loadRepoEnv } from "./lib/public-config.ts";
+
+Object.assign(process.env, loadRepoEnv());
+const devToken = process.env.T3CODE_DEV_AUTH_TOKEN?.trim();
+
 const root = NodeURL.fileURLToPath(new URL("..", import.meta.url));
 const runner = NodeURL.fileURLToPath(new URL("./dev-runner.ts", import.meta.url));
 const seedPath = NodeURL.fileURLToPath(
@@ -160,7 +165,12 @@ const printTable = Effect.fn("enterprise-dev.printTable")(function* () {
     yield* Effect.sleep("250 millis");
   } while (!instances.every((i) => i.url));
   if (stopping) return;
-  const rows = instances.map((i) => [i.name, i.email, i.url!]);
+  // The reusable dev credential signs a browser in once for every localhost port.
+  const rows = instances.map((i) => [
+    i.name,
+    i.email,
+    devToken && i.name !== "hub" ? `${i.url!}/pair#token=${devToken}` : i.url!,
+  ]);
   const widths = [0, 1, 2].map((c) => Math.max(...rows.map((r) => r[c]!.length)));
   yield* Console.log("\nname  → email → URL");
   for (const r of rows) yield* Console.log(r.map((cell, c) => cell.padEnd(widths[c]!)).join("  "));

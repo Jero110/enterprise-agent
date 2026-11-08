@@ -29,10 +29,7 @@ export const layer = Layer.unwrap(
             ),
           SchemaError: () =>
             Effect.succeed(
-              HttpServerResponse.jsonUnsafe(
-                { message: "Enter your email and Enterprise token." },
-                { status: 400 },
-              ),
+              HttpServerResponse.jsonUnsafe({ message: "Enter your email." }, { status: 400 }),
             ),
         }),
         Effect.orElseSucceed(() =>

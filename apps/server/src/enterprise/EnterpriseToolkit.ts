@@ -55,7 +55,7 @@ const EnrollTool = Tool.make("enterprise_enroll", {
   ...shared,
   description:
     "Bind this connection to an enterprise member with their email and the enterprise token. Members' IDEs call it right after linking.",
-  parameters: Schema.Struct({ email: Schema.String, token: Schema.String }),
+  parameters: Schema.Struct({ email: Schema.String, token: Schema.optionalKey(Schema.String) }),
   success: hubResult(EnterpriseHubIdentity),
 }).annotate(Tool.Destructive, false);
 const WhoAmITool = Tool.make("enterprise_whoami", {

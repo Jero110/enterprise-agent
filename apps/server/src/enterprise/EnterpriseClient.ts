@@ -244,7 +244,7 @@ const make = Effect.gen(function* () {
           }
           const request = yield* HttpClientRequest.bodyJson(
             HttpClientRequest.post(`${origin}/api/enterprise/connect`),
-            { email: input.email, token: input.token },
+            { email: input.email, ...(input.token === undefined ? {} : { token: input.token }) },
           );
           const response = yield* http.execute(request);
           const body = yield* response.json;
@@ -327,7 +327,7 @@ const make = Effect.gen(function* () {
       return yield* callResult(
         hub,
         "enterprise_enroll",
-        { email: input.email, token: input.token },
+        { email: input.email, ...(input.token === undefined ? {} : { token: input.token }) },
         EnterpriseHubIdentity,
       ).pipe(
         Effect.tap(() => writeConnection(hub)),

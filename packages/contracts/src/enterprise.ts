@@ -42,7 +42,7 @@ export type EnterpriseStatus = typeof EnterpriseStatus.Type;
 
 export const EnterpriseLoginInput = Schema.Struct({
   email: TrimmedNonEmptyString,
-  token: TrimmedNonEmptyString,
+  token: Schema.optionalKey(TrimmedNonEmptyString),
 });
 export type EnterpriseLoginInput = typeof EnterpriseLoginInput.Type;
 
