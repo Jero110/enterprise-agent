@@ -124,6 +124,14 @@ export const layer = Layer.effect(
       if (input.scope !== "global" && (yield* store.getTeam(input.scope)) === null)
         return yield* invalid;
       if (input.kind === "upload" || input.recipient !== undefined) return yield* invalid;
+      if (ingestion && (input.kind === "create" || input.kind === "update")) {
+        const node = KnowledgeRepo.documentOf(input.path, input.content ?? "");
+        if (
+          node.layer === undefined ||
+          node.areaId !== (input.scope === "global" ? "general" : input.scope)
+        )
+          return yield* invalid;
+      }
       if (input.kind === "area-access") {
         if (
           input.scope === "global" ||

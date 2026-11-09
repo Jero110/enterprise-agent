@@ -59,7 +59,7 @@ const Frontmatter = Schema.Struct({
 
 const decodeFrontmatter = Schema.decodeUnknownSync(Frontmatter);
 
-const documentOf = (id: string, raw: string): KnowledgeDocument => {
+export const documentOf = (id: string, raw: string): KnowledgeDocument => {
   const areaId = id.startsWith("global/") ? GENERAL_AREA : id.split("/")[1]!;
   const fallback = { id, areaId, title: titleOf(id, raw), content: raw };
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw);

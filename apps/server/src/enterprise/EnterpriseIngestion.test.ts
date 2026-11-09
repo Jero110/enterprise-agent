@@ -70,6 +70,12 @@ describe("EnterpriseIngestion", () => {
         "message.dispatch",
       ]);
       expect(commands[0]).toMatchObject({ threadId: result.threadId, modelSelection });
+      const message = commands.find((command) => command.type === "message.dispatch");
+      expect(message?.text).toContain("Organization and areas");
+      expect(message?.text).toContain("Ledger");
+      expect(message?.text).toContain("knowledge_propose");
+      expect(message?.text).toContain("Metrics, Business, AI, Data");
+      expect(message?.text).toContain("Existing node index");
       expect(yield* store.getIngestionRun(result.threadId)).toMatchObject({
         id: result.runId,
         adminEmail: "jeronimo.deli@gmail.com",
