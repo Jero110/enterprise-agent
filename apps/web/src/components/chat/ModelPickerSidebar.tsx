@@ -5,6 +5,7 @@ import { StarIcon } from "lucide-react";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import {
   isProviderInstancePickerReady,
   shouldShowInstanceBadge,
@@ -15,13 +16,17 @@ function describeUnavailableInstance(entry: ProviderInstanceEntry): string {
   const label = entry.displayName;
   // An unavailable instance (a driver this build lacks or the policy leaves out) says why instead.
   if ((!entry.enabled && entry.isAvailable) || entry.status === "disabled") {
-    return `${label}: Disabled in settings.`;
+    return t("{label}: Disabled in settings.", { label });
   }
   if (entry.status === "ready" && entry.isAvailable) {
     return label;
   }
   const kind =
-    entry.status === "error" ? "Unavailable" : entry.status === "warning" ? "Limited" : "Not ready";
+    entry.status === "error"
+      ? t("Unavailable")
+      : entry.status === "warning"
+        ? t("Limited", undefined, "model")
+        : t("Not ready");
   const msg = entry.snapshot.message?.trim();
   return msg ? `${label}: ${kind}. ${msg}` : `${label}: ${kind}.`;
 }
@@ -103,7 +108,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
                         )}
                         onClick={() => handleSelect("favorites")}
                         type="button"
-                        aria-label="Favorites"
+                        aria-label={t("Favorites")}
                         aria-pressed={props.selectedInstanceId === "favorites"}
                       >
                         <StarIcon className="size-5 fill-current shrink-0" aria-hidden />
@@ -115,7 +120,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
                     sideOffset={PICKER_TOOLTIP_SIDE_OFFSET}
                     align="center"
                   >
-                    Favorites
+                    {t("Favorites")}
                   </TooltipPopup>
                 </Tooltip>
               </div>

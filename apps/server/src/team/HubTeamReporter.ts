@@ -69,7 +69,7 @@ const make = Effect.gen(function* () {
         (summary) =>
           summary.ownerEmail === email &&
           local.has(summary.threadId) &&
-          summary.publicationStatus === "read-only" &&
+          summary.publicationStatus !== "unpublished" &&
           (changed === undefined || changed.has(summary.threadId)),
       );
       for (const summary of shared) {
@@ -111,7 +111,7 @@ const make = Effect.gen(function* () {
       }
       yield* sync(new Set());
       const result = yield* publication.publish(ownerSession(member.email), input);
-      if (input.status === "read-only") yield* sync(undefined, member.email);
+      if (input.status !== "unpublished") yield* sync(undefined, member.email);
       return result;
     },
     (effect) => lock.withPermits(1)(effect),

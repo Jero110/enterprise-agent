@@ -1,10 +1,11 @@
 import { useAuth } from "@clerk/react";
+import { t } from "~/i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { CheckIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-import { APP_DISPLAY_NAME, DESKTOP_DOWNLOAD_URL } from "~/branding";
+import { APP_BASE_NAME, APP_DISPLAY_NAME, DESKTOP_DOWNLOAD_URL } from "~/branding";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { isElectron } from "../env";
 import { isLocalEnvironmentDisabled } from "../localEnvironment";
@@ -36,14 +37,16 @@ export function HostedEmptyState() {
         <Empty className="flex-1">
           <EmptyHeader>
             <EmptyTitle>
-              {localEnvironmentOff ? "This computer is off" : "No computer connected"}
+              {localEnvironmentOff ? t("This computer is off") : t("No computer connected")}
             </EmptyTitle>
             <EmptyDescription>
               {localEnvironmentOff
-                ? "Turn it back on, or connect a different computer."
+                ? t("Turn it back on, or connect a different computer.")
                 : cloudEnabled
-                  ? "Your agents run on your computer."
-                  : "Your agents run on your computer. Start T3 Code there first."}
+                  ? t("Your agents run on your computer.")
+                  : t("Your agents run on your computer. Open {app} there first.", {
+                      app: APP_BASE_NAME,
+                    })}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

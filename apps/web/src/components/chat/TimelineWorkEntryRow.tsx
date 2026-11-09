@@ -44,6 +44,7 @@ import {
   workEntryReadOutput,
 } from "./MessagesTimeline.logic";
 import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { FetchedToolOutput, V2ItemInspector } from "./V2ItemInspector";
 import { SubagentNotificationLink } from "./V2LifecycleRow";
@@ -291,8 +292,8 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const previewText =
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
-        ? "Thinking"
-        : "Thought"
+        ? t("Thinking", undefined, "timeline")
+        : t("Thought", undefined, "timeline")
       : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
@@ -466,14 +467,16 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             <button
               type="button"
               className="shrink-0 rounded-sm text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              aria-label={`Open ${createdThread.title ?? "created thread"}`}
+              aria-label={t("Open {title}", {
+                title: createdThread.title ?? t("created thread"),
+              })}
               onClick={(event) => {
                 event.stopPropagation();
                 ctx.onOpenThread(createdThread.targetThreadId);
               }}
               onKeyDown={stopRowToggle}
             >
-              Open chat
+              {t("Open chat")}
             </button>
           ) : null}
           {notifiedSubagentThreadId ? (

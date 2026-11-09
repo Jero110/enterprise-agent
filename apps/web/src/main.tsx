@@ -8,6 +8,7 @@ import { hasCloudPublicConfig } from "./cloud/publicConfig";
 import { isElectron } from "./env";
 import { startAppServices } from "./appInit";
 import { AppRoot } from "./AppRoot";
+import { dismissBootSplash } from "./lib/bootSplash";
 import { clearChunkReloadGuard, reloadOnceForChunkLoadError } from "./lib/chunkReloadGuard";
 
 const router = startAppServices();
@@ -51,6 +52,8 @@ export const startup = Promise.all([
         )}
       </React.StrictMode>,
     );
+    // render() commits asynchronously; wait a frame so the splash never fades over an empty page.
+    window.requestAnimationFrame(() => dismissBootSplash());
   })
   .catch((error: unknown) => {
     if (reloadScheduled) return;

@@ -11,6 +11,8 @@ import {
 } from "@t3tools/contracts";
 import { useState } from "react";
 
+import { t } from "~/i18n";
+
 import {
   enterpriseEnvironment,
   enterpriseFailureMessage,
@@ -19,13 +21,17 @@ import {
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { ConnectEnterpriseDialog } from "../enterprise/ConnectEnterpriseDialog";
+import { ContextChanges } from "../enterprise/ContextChanges";
 import { createEnterpriseInvite } from "../enterprise/invite";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
+import { ScopedSwitch } from "./ScopedSwitch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
+import { searchableSetting } from "./settingsSearch";
+import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
 const NO_TEAM = "none";
 
@@ -35,15 +41,44 @@ export function EnterpriseSettingsPanel() {
     <SettingsPageContainer>
       <SettingsSection title="Enterprise">
         {environmentId === null || isPending ? (
-          <SettingsRow title="Loading…" role="status" />
+          <SettingsRow title={t("Loading…")} role="status" />
         ) : (
           <IdentityRows environmentId={environmentId} identity={identity} error={error} />
         )}
       </SettingsSection>
+      {environmentId !== null && identity ? (
+        <SettingsSection title="Pending approval">
+          <ContextChanges environmentId={environmentId} />
+        </SettingsSection>
+      ) : null}
+      <TeamWikiSection />
       {environmentId !== null && identity?.role === "admin" ? (
         <MembersSection environmentId={environmentId} />
       ) : null}
     </SettingsPageContainer>
+  );
+}
+
+function TeamWikiSection() {
+  const citeWikiSources = useScopedSettings((settings) => settings.citeWikiSources);
+  const updateSettings = useUpdateScopedSettings();
+  return (
+    <SettingsSection title="Team wiki">
+      <SettingsRow
+        serverScoped
+        settingKeys={["citeWikiSources"]}
+        {...searchableSetting("cite-wiki-sources")}
+        description="When an agent answers with information from the team wiki, it ends with a short Sources list of the pages it used, so you can check where the answer came from. Applies to new conversations."
+        control={
+          <ScopedSwitch
+            settingKeys={["citeWikiSources"]}
+            checked={citeWikiSources}
+            onCheckedChange={(checked) => updateSettings({ citeWikiSources: Boolean(checked) })}
+            aria-label={t("Cite team wiki sources")}
+          />
+        }
+      />
+    </SettingsSection>
   );
 }
 
@@ -64,15 +99,18 @@ function IdentityRows({
   });
   const leave = async () => {
     setBusy(true);
-    await disconnect({ environmentId, input: {} });
+    const result = await disconnect({ environmentId, input: {} });
     setBusy(false);
+    if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+      toastManager.add({ type: "error", title: t("Could not disconnect") });
+    }
   };
   return (
     <>
       {identity ? (
         <SettingsRow
-          title={`${identity.displayName} · ${identity.role}`}
-          description={`${identity.email} · ${identity.teamName ?? "No team"}`}
+          title={`${identity.displayName} · ${t(identity.role, undefined, "role")}`}
+          description={`${identity.email} · ${identity.teamName ?? t("No team")}`}
           control={
             <Button
               size="xs"
@@ -80,7 +118,7 @@ function IdentityRows({
               disabled={busy}
               onClick={() => void leave()}
             >
-              {busy ? "Disconnecting…" : "Disconnect"}
+              {busy ? t("Disconnecting…") : t("Disconnect")}
             </Button>
           }
         />
@@ -90,13 +128,13 @@ function IdentityRows({
           description="Connect with your work email and a one-time Enterprise invite. Nothing changes here until you do."
           control={
             <Button size="xs" onClick={() => setConnecting(true)}>
-              Connect Enterprise
+              {t("Connect Enterprise")}
             </Button>
           }
         />
       )}
       {error ? (
-        <SettingsRow title="The hub did not confirm your access" description={error} />
+        <SettingsRow title="The hub did not confirm your access" description={t(error)} />
       ) : null}
       <ConnectEnterpriseDialog
         environmentId={environmentId}
@@ -113,15 +151,17 @@ function MembersSection({ environmentId }: { readonly environmentId: Environment
     <SettingsSection title="Members">
       <AuthorizeRow environmentId={environmentId} teams={members.data?.teams ?? []} />
       <details className="px-3 py-3 sm:px-4">
-        <summary className="cursor-pointer text-sm font-medium">Create an invite</summary>
+        <summary className="cursor-pointer text-sm font-medium">{t("Create an invite")}</summary>
         <InviteRow />
       </details>
       <details className="px-3 py-3 sm:px-4">
-        <summary className="cursor-pointer text-sm font-medium">Manage existing members</summary>
+        <summary className="cursor-pointer text-sm font-medium">
+          {t("Manage existing members")}
+        </summary>
         {members.error ? (
-          <SettingsRow title="Could not load members" description={members.error} />
+          <SettingsRow title="Could not load members" description={t(members.error)} />
         ) : !members.data ? (
-          <SettingsRow title="Loading members…" role="status" />
+          <SettingsRow title={t("Loading members…")} role="status" />
         ) : (
           members.data.members.map((member) => (
             <MemberRow
@@ -158,12 +198,12 @@ function InviteRow() {
             setError("");
           } catch {
             setInvite("");
-            setError("Enter the hub address, pairing code and Enterprise token.");
+            setError(t("Enter the hub address, pairing code and Enterprise token."));
           }
         }}
       >
         <Input
-          aria-label="Hub address"
+          aria-label={t("Hub address")}
           value={url}
           onChange={(event) => {
             setUrl(event.target.value);
@@ -174,30 +214,30 @@ function InviteRow() {
           spellCheck={false}
         />
         <Input
-          aria-label="Hub pairing code"
+          aria-label={t("Hub pairing code")}
           value={pairingCode}
           onChange={(event) => {
             setPairingCode(event.target.value);
             setInvite("");
           }}
-          placeholder="Fresh pairing code"
+          placeholder={t("Fresh pairing code")}
           nativeInput
           spellCheck={false}
         />
         <Input
-          aria-label="Enterprise token"
+          aria-label={t("Enterprise token")}
           type="password"
           value={token}
           onChange={(event) => {
             setToken(event.target.value);
             setInvite("");
           }}
-          placeholder="Enterprise token"
+          placeholder={t("Enterprise token")}
           nativeInput
           spellCheck={false}
         />
         <Button size="xs" type="submit">
-          Create invite
+          {t("Create invite")}
         </Button>
       </form>
       {error ? (
@@ -208,7 +248,7 @@ function InviteRow() {
       {invite ? (
         <div className="mt-3 flex items-center gap-2">
           <Input
-            aria-label="Enterprise invite"
+            aria-label={t("Enterprise invite")}
             value={invite}
             readOnly
             nativeInput
@@ -219,7 +259,7 @@ function InviteRow() {
             variant="outline"
             onClick={() => void navigator.clipboard.writeText(invite)}
           >
-            Copy
+            {t("Copy")}
           </Button>
         </div>
       ) : null}
@@ -249,12 +289,14 @@ function TeamRoleControls({
           if (next !== null) onChange({ teamId: next === NO_TEAM ? null : next, role });
         }}
       >
-        <SelectTrigger size="xs" aria-label="Team">
-          <SelectValue>{teams.find((team) => team.id === teamId)?.name ?? "No team"}</SelectValue>
+        <SelectTrigger size="xs" aria-label={t("Team")}>
+          <SelectValue>
+            {teams.find((team) => team.id === teamId)?.name ?? t("No team")}
+          </SelectValue>
         </SelectTrigger>
         <SelectPopup alignItemWithTrigger={false}>
           <SelectItem value={NO_TEAM} hideIndicator>
-            No team
+            {t("No team")}
           </SelectItem>
           {teams.map((team) => (
             <SelectItem key={team.id} value={team.id} hideIndicator>
@@ -270,13 +312,13 @@ function TeamRoleControls({
           if (next !== null) onChange({ teamId, role: next as TeamMemberRole });
         }}
       >
-        <SelectTrigger size="xs" aria-label="Role">
-          <SelectValue>{role}</SelectValue>
+        <SelectTrigger size="xs" aria-label={t("Role")}>
+          <SelectValue>{t(role, undefined, "role")}</SelectValue>
         </SelectTrigger>
         <SelectPopup alignItemWithTrigger={false}>
           {TeamMemberRole.literals.map((option) => (
             <SelectItem key={option} value={option} hideIndicator>
-              {option}
+              {t(option, undefined, "role")}
             </SelectItem>
           ))}
         </SelectPopup>
@@ -338,12 +380,12 @@ function MemberRow({
           environmentId,
           input: { email: member.email, displayName: member.displayName, ...next },
         }),
-      "Could not update the member",
+      t("Could not update the member"),
     );
   return (
     <SettingsRow
       title={member.displayName}
-      description={member.active ? member.email : `${member.email} · revoked`}
+      description={member.active ? member.email : `${member.email} · ${t("revoked")}`}
       control={
         <div className="flex flex-wrap items-center gap-2">
           <TeamRoleControls
@@ -357,7 +399,7 @@ function MemberRow({
             disabled={busy || !canAuthorize || !member.active || member.areaIds === undefined}
             className="flex flex-wrap gap-2"
           >
-            <legend className="text-xs text-muted-foreground">Additional areas</legend>
+            <legend className="text-xs text-muted-foreground">{t("Additional areas")}</legend>
             {teams.map((team) => (
               <label key={team.id} className="flex items-center gap-1 text-xs">
                 <Checkbox
@@ -384,15 +426,15 @@ function MemberRow({
               onClick={() =>
                 void run(
                   () => revoke({ environmentId, input: { email: member.email } }),
-                  "Could not revoke the email",
+                  t("Could not revoke the email"),
                 )
               }
             >
-              Revoke
+              {t("Revoke")}
             </Button>
           ) : (
             <Button size="xs" variant="outline" disabled={busy} onClick={() => void save(member)}>
-              Authorize
+              {t("Authorize")}
             </Button>
           )}
         </div>
@@ -427,7 +469,7 @@ function AuthorizeRow({
           role: "member",
         },
       }),
-      "Could not authorize the email",
+      t("Could not authorize the email"),
     );
     setBusy(false);
     if (ok) setEmail("");
@@ -446,16 +488,16 @@ function AuthorizeRow({
         }}
       >
         <Input
-          aria-label="Email"
+          aria-label={t("Email")}
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder="email"
+          placeholder={t("email")}
           disabled={busy}
           nativeInput
           spellCheck={false}
         />
         <Button size="xs" type="submit" disabled={busy || !ready}>
-          Add member
+          {t("Add member")}
         </Button>
       </form>
     </SettingsRow>

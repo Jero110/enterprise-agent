@@ -2,6 +2,7 @@ import type { EnvironmentId, SourceControlProviderAuth } from "@t3tools/contract
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { useState } from "react";
 
+import { t } from "~/i18n";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -31,7 +32,7 @@ function RedactedLogin(props: {
       <span className="select-none blur-xs" aria-hidden>
         {redactedPlaceholder(props.account)}
       </span>
-      <span className="sr-only">{props.label ?? "Hidden account"}</span>
+      <span className="sr-only">{props.label ?? t("Hidden account")}</span>
     </span>
   );
 }
@@ -83,9 +84,9 @@ export function SourceControlAccountSettings({
   if (groups.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        Sign in with{" "}
-        <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.loginCommand}</code> on
-        the server host, then rescan to choose accounts here.
+        {t("Sign in with")}{" "}
+        <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.loginCommand}</code>{" "}
+        {t("on the server host, then rescan to choose accounts here.")}
       </p>
     );
   }
@@ -94,14 +95,19 @@ export function SourceControlAccountSettings({
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-          Choose which <code className="rounded bg-muted px-1 py-px text-2xs">{cliName}</code> login
-          each {label} host uses, or turn a host off.
+          {t("Choose which")}{" "}
+          <code className="rounded bg-muted px-1 py-px text-2xs">{cliName}</code>{" "}
+          {t("login each {name} host uses, or turn a host off.", { name: label })}
         </p>
         <Button
           size="icon-xs"
           variant="ghost-muted"
           onClick={() => setRevealed((current) => !current)}
-          aria-label={revealed ? `Hide ${label} accounts` : `Reveal ${label} accounts`}
+          aria-label={
+            revealed
+              ? t("Hide {name} accounts", { name: label })
+              : t("Reveal {name} accounts", { name: label })
+          }
           aria-pressed={revealed}
         >
           {revealed ? <EyeOffIcon /> : <EyeIcon />}
@@ -120,7 +126,7 @@ export function SourceControlAccountSettings({
                 <span className="text-xs font-medium text-foreground">{group.host}</span>
                 {group.selectable.length === 1 && group.selectable[0] !== undefined ? (
                   <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                    <span>Signed in as</span>
+                    <span>{t("Signed in as")}</span>
                     <RedactedLogin revealed={revealed} account={group.selectable[0]} />
                   </p>
                 ) : null}
@@ -128,13 +134,13 @@ export function SourceControlAccountSettings({
               <Switch
                 checked={enabled}
                 disabled={saving}
-                aria-label={`Use ${label} on ${group.host}`}
+                aria-label={t("Use {name} on {host}", { name: label, host: group.host })}
                 onCheckedChange={(checked) => void save(group.host, { enabled: checked })}
               />
             </div>
             {group.selectable.length > 1 ? (
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">Account</span>
+                <span className="text-xs text-muted-foreground">{t("Account")}</span>
                 <div className="w-64 max-w-full">
                   <Select
                     value={pinned}
@@ -146,12 +152,15 @@ export function SourceControlAccountSettings({
                       });
                     }}
                   >
-                    <SelectTrigger size="sm" aria-label={`${label} account for ${group.host}`}>
+                    <SelectTrigger
+                      size="sm"
+                      aria-label={t("{name} account for {host}", { name: label, host: group.host })}
+                    >
                       <SelectValue>
                         {(value: string) =>
                           value === ACTIVE_ACCOUNT ? (
                             <span className="flex min-w-0 items-center gap-1">
-                              Active {cliName} account
+                              {t("Active {cli} account", { cli: cliName })}
                               {group.activeAccount ? (
                                 <>
                                   (
@@ -172,7 +181,7 @@ export function SourceControlAccountSettings({
                     <SelectPopup align="end" alignItemWithTrigger={false}>
                       <SelectItem value={ACTIVE_ACCOUNT}>
                         <span className="flex min-w-0 items-center gap-1">
-                          Active {cliName} account
+                          {t("Active {cli} account", { cli: cliName })}
                           {group.activeAccount ? (
                             <>
                               (<RedactedLogin revealed={revealed} account={group.activeAccount} />)
@@ -185,7 +194,7 @@ export function SourceControlAccountSettings({
                           <RedactedLogin
                             revealed={revealed}
                             account={account}
-                            label={`Account ${index + 1}`}
+                            label={t("Account {number}", { number: index + 1 })}
                           />
                         </SelectItem>
                       ))}
@@ -197,7 +206,10 @@ export function SourceControlAccountSettings({
             {stalePin ? (
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-warning">
-                  The chosen login is no longer signed in, so the active {cliName} login is used.
+                  {t(
+                    "The chosen login is no longer signed in, so the active {cli} login is used.",
+                    { cli: cliName },
+                  )}
                 </p>
                 <Button
                   size="xs"
@@ -205,7 +217,7 @@ export function SourceControlAccountSettings({
                   disabled={saving}
                   onClick={() => void save(group.host, { account: null })}
                 >
-                  Use active login
+                  {t("Use active login")}
                 </Button>
               </div>
             ) : null}
@@ -216,14 +228,19 @@ export function SourceControlAccountSettings({
               >
                 <RedactedLogin revealed={revealed} account={entry.account} />
                 <span>
-                  can't be used: {entry.error ?? `${cliName} reports this login as invalid.`}
+                  {t("can't be used: {reason}", {
+                    reason:
+                      entry.error ?? t("{cli} reports this login as invalid.", { cli: cliName }),
+                  })}
                 </span>
               </p>
             ))}
             {group.environmentVariable ? (
               <p className="text-xs text-warning">
-                {group.environmentVariable} is set on the server, so it overrides the account chosen
-                here until it is unset.
+                {t(
+                  "{variable} is set on the server, so it overrides the account chosen here until it is unset.",
+                  { variable: group.environmentVariable },
+                )}
               </p>
             ) : null}
           </div>

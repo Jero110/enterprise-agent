@@ -1,4 +1,6 @@
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
+import { t } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import { TRIAGE_CLI_COMMAND } from "~/hooks/useStartTriage";
 
 import { InlineButton } from "../ui/button";
@@ -31,8 +33,10 @@ export function TriageDraftHero(props: {
             )}
           </TooltipTrigger>
           <TooltipPopup side="bottom">
-            The agent reads T3 Code's logs and source here, and asks before it applies a fix or
-            posts anything.
+            {t(
+              "The agent reads {app}'s logs and code on this computer, and asks before it applies a fix or posts anything.",
+              { app: APP_BASE_NAME },
+            )}
           </TooltipPopup>
         </Tooltip>
         <span aria-hidden className="text-muted-foreground">

@@ -3,6 +3,7 @@ import type { SourceControlDefinition } from "@t3tools/client-runtime/source-con
 import * as Equal from "effect/Equal";
 import { useState } from "react";
 
+import { t } from "~/i18n";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -68,7 +69,7 @@ export function SourceControlHostSettings({
               void save(Object.fromEntries(Object.keys(saved ?? {}).map((key) => [key, ""])))
             }
           >
-            Remove
+            {t("Remove")}
           </Button>
         </div>
       ) : null}

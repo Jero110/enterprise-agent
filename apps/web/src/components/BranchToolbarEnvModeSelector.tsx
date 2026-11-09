@@ -3,10 +3,13 @@ import { ComposerContextLabel } from "./ComposerContextLabel";
 import { FolderGit2Icon, FolderGitIcon, FolderIcon } from "lucide-react";
 import { memo, type MouseEvent as ReactMouseEvent } from "react";
 
+import { t } from "~/i18n";
+
 import {
   resolveCurrentWorkspaceLabel,
   resolveEnvModeLabel,
   resolveLockedWorkspaceLabel,
+  resolveWorkspaceDescription,
   type EnvMode,
 } from "./BranchToolbar.logic";
 import { useComposerMenuProps } from "./chat/composerEventScope";
@@ -96,8 +99,8 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
         <TooltipTrigger render={lockedRow} />
         <TooltipPopup>
           {forceNewWorktree
-            ? "Each model starts in its own worktree."
-            : resolveLockedWorkspaceLabel(activeWorktreePath, effectiveEnvMode)}
+            ? t("Each model starts in its own worktree.")
+            : `${resolveLockedWorkspaceLabel(activeWorktreePath, effectiveEnvMode)}. ${resolveWorkspaceDescription(activeWorktreePath, effectiveEnvMode)}`}
         </TooltipPopup>
       </Tooltip>
     );
@@ -122,7 +125,7 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
             <ComposerSelectControl
               size="xs"
               className="min-w-0 shrink"
-              aria-label="Workspace"
+              aria-label={t("Where the agent works")}
               data-composer-shortcut="composer.workspace"
               data-composer-context-control
               onMouseDownCapture={stopContextMenuMouseDown}
@@ -144,6 +147,7 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
           {effectiveEnvMode === "worktree"
             ? resolveEnvModeLabel("worktree")
             : resolveCurrentWorkspaceLabel(activeWorktreePath)}
+          {`. ${resolveWorkspaceDescription(activeWorktreePath, effectiveEnvMode)}`}
           {shortcutLabel ? ` · ${shortcutLabel}` : null}
         </TooltipPopup>
       </Tooltip>
@@ -153,7 +157,7 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
         className={showPreviousWorktree ? "w-[min(21rem,calc(100vw-2rem))]" : undefined}
       >
         <SelectGroup>
-          <SelectGroupLabel>Workspace</SelectGroupLabel>
+          <SelectGroupLabel>{t("Where the agent works")}</SelectGroupLabel>
           <SelectItem value="local">
             <span className="inline-flex items-center gap-1.5">
               {activeWorktreePath ? (

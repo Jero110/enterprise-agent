@@ -10,6 +10,7 @@ import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import { layerKnowledge } from "../knowledge/KnowledgeRepo.testkit.ts";
+import * as TeamMessages from "../team/TeamMessages.ts";
 import * as TeamPublication from "../team/TeamPublication.ts";
 import * as EnterpriseClient from "./EnterpriseClient.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
@@ -31,6 +32,7 @@ const layer = EnterpriseHubClient.layer.pipe(
   ),
   Layer.provide(EnterpriseHub.layer),
   Layer.provide(TeamPublication.layer),
+  Layer.provide(TeamMessages.layer),
   Layer.provide(RunRecords.layer),
   Layer.provide(layerKnowledge),
   Layer.provideMerge(layerSeededStore),

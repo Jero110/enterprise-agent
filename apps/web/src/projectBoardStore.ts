@@ -61,112 +61,9 @@ interface ProjectBoardState {
 
 const newId = () => randomUUID();
 
-function seedTask(
-  status: ProjectTaskStatus,
-  title: string,
-  rest: Partial<Omit<ProjectTaskDraft, "status" | "title">> = {},
-): ProjectTask {
-  return {
-    id: newId(),
-    title,
-    description: "",
-    status,
-    priority: null,
-    assignees: [],
-    tags: [],
-    dueDate: null,
-    ...rest,
-  };
-}
-
+/** No example board: only boards someone actually saved in this browser show up, to import. */
 function seedBoards(): ProjectBoard[] {
-  return [
-    {
-      id: newId(),
-      name: "DS - PE",
-      tasks: [
-        seedTask("backlog", "QA métricas asesores", { assignees: ["GG"], tags: ["asesores"] }),
-        seedTask("backlog", "data - panda", {
-          assignees: ["AM"],
-          priority: "normal",
-          tags: ["pe"],
-        }),
-        seedTask("backlog", "terrenos - costos", { assignees: ["AM"], tags: ["pe"] }),
-        seedTask("backlog", "Agente: DB Explorer", { assignees: ["GG"], priority: "low" }),
-        seedTask("backlog", "Score de Leads"),
-        seedTask("in_progress", "Analítica y Métricas de Monopolio", {
-          assignees: ["AM", "GG", "IH"],
-          priority: "high",
-          tags: ["spike"],
-        }),
-        seedTask("in_progress", "QA berriozaval", {
-          assignees: ["AM", "IH"],
-          priority: "urgent",
-          tags: ["catastro"],
-        }),
-        seedTask("in_progress", "medir error en estimación m2", {
-          assignees: ["AM"],
-          priority: "high",
-          tags: ["catastro"],
-        }),
-        seedTask("in_progress", "liberación modelo lujo", {
-          assignees: ["AM"],
-          priority: "urgent",
-        }),
-        seedTask("in_progress", "continuación modelo de costos", {
-          assignees: ["AM"],
-          priority: "normal",
-        }),
-        seedTask("in_progress", "mapa de precios", { assignees: ["IH"], priority: "high" }),
-        seedTask("in_progress", "liberar comparables 3 etapas", {
-          assignees: ["IH"],
-          priority: "high",
-        }),
-        seedTask("blocked", "venta de leads caso de estudio", {
-          assignees: ["GG"],
-          priority: "normal",
-          dueDate: "2026-09-16",
-        }),
-        seedTask("blocked", "Homologación métricas hex Desarrollos y Asesores", {
-          assignees: ["GG"],
-        }),
-        seedTask("blocked", "match de cuentas", {
-          assignees: ["GG"],
-          priority: "high",
-          tags: ["catastro"],
-        }),
-        seedTask("blocked", "armar demo PE", { assignees: ["AM", "GG", "IH"], tags: ["pe"] }),
-        seedTask("complete", "Metodología costos construcción", {
-          assignees: ["AM"],
-          priority: "normal",
-          tags: ["pe"],
-        }),
-        seedTask("complete", "Incluir 'Avalúos' a shadow PE reentrenado", {
-          assignees: ["GG"],
-          priority: "high",
-          tags: ["pe"],
-        }),
-        seedTask("complete", "Documentar tablas de Monopolio", {
-          assignees: ["GG"],
-          dueDate: "2026-10-13",
-        }),
-        seedTask("complete", "modelo pe comparable renta", { assignees: ["IH"], tags: ["pe"] }),
-        seedTask("complete", "analizar datos berriozaval", {
-          assignees: ["AM", "GG", "IH"],
-          tags: ["catastro"],
-        }),
-        seedTask("complete", "encontrar tablas de valor berriozabal", {
-          assignees: ["AM"],
-          tags: ["catastro"],
-        }),
-        seedTask("complete", "ajustar precio por frente de manzana", {
-          assignees: ["IH"],
-          tags: ["catastro"],
-        }),
-        seedTask("complete", "Artefactos Reentreno PE"),
-      ],
-    },
-  ];
+  return [];
 }
 
 const initialBoards = seedBoards();
@@ -183,7 +80,7 @@ export const useProjectBoardStore = create<ProjectBoardState>()(
   persist(
     (set) => ({
       boards: initialBoards,
-      activeBoardId: initialBoards[0]!.id,
+      activeBoardId: initialBoards[0]?.id ?? "",
       selectBoard: (activeBoardId) => set({ activeBoardId }),
       addBoard: (name) => {
         const board: ProjectBoard = { id: newId(), name, tasks: [] };

@@ -1,3 +1,5 @@
+// Not wired into Norai: it asks for a star on the upstream T3 Code repository.
+// Kept (with its tests) so upstream merges stay simple; nothing in the app calls recordPromptSent.
 import { type EnvironmentId, SourceControlProviderKind } from "@t3tools/contracts";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
 import * as Schema from "effect/Schema";

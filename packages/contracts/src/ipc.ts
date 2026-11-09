@@ -1113,6 +1113,11 @@ export interface DesktopBridge {
   checkSystemPermission: (pane: SystemSettingsPane) => Promise<boolean>;
   probeRemoteEditors: () => Promise<readonly EditorId[]>;
   pasteAsText: () => Promise<void>;
+  /**
+   * Windows only: opens the system voice typing panel (Win+H) over the focused text field.
+   * Resolves false when it could not start. Optional so a renderer can feature-detect it.
+   */
+  startSystemDictation?: () => Promise<boolean>;
   onMenuAction: (listener: (action: string) => void) => () => void;
   onSnapShotEvent: (listener: (event: DesktopSnapShotEvent) => void) => () => void;
   onQuitShortcut: (listener: (event: QuitShortcutHintEvent) => void) => () => void;

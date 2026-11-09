@@ -1,4 +1,5 @@
 import { useEnterpriseStatus, enterpriseEnvironment } from "~/state/enterprise";
+import { t } from "~/i18n";
 import { useEnvironmentQuery } from "~/state/query";
 
 export function ApprovalCount() {
@@ -9,5 +10,7 @@ export function ApprovalCount() {
       : null,
   );
   const count = inbox.error ? 0 : (inbox.data?.pendingCount ?? 0);
-  return count > 0 ? <span aria-label={`${count} pending approvals`}>({count})</span> : null;
+  return count > 0 ? (
+    <span aria-label={t("{count} pending approvals", { count })}>({count})</span>
+  ) : null;
 }

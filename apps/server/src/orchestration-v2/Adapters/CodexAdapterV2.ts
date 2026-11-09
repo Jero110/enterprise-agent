@@ -30,6 +30,7 @@ import {
 } from "../../provider/codexUsageLimits.ts";
 import {
   CodexSettings,
+  DEFAULT_SERVER_SETTINGS,
   defaultInstanceIdForDriver,
   isOrchestrationV2WorkActive,
   type OrchestrationV2GoalCommand,
@@ -107,6 +108,7 @@ import { getCodexServiceTierOptionValue } from "../../codexModelOptions.ts";
 import { ServerConfig } from "../../config.ts";
 import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
 import { buildCodexAdditionalContext } from "../../provider/CodexDeveloperInstructions.ts";
+import * as ServerSettings from "../../serverSettings.ts";
 import {
   describeMcpElicitation,
   toMcpElicitationResponse,
@@ -764,6 +766,7 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
     readonly hasT3Mcp?: boolean;
     readonly browserToolsAvailable?: boolean;
     readonly deviceToolsAvailable?: boolean;
+    readonly citeWikiSources?: boolean;
     /** ChatGPT token sharing does not accept service tiers. */
     readonly omitServiceTier?: boolean;
     readonly appContext?: ProviderAdapter.ProviderAdapterV2TurnInput["appContext"];
@@ -801,6 +804,7 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
               browser: input.browserToolsAvailable ?? true,
               device: input.deviceToolsAvailable ?? false,
             },
+            input.citeWikiSources ?? true,
           )
         : undefined;
     const additionalContext =
@@ -1702,6 +1706,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
   const readMcpSession = (threadId: ThreadId | null) =>
     threadId === null ? Effect.undefined : mcpSessions.read(threadId);
+  const serverSettings = yield* Effect.serviceOption(ServerSettings.ServerSettingsService);
   const { clientFactory, digest, fileSystem, idAllocator, serverConfig } = adapterOptions;
   const continuationRequests = adapterOptions.continuationRequests;
 
@@ -6767,6 +6772,13 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           ) {
             const threadId = yield* getNativeThreadId(turnInput.providerThread);
             const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+            // Read per turn, so turning wiki citations off applies from the next message.
+            const citeWikiSources = Option.isSome(serverSettings)
+              ? yield* serverSettings.value.getSettings.pipe(
+                  Effect.map((settings) => settings.citeWikiSources),
+                  Effect.orElseSucceed(() => DEFAULT_SERVER_SETTINGS.citeWikiSources),
+                )
+              : DEFAULT_SERVER_SETTINGS.citeWikiSources;
             const turnStartParams = yield* buildCodexTurnStartParams({
               nativeThreadId: threadId,
               codexInput,
@@ -6775,6 +6787,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               hasT3Mcp: mcpSession !== undefined,
               browserToolsAvailable: mcpSession?.browserToolsAvailable ?? true,
               deviceToolsAvailable: mcpSession?.capabilities?.has("device") ?? false,
+              citeWikiSources,
               omitServiceTier: adapterOptions.resolveRuntime !== undefined,
               ...(turnInput.appContext === undefined ? {} : { appContext: turnInput.appContext }),
             });

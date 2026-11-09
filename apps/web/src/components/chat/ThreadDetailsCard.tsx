@@ -9,6 +9,7 @@ import {
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "../../lib/utils";
+import { t } from "~/i18n";
 import { Popover, PopoverPopup, PopoverCreateHandle } from "../ui/popover";
 import { selectThreadPanelOpen, useRightPanelStore } from "../../rightPanelStore";
 import { useChatCanvas } from "./ChatCanvasContext";
@@ -35,7 +36,7 @@ export function ThreadDetailsCard({
   onContextMenu?: MouseEventHandler<HTMLDivElement>;
   children: (density: "full" | "compact" | "essential") => ReactNode;
 }) {
-  const detailsArea = workspaceAreaProps("details", 3, "Thread details");
+  const detailsArea = workspaceAreaProps("details", 3, t("Thread details"));
   const canvas = useChatCanvas();
   const preferredPlacement = canvas?.preferredDetailsCard ?? null;
   const placement = canvas?.detailsCardPlacement ?? null;

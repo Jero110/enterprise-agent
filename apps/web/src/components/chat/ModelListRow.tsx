@@ -8,6 +8,7 @@ import { Badge } from "../ui/badge";
 import { Kbd } from "../ui/kbd";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import { modelPickerModelKey } from "./modelPickerKeys";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 
@@ -115,7 +116,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
                   event.stopPropagation();
                 }}
                 disabled={Boolean(props.disabledReason)}
-                aria-label={props.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                aria-label={props.isFavorite ? t("Remove from favorites") : t("Add to favorites")}
               >
                 <StarIcon
                   className={cn(
@@ -129,7 +130,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
             }
           />
           <TooltipPopup side="top" align="center">
-            {props.isFavorite ? "Remove from favorites" : "Add to favorites"}
+            {props.isFavorite ? t("Remove from favorites") : t("Add to favorites")}
           </TooltipPopup>
         </Tooltip>
         {props.jumpLabel ? <Kbd>{props.jumpLabel}</Kbd> : null}

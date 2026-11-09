@@ -4,6 +4,7 @@ import { CornerUpRight, ListPlus } from "lucide";
 import { MorphIcon } from "~/components/MorphIcon";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
 import { formatContextWindowTokens } from "~/lib/contextWindow";
+import { t } from "~/i18n";
 import { cn, isMacPlatform } from "~/lib/utils";
 import { useShortcutModifierState } from "../../shortcutModifierState";
 import { StageBackdropButtonArt, useSidebarStageBackdropVariant } from "../SidebarStageBackdrop";
@@ -139,7 +140,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             onClick={() => {
               if (canOperateThread) onInterrupt();
             }}
-            aria-label="Stop generation"
+            aria-label={t("Stop generation")}
           />
         }
       >
@@ -147,7 +148,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           <rect x="2" y="2" width="8" height="8" rx="1.5" />
         </svg>
       </TooltipTrigger>
-      <TooltipPopup>Interrupt</TooltipPopup>
+      <TooltipPopup>{t("Interrupt")}</TooltipPopup>
     </Tooltip>
   );
 
@@ -281,7 +282,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           ? "Queue message"
           : isRunning
             ? "Steer message"
-            : "Submit message";
+            : t("Submit message");
   const submitStatus = isEnvironmentUnavailable
     ? "Environment disconnected"
     : (sendDisabledReason ??

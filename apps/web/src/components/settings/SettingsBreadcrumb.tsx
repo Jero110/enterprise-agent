@@ -3,6 +3,7 @@ import {
   WorkspaceBreadcrumbItem,
   WorkspaceBreadcrumbSeparator,
 } from "../WorkspaceBreadcrumb";
+import { t } from "~/i18n";
 import { SETTINGS_SECTION_LABELS } from "./settingsSearch";
 
 const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {
@@ -13,22 +14,23 @@ const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {
 
 function settingsBreadcrumbLabel(pathname: string): string | null {
   const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
-  return SETTINGS_BREADCRUMB_LABELS[normalizedPathname] ?? null;
+  const label = SETTINGS_BREADCRUMB_LABELS[normalizedPathname];
+  return label ? t(label) : null;
 }
 
 export function SettingsBreadcrumb({ pathname }: { pathname: string }) {
   const sectionLabel = settingsBreadcrumbLabel(pathname);
 
   return (
-    <WorkspaceBreadcrumb ariaLabel="Settings breadcrumb">
+    <WorkspaceBreadcrumb ariaLabel={t("Settings breadcrumb")}>
       {sectionLabel ? (
         <>
-          <WorkspaceBreadcrumbItem>Settings</WorkspaceBreadcrumbItem>
+          <WorkspaceBreadcrumbItem>{t("Settings")}</WorkspaceBreadcrumbItem>
           <WorkspaceBreadcrumbSeparator />
         </>
       ) : null}
       <WorkspaceBreadcrumbItem current className="truncate">
-        {sectionLabel ?? "Settings"}
+        {sectionLabel ?? t("Settings")}
       </WorkspaceBreadcrumbItem>
     </WorkspaceBreadcrumb>
   );

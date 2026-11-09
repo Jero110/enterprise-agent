@@ -7,6 +7,8 @@ import {
 import type {
   EnterpriseOrgTeam,
   EnvironmentId,
+  ProjectId,
+  PublicationStatus,
   ServerProviderSkill,
   ThreadId,
   ThreadKnowledgeScope,
@@ -19,14 +21,21 @@ import {
   enterpriseFailureMessage,
   useEnterpriseStatus,
 } from "~/state/enterprise";
+import { t } from "~/i18n";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { cn } from "~/lib/utils";
 import { Badge } from "../ui/badge";
+import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { KnowledgeMap } from "../enterprise/KnowledgeMap";
 import { ContextChanges } from "../enterprise/ContextChanges";
+import {
+  SharingPanel,
+  TeamMessagesButton,
+  usePendingSharedCount,
+} from "../enterprise/TeamMessages";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Radio, RadioGroup } from "../ui/radio-group";
 import { toastManager } from "../ui/toast";
@@ -79,7 +88,7 @@ function OrgTeam({ team }: { readonly team: EnterpriseOrgTeam }) {
     >
       <div className="flex items-center gap-2">
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium">{team.name}</h3>
-        {label ? <Badge variant="info">{label}</Badge> : null}
+        {label ? <Badge variant="default">{t(label)}</Badge> : null}
       </div>
       <ul className="mt-2 space-y-1">
         {team.members.map((member) => (
@@ -92,9 +101,9 @@ function OrgTeam({ team }: { readonly team: EnterpriseOrgTeam }) {
           >
             <span className="min-w-0 flex-1 truncate">
               {member.displayName}
-              {member.isMe ? " (you)" : ""}
+              {member.isMe ? ` ${t("(you)")}` : ""}
             </span>
-            <span>{member.role}</span>
+            <span>{t(member.role, undefined, "role")}</span>
           </li>
         ))}
       </ul>
@@ -107,12 +116,12 @@ function OrgPanel({ environmentId }: { readonly environmentId: EnvironmentId }) 
   const teams = org.data?.teams ?? [];
   return (
     <div className="max-h-[70dvh] w-full space-y-2 overflow-y-auto bg-popover p-3">
-      <h2 className="text-sm font-medium">Organization</h2>
+      <h2 className="text-sm font-medium">{t("Organization")}</h2>
       {org.error ? (
-        <p className="text-xs text-muted-foreground">{org.error}</p>
+        <p className="text-xs text-muted-foreground">{t(org.error)}</p>
       ) : teams.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          {org.isPending ? "Loading organization…" : "No teams yet."}
+          {org.isPending ? t("Loading organization…") : t("No teams yet.")}
         </p>
       ) : (
         teams.map((team) => <OrgTeam key={team.id} team={team} />)
@@ -153,12 +162,19 @@ function ContextPanel(props: {
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add({
         type: "error",
-        title: "Could not change this conversation's knowledge",
+        title: t("Could not change this conversation's knowledge"),
         description: enterpriseFailureMessage(squashAtomCommandFailure(result)),
       });
     }
   };
-  const cards = context.data?.cards ?? [];
+  if (!context.data) {
+    return (
+      <p className="px-8 py-6 text-xs text-muted-foreground" role="status">
+        {context.error ? t(context.error) : t("Loading…")}
+      </p>
+    );
+  }
+  const cards = context.data.cards;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <KnowledgeMap
@@ -175,39 +191,59 @@ function ContextPanel(props: {
 function EnterpriseContextDialog(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
+  readonly projectId: ProjectId | null;
   readonly skills: ReadonlyArray<ServerProviderSkill>;
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("context");
+  // Proposals this user can approve; the header shows a labeled pill and opens on that tab.
+  const inbox = useEnvironmentQuery(
+    enterpriseEnvironment.proposalInbox({
+      environmentId: props.environmentId,
+      input: { countOnly: true },
+    }),
+  );
+  const pendingCount = inbox.error ? 0 : (inbox.data?.pendingCount ?? 0);
+  const pendingShared = usePendingSharedCount(props.environmentId);
+  // Shared skills wait on this user's answer just like proposals do.
+  const toAnswer = pendingCount + pendingShared;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
-              size="icon"
+              size={toAnswer > 0 ? "sm" : "icon-sm"}
               variant="ghost"
-              aria-label="Conversation context and changes"
+              aria-label={t("Conversation context and changes")}
               aria-haspopup="dialog"
               aria-expanded={open}
               data-pressed={open ? "" : undefined}
-              className="[-webkit-app-region:no-drag]"
-              onClick={() => setOpen(true)}
+              className="shrink-0 [-webkit-app-region:no-drag]"
+              onClick={() => {
+                setTab(pendingShared > 0 ? "sharing" : pendingCount > 0 ? "changes" : "context");
+                setOpen(true);
+              }}
             />
           }
         >
-          <BrainCircuitIcon className="size-5" />
+          <BrainCircuitIcon className="size-4" />
+          {toAnswer > 0 ? (
+            <span className="whitespace-nowrap rounded-full bg-primary px-1.5 text-2xs font-medium text-primary-foreground">
+              {t("Pending · {count}", { count: toAnswer })}
+            </span>
+          ) : null}
         </TooltipTrigger>
-        <TooltipPopup side="bottom">Conversation context and changes</TooltipPopup>
+        <TooltipPopup side="bottom">{t("Conversation context and changes")}</TooltipPopup>
       </Tooltip>
       <DialogPopup
         className="flex h-[min(840px,90dvh)] w-[min(1050px,94vw)] max-w-none flex-col overflow-hidden"
         bottomStickOnMobile={false}
       >
         <div className="shrink-0 border-b border-border/60 px-8 py-5">
-          <DialogTitle>Conversation context</DialogTitle>
+          <DialogTitle>{t("Knowledge and approvals")}</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Knowledge for this conversation, pending proposals and review history.
+            {t("Knowledge for this conversation, pending proposals and review history.")}
           </p>
         </div>
         <Tabs.Root
@@ -215,20 +251,36 @@ function EnterpriseContextDialog(props: {
           onValueChange={(value) => setTab(String(value))}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <Tabs.List aria-label="Conversation knowledge" className="flex shrink-0 gap-2 px-8 py-3">
+          <Tabs.List
+            aria-label={t("Conversation knowledge")}
+            className="flex shrink-0 gap-2 px-8 py-3"
+          >
+            <Tabs.Tab
+              value="sharing"
+              render={<Button size="sm" variant={tab === "sharing" ? "secondary" : "ghost"} />}
+            >
+              {pendingShared > 0 ? t("Sharing ({count})", { count: pendingShared }) : t("Sharing")}
+            </Tabs.Tab>
             <Tabs.Tab
               value="context"
               render={<Button size="sm" variant={tab === "context" ? "secondary" : "ghost"} />}
             >
-              Context
+              {t("Context")}
             </Tabs.Tab>
             <Tabs.Tab
               value="changes"
               render={<Button size="sm" variant={tab === "changes" ? "secondary" : "ghost"} />}
             >
-              Changes
+              {pendingCount > 0
+                ? t("To approve ({count})", { count: pendingCount })
+                : t("Changes", undefined, "knowledge")}
             </Tabs.Tab>
           </Tabs.List>
+          <Tabs.Panel value="sharing" className="flex min-h-0 flex-1 flex-col">
+            {open && (
+              <SharingPanel environmentId={props.environmentId} projectId={props.projectId} />
+            )}
+          </Tabs.Panel>
           <Tabs.Panel value="context" className="flex min-h-0 flex-1 flex-col">
             {open && <ContextPanel {...props} />}
           </Tabs.Panel>
@@ -251,7 +303,7 @@ export function EnterpriseShareControl({
   const { environmentId: queryEnvironmentId, identity } = useEnterpriseStatus();
   if (queryEnvironmentId === null || identity === null) return null;
   return (
-    <HeaderPopover icon={UsersIcon} label="Share with team">
+    <HeaderPopover icon={UsersIcon} label={t("Share with team")}>
       <SharePanel
         environmentId={environmentId}
         queryEnvironmentId={queryEnvironmentId}
@@ -284,48 +336,138 @@ function SharePanel(props: {
       thread.parentThreadId === null &&
       thread.ownerEmail === props.ownerEmail,
   );
-  const change = async (status: "unpublished" | "read-only") => {
+  const org = useEnvironmentQuery(
+    enterpriseEnvironment.org({ environmentId: props.queryEnvironmentId, input: {} }),
+  );
+  const colleagues = (org.data?.teams ?? []).flatMap((team) =>
+    team.members.flatMap((member) =>
+      member.isMe || member.memberKey === undefined
+        ? []
+        : [{ key: member.memberKey, label: `${member.displayName} · ${team.name}` }],
+    ),
+  );
+  // Shows the choice right away; falls back to the server value once the save settles.
+  const [pendingStatus, setPendingStatus] = useState<PublicationStatus | null>(null);
+  // "people" with nobody ticked yet stays local: an empty list would mean the whole team.
+  const [choosingPeople, setChoosingPeople] = useState(false);
+  const status = pendingStatus ?? summary?.publicationStatus ?? "unpublished";
+  const audienceKeys = summary?.audienceKeys ?? [];
+  const forPeople = choosingPeople || audienceKeys.length > 0;
+  const change = async (next: PublicationStatus, keys: ReadonlyArray<string> = audienceKeys) => {
+    if (pendingStatus !== null) return;
+    setPendingStatus(next);
     const result = await publish({
       environmentId: props.environmentId,
-      input: { threadId: props.threadId, status },
+      input: {
+        threadId: props.threadId,
+        status: next,
+        ...(next !== "unpublished" && keys.length > 0 ? { audienceKeys: [...keys] } : {}),
+      },
     });
+    if (result._tag === "Success" && keys.length > 0) setChoosingPeople(false);
+    setPendingStatus(null);
     if (result._tag === "Success") threads.refresh();
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add({
         type: "error",
-        title: "Could not update sharing",
+        title: t("Could not update sharing"),
         description: enterpriseFailureMessage(squashAtomCommandFailure(result)),
       });
     }
   };
   return (
     <div className="w-full space-y-3 bg-popover p-3">
-      <h2 className="text-sm font-medium">Share with your team</h2>
+      <h2 className="text-sm font-medium">{t("Share with your team")}</h2>
       <RadioGroup
-        aria-label="Team sharing"
-        disabled={!canPublish}
-        value={summary?.publicationStatus ?? "unpublished"}
-        onValueChange={(value) => void change(value as "unpublished" | "read-only")}
+        aria-label={t("Team sharing")}
+        disabled={!canPublish || pendingStatus !== null}
+        value={status}
+        onValueChange={(value) => void change(value as PublicationStatus)}
       >
         <label className="flex items-start gap-2 text-sm">
           <Radio value="unpublished" />
           <span>
-            Not shared
+            {t("Not shared")}
             <span className="block text-xs text-muted-foreground">
-              Only you can see this conversation.
+              {t("Only you can see this conversation.")}
             </span>
           </span>
         </label>
         <label className="flex items-start gap-2 text-sm">
           <Radio value="read-only" />
           <span>
-            Team readable
+            {t("Team readable")}
             <span className="block text-xs text-muted-foreground">
-              Your team can read this conversation and its subagents. Stop sharing any time.
+              {t("They can read this conversation and its subagents. Stop sharing any time.")}
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <Radio value="summary" />
+          <span>
+            {t("Summary only")}
+            <span className="block text-xs text-muted-foreground">
+              {t(
+                "They and their agents see only what you asked and the result. The chat itself stays on your computer.",
+              )}
             </span>
           </span>
         </label>
       </RadioGroup>
+      {status !== "unpublished" ? (
+        <div className="space-y-2 border-t border-border/60 pt-3">
+          <h3 className="text-xs font-medium">{t("Who can read it")}</h3>
+          <RadioGroup
+            aria-label={t("Who can read it")}
+            disabled={!canPublish || pendingStatus !== null}
+            value={forPeople ? "people" : "team"}
+            onValueChange={(value) => {
+              if (value === "people") setChoosingPeople(true);
+              else {
+                setChoosingPeople(false);
+                void change(status, []);
+              }
+            }}
+          >
+            <label className="flex items-center gap-2 text-sm">
+              <Radio value="team" />
+              {t("My whole team")}
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Radio value="people" />
+              {t("Only people I choose")}
+            </label>
+          </RadioGroup>
+          {forPeople ? (
+            <ul className="max-h-48 space-y-1 overflow-y-auto">
+              {colleagues.map((colleague) => (
+                <li key={colleague.key}>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={audienceKeys.includes(colleague.key)}
+                      disabled={!canPublish || pendingStatus !== null}
+                      onCheckedChange={(checked) => {
+                        const next = checked
+                          ? [...audienceKeys, colleague.key]
+                          : audienceKeys.filter((key) => key !== colleague.key);
+                        // Unticking the last person falls back to the whole team, so say so first.
+                        if (next.length === 0) setChoosingPeople(true);
+                        void change(status, next);
+                      }}
+                    />
+                    <span className="min-w-0 truncate">{colleague.label}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            {forPeople && audienceKeys.length === 0
+              ? t("Tick who can read it. Until then your whole team can.")
+              : t("Your bosses (admins and your area's lead) can always read what you share.")}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -333,19 +475,26 @@ function SharePanel(props: {
 /** Org chart, conversation context and team sharing: only for an IDE linked to an enterprise hub. */
 export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(props: {
   readonly threadId: ThreadId;
+  readonly projectId: ProjectId | null;
   readonly skills: ReadonlyArray<ServerProviderSkill>;
 }) {
   const { environmentId, identity } = useEnterpriseStatus();
   if (environmentId === null || identity === null) return null;
   return (
     <>
-      <HeaderPopover icon={UsersRoundIcon} label="Organization">
+      <TeamMessagesButton
+        environmentId={environmentId}
+        projectId={props.projectId}
+        skills={props.skills}
+      />
+      <HeaderPopover icon={UsersRoundIcon} label={t("Organization")}>
         <OrgPanel environmentId={environmentId} />
       </HeaderPopover>
       <EnterpriseContextDialog
         key={`${environmentId}:${props.threadId}`}
         environmentId={environmentId}
         threadId={props.threadId}
+        projectId={props.projectId}
         skills={props.skills}
       />
     </>

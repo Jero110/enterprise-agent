@@ -171,6 +171,7 @@ import {
 import type { SidebarThreadSummary } from "../types";
 import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import { ProjectEnvironmentBadge } from "./ProjectEnvironmentBadge";
 import {
   buildDraftActionMenuItems,
@@ -844,7 +845,7 @@ function useSidebarLookups() {
     projectGroups.map((project) => [project.projectKey, project] as const),
   );
   const projectScopeItems = [
-    { value: "all", label: "All projects" },
+    { value: "all", label: t("All projects") },
     ...pickableProjectGroups(projectGroups).map((project) => ({
       value: project.projectKey,
       label: project.displayName,
@@ -1274,16 +1275,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             [
-              { id: "new-thread", label: "New thread" },
-              { id: "copy-path", label: "Copy path" },
+              { id: "new-thread", label: t("New thread") },
+              { id: "copy-path", label: t("Copy path") },
               ...(canPinProject(group)
                 ? [
                     group.pinned
-                      ? { id: "unpin", label: "Unpin project", icon: "pin-off" }
-                      : { id: "pin", label: "Pin project", icon: "pin" },
+                      ? { id: "unpin", label: t("Unpin project"), icon: "pin-off" }
+                      : { id: "pin", label: t("Pin project"), icon: "pin" },
                   ]
                 : []),
-              { id: "project-settings", label: "Project settings", icon: "settings" },
+              { id: "project-settings", label: t("Project settings"), icon: "settings" },
             ],
             position,
           ),
@@ -2328,14 +2329,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               : []),
             {
               id: "settle",
-              label: `Settle (${count})`,
+              label: t("Settle ({count})", { count }),
               disabled: settlingThreads.length === 0 || !canOperateThreads(settlingThreads),
             },
             ...(canSnoozeSelection
               ? [
                   {
                     id: "snooze",
-                    label: `Snooze (${count})`,
+                    label: t("Snooze ({count})", { count }),
                     disabled: !canOperateThreads(selectedThreads),
                     children: [
                       ...snoozePresets.map((preset) => ({
@@ -2345,7 +2346,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       })),
                       {
                         id: "snooze:custom",
-                        label: "Custom…",
+                        label: t("Custom…"),
                         separatorBefore: snoozePresets.length > 0,
                         disabled: !canOperateThreads(selectedThreads),
                       },
@@ -2363,10 +2364,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   },
                 ]
               : []),
-            { id: "mark-unread", label: `Mark unread (${count})` },
+            { id: "mark-unread", label: t("Mark unread ({count})", { count }) },
             {
               id: "delete",
-              label: `Delete (${count})`,
+              label: t("Delete ({count})", { count }),
               destructive: true,
               disabled: !canOperateThreads(selectedThreads),
             },
@@ -3036,8 +3037,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       <SidebarHeaderIconButton
                         label={
                           scopedProjectGroups.length > 0
-                            ? `Filter threads by project: ${scopedProjectGroups.map((project) => project.displayName).join(", ")}`
-                            : "Filter threads by project"
+                            ? t("Filter threads by project: {projects}", {
+                                projects: scopedProjectGroups
+                                  .map((project) => project.displayName)
+                                  .join(", "),
+                              })
+                            : t("Filter threads by project")
                         }
                       />
                     }
@@ -3068,8 +3073,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     finalFocus={(closeType) => closeType === "keyboard"}
                   >
                     <ComboboxSearchInput
-                      aria-label="Search projects"
-                      placeholder="Search projects..."
+                      aria-label={t("Search projects")}
+                      placeholder={t("Search projects...")}
                       value={projectScopeMenuState.query}
                       onKeyDown={(event) => {
                         if (
@@ -3114,7 +3119,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         })
                       }
                     />
-                    <ComboboxEmpty>No matching projects.</ComboboxEmpty>
+                    <ComboboxEmpty>{t("No matching projects.")}</ComboboxEmpty>
                     <ComboboxList aria-multiselectable>
                       {(item: (typeof projectScopeItems)[number]) => {
                         const project = projectGroupByScopeKey.get(item.value) ?? null;
@@ -3162,7 +3167,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 variant="ghost-muted"
                                 tabIndex={-1}
                                 aria-hidden="true"
-                                title={`Project settings for ${project.displayName}`}
+                                title={t("Project settings for {project}", {
+                                  project: project.displayName,
+                                })}
                                 className={canPinProject(project) ? undefined : "ml-auto"}
                                 onPointerDown={(event) => event.stopPropagation()}
                                 onClick={(event) => {
@@ -3219,7 +3226,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 <ul
                   id="sidebar-thread-search-results"
                   role="listbox"
-                  aria-label="Thread search results"
+                  aria-label={t("Thread search results")}
                   className="flex flex-col gap-px"
                 >
                   {threadSearchResults.map((thread, index) => {
@@ -3273,7 +3280,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 role="status"
                 className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground"
               >
-                {threadSearch.isPending ? "Searching thread messages…" : "No threads found"}
+                {threadSearch.isPending ? t("Searching thread messages…") : t("No threads found")}
               </p>
             )
           ) : null}
@@ -3476,7 +3483,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarDragBoundary
                                 key="pinned-header"
                                 marker="pinned-header"
-                                label="Pinned"
+                                label={t("Pinned")}
                                 visible={from !== null}
                                 isDropTarget={dragTargetSection === "pinned"}
                               />,
@@ -3487,7 +3494,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarDragBoundary
                                 key="pinned-divider"
                                 marker="pinned-divider"
-                                label="Active"
+                                label={t("Active")}
                                 visible={from !== null}
                                 isDropTarget={dragTargetSection === "active"}
                               />,
@@ -3498,7 +3505,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionPlaceholder
                                 key="active-placeholder"
                                 marker="active-placeholder"
-                                label="Active"
+                                label={t("Active")}
                                 showHint={
                                   from !== null &&
                                   (activeThreads.length === 0 ||
@@ -3517,7 +3524,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 key="working-shelf-header"
                                 marker="working-header"
                                 className="mt-auto"
-                                label="Working"
+                                label={t("Working")}
                                 count={workingThreads.length}
                                 toggle={{
                                   expanded: workingShelfExpanded,
@@ -3532,7 +3539,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 key="snoozed-shelf-header"
                                 marker="snoozed-header"
                                 className={cn(workingThreads.length === 0 && "mt-auto")}
-                                label="Snoozed"
+                                label={t("Snoozed")}
                                 count={snoozedThreads.length}
                                 toggle={{
                                   expanded: snoozedShelfExpanded,
@@ -3549,7 +3556,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 className={cn(
                                   workingThreads.length + snoozedThreads.length === 0 && "mt-auto",
                                 )}
-                                label="Settled"
+                                label={t("Settled")}
                                 count={settledCount}
                                 dragging={from !== null}
                                 isDropTarget={dragTargetSection === "settled"}
@@ -3565,7 +3572,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionPlaceholder
                                 key="settled-placeholder"
                                 marker="settled-placeholder"
-                                label="Settled"
+                                label={t("Settled")}
                                 showHint={
                                   from !== null &&
                                   (renderedSettledThreads.length === 0 ||
@@ -3598,10 +3605,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           {/* Plus means "add", so revealing more uses a chevron. */}
                           <ChevronDownIcon aria-hidden className="size-4 shrink-0" />
                           {olderSettledShelf.loading
-                            ? "Loading"
+                            ? t("Loading")
                             : olderSettledShelf.failed
-                              ? "Could not load older threads. Retry"
-                              : `Show ${Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT)} more`}
+                              ? t("Could not load older threads. Retry")
+                              : t("Show {count} more", {
+                                  count: Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT),
+                                })}
                         </button>
                       </li>
                     ) : null}
@@ -3622,22 +3631,22 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-xs text-muted-foreground/60">
               {projects.length === 0 ? (
                 <>
-                  <span>No projects yet</span>
+                  <span>{t("No projects yet")}</span>
                   <button
                     type="button"
                     onClick={openAddProjectCommandPalette}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
                   >
                     <PlusIcon className="-mx-0.5 size-3" />
-                    Add project
+                    {t("Add project")}
                   </button>
                 </>
               ) : scopedProjectGroups.length > 1 ? (
-                "No threads in these projects yet"
+                t("No threads in these projects yet")
               ) : scopedProjectGroups[0] ? (
-                `No threads in ${scopedProjectGroups[0].displayName} yet`
+                t("No threads in {project} yet", { project: scopedProjectGroups[0].displayName })
               ) : (
-                "No threads yet"
+                t("No threads yet")
               )}
             </div>
           ) : null}

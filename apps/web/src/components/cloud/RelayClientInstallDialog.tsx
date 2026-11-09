@@ -1,4 +1,6 @@
 import { DownloadIcon } from "lucide-react";
+import { t } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import { useSyncExternalStore } from "react";
 import type { RelayClientInstallProgressStage } from "@t3tools/contracts";
 
@@ -65,12 +67,19 @@ export function RelayClientInstallDialog() {
             <DownloadIcon aria-hidden className="size-4.5 text-muted-foreground" />
           </div>
           <DialogTitle>
-            {isInstalling ? "Installing relay client" : "Install relay client?"}
+            {isInstalling ? t("Installing relay client") : t("Install relay client?")}
           </DialogTitle>
           <DialogDescription>
             {isInstalling
-              ? "T3 Code is preparing this environment for secure access through T3 Connect."
-              : "T3 Code needs the relay client to make this environment available through T3 Connect."}
+              ? t("{app} is preparing this computer for secure remote access.", {
+                  app: APP_BASE_NAME,
+                })
+              : t(
+                  "{app} needs the relay client so you can reach this computer from your other devices.",
+                  {
+                    app: APP_BASE_NAME,
+                  },
+                )}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel scrollFade={false}>
@@ -78,28 +87,33 @@ export function RelayClientInstallDialog() {
             <div className="space-y-2.5">
               <div className="flex items-center justify-between gap-3 text-sm">
                 <p aria-live="polite" className="font-medium text-foreground">
-                  {activeStep?.label}
+                  {activeStep ? t(activeStep.label) : null}
                 </p>
                 <p className="shrink-0 tabular-nums text-muted-foreground">
-                  {activeStepIndex + 1} of {installSteps.length}
+                  {t("{current} of {total}", {
+                    current: activeStepIndex + 1,
+                    total: installSteps.length,
+                  })}
                 </p>
               </div>
               <progress
-                aria-label="Relay client installation progress"
+                aria-label={t("Relay client installation progress")}
                 className="h-2 w-full appearance-none overflow-hidden rounded-full bg-muted [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
                 max={installSteps.length}
                 value={activeStepIndex + 1}
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Keep T3 Code open while the relay client is installed.
+                {t("Keep {app} open while the relay client is installed.", { app: APP_BASE_NAME })}
               </p>
             </div>
           ) : (
             <div className="rounded-xl border border-border/70 bg-muted/35 p-3">
-              <p className="text-sm font-medium text-foreground">Managed relay client</p>
+              <p className="text-sm font-medium text-foreground">{t("Managed relay client")}</p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                T3 Code will download and install version{" "}
-                {view.status === "confirming" ? view.version : ""} locally.
+                {t("{app} will download and install version {version} on this computer.", {
+                  app: APP_BASE_NAME,
+                  version: view.status === "confirming" ? view.version : "",
+                })}
               </p>
             </div>
           )}
@@ -110,10 +124,10 @@ export function RelayClientInstallDialog() {
               variant="outline"
               onClick={() => respondToRelayClientInstallConfirmation(false)}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button onClick={() => respondToRelayClientInstallConfirmation(true)}>
-              Download and install
+              {t("Download and install")}
             </Button>
           </DialogFooter>
         ) : null}

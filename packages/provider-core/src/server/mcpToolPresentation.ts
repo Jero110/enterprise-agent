@@ -43,11 +43,13 @@ export function mcpToolPresentation(input: {
     normalizeMcpText(input.title) ??
     (server && tool ? normalizeMcpText(tool.replace(/[_-]+/gu, " ")) : undefined);
   if (!server) return title ? { title } : {};
-  const name =
-    normalizeMcpText(input.serverDisplayName) ??
-    normalizeMcpText(source && Reflect.get(source, "name")) ??
-    normalizeMcpText(server.replace(/[_-]+/gu, " ")) ??
-    server;
+  // The app's own tool server keeps its internal id; people see the product name.
+  const name = /^t3[\s_-]?code$/iu.test(server)
+    ? "Norai"
+    : (normalizeMcpText(input.serverDisplayName) ??
+      normalizeMcpText(source && Reflect.get(source, "name")) ??
+      normalizeMcpText(server.replace(/[_-]+/gu, " ")) ??
+      server);
   const logoUrl =
     normalizeMcpHttpUrl(input.iconUrl) ??
     normalizeMcpHttpUrl(source && Reflect.get(source, "logoUrl"));

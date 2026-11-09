@@ -94,6 +94,8 @@ import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
 import * as ProjectBoards from "./project/ProjectBoards.ts";
 import * as ProjectBoardToolkit from "./project/ProjectBoardToolkit.ts";
 import * as TeamContinuation from "./team/TeamContinuation.ts";
+import * as TeamMessages from "./team/TeamMessages.ts";
+import * as TeamMessenger from "./team/TeamMessenger.ts";
 import * as TeamPublication from "./team/TeamPublication.ts";
 import * as HubTeamReporter from "./team/HubTeamReporter.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
@@ -805,6 +807,7 @@ const layerHubMcp = Layer.mergeAll(
   Layer.provide(EnterpriseIngestion.layer),
   Layer.provide(EnterpriseHub.layer),
   Layer.provide(TeamPublication.layer),
+  Layer.provide(TeamMessages.layer),
   Layer.provide(RunRecords.layer),
   Layer.provide(AreaKnowledge.layer),
   Layer.provide(KnowledgeProposals.layer),
@@ -838,6 +841,7 @@ const layerEnterpriseHubClient = EnterpriseHubClient.layer.pipe(
   Layer.provide(EnterpriseIngestion.layer),
   Layer.provide(EnterpriseHub.layer),
   Layer.provide(TeamPublication.layer),
+  Layer.provide(TeamMessages.layer),
   Layer.provide(RunRecords.layer),
   Layer.provide(AreaKnowledge.layer),
   Layer.provide(KnowledgeProposals.layer),
@@ -927,6 +931,7 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(PreviewBrowser.layer),
   Layer.provide(EnterpriseThreadAuthor.layer),
   Layer.provide(TeamContinuation.layer),
+  Layer.provide(TeamMessenger.layer),
   Layer.provide(ProjectBoards.layer),
   // Links to other environments, shared by Settings (WebSocket) and agents (/mcp).
   Layer.provide(

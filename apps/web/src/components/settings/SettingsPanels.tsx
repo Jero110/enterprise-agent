@@ -1,6 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
 import { NotificationSettings } from "./NotificationSettings";
-import { PRIVACY_POLICY_URL } from "../../legalLinks";
 import { CheckIcon } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -28,10 +27,16 @@ import { createModelSelection } from "@t3tools/shared/model";
 import { resolvePastedPath } from "@t3tools/shared/path";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
-import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
+import {
+  APP_BASE_NAME,
+  APP_VERSION,
+  HOSTED_APP_CHANNEL,
+  HOSTED_APP_CHANNEL_LABEL,
+} from "../../branding";
+import { getLocale, LOCALE_OPTIONS, setLocale, t } from "~/i18n";
+import { useShowAdvancedSettings } from "./settingsAdvancedMode";
 import { AboutVersionTitle } from "./AboutVersionTitle";
 import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
-import { MobileAppSettingsRow } from "./MobileAppSettingsRow";
 import {
   canCheckForUpdate,
   getDesktopUpdateButtonTooltip,
@@ -62,7 +67,7 @@ import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { ThreadTitleInstructionsSettings } from "./ThreadTitleInstructionsSettings";
 import { SnoozePresetsRow } from "./SnoozePresetsSettings";
 import { useDesktopUpdateState } from "../../state/desktopUpdate";
-import { managedTelemetryOffMessage, usePrimaryManagedPolicy } from "../../state/managedPolicy";
+import { usePrimaryManagedPolicy } from "../../state/managedPolicy";
 import {
   getCustomModelOptionsByInstance,
   resolveAppModelSelectionState,
@@ -198,8 +203,8 @@ function AboutVersionSection() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not download update",
-            description: error instanceof Error ? error.message : "Download failed.",
+            title: t("Could not download update"),
+            description: error instanceof Error ? error.message : t("Download failed."),
           }),
         );
       });
@@ -221,8 +226,8 @@ function AboutVersionSection() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not confirm update",
-            description: error instanceof Error ? error.message : "Update confirmation failed.",
+            title: t("Could not confirm update"),
+            description: error instanceof Error ? error.message : t("Update confirmation failed."),
           }),
         );
         return;
@@ -237,8 +242,8 @@ function AboutVersionSection() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not install update",
-              description: error instanceof Error ? error.message : "Install failed.",
+              title: t("Could not install update"),
+              description: error instanceof Error ? error.message : t("Install failed."),
             }),
           );
         })
@@ -254,11 +259,11 @@ function AboutVersionSection() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not check for updates",
+              title: t("Could not check for updates"),
               description:
                 updatesDenial ??
                 result.state.message ??
-                "Automatic updates are not available in this build.",
+                t("Automatic updates are not available in this build."),
             }),
           );
         }
@@ -267,8 +272,8 @@ function AboutVersionSection() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not check for updates",
-            description: error instanceof Error ? error.message : "Update check failed.",
+            title: t("Could not check for updates"),
+            description: error instanceof Error ? error.message : t("Update check failed."),
           }),
         );
       });
@@ -281,20 +286,20 @@ function AboutVersionSection() {
       ? !canCheckForUpdate(updateState)
       : isDesktopUpdateButtonDisabled(updateState);
 
-  const actionLabel: Record<string, string> = { download: "Download", install: "Install" };
+  const actionLabel: Record<string, string> = { download: t("Download"), install: t("Install") };
   const statusLabel: Record<string, string> = {
-    checking: "Checking…",
-    downloading: "Downloading…",
+    checking: t("Checking…"),
+    downloading: t("Downloading…"),
     // Off its track, "up to date" only means no switch is pending; Review moves it.
-    ...(appOffTrack ? {} : { "up-to-date": "Up to Date" }),
+    ...(appOffTrack ? {} : { "up-to-date": t("Up to Date") }),
   };
   const buttonLabel =
-    actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? "Check for Updates";
+    actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? t("Check for Updates");
   const description =
     action === "download" || action === "install"
-      ? "Update available."
+      ? t("Update available.")
       : (getDesktopUpdateDisabledReason(updateState, updatesDenial) ??
-        "Current version of the application.");
+        t("Current version of the application."));
 
   return (
     <>
@@ -326,17 +331,29 @@ function AboutVersionSection() {
           {...searchableSetting("update-track")}
           description={
             nightlyDeniedBy !== undefined ? (
-              `${managedUpdatesMessage(nightlyDeniedBy)} Nightly builds are not available${
+              `${managedUpdatesMessage(nightlyDeniedBy)} ${
                 selectedUpdateChannel === "nightly"
-                  ? "; switch to Stable to keep getting updates."
-                  : "."
+                  ? t("Nightly builds are not available; switch to Stable to keep getting updates.")
+                  : t("Nightly builds are not available.")
               }`
             ) : unswitchedMachines > 0 ? (
               <>
                 {unswitchedMachines === 1
-                  ? "1 machine still runs"
-                  : `${unswitchedMachines} machines still run`}{" "}
-                {channelSwitchLabel(selectedUpdateChannel === "nightly" ? "latest" : "nightly")}.{" "}
+                  ? t("1 machine still runs {channel}.", {
+                      channel: t(
+                        channelSwitchLabel(
+                          selectedUpdateChannel === "nightly" ? "latest" : "nightly",
+                        ),
+                      ),
+                    })
+                  : t("{count} machines still run {channel}.", {
+                      count: unswitchedMachines,
+                      channel: t(
+                        channelSwitchLabel(
+                          selectedUpdateChannel === "nightly" ? "latest" : "nightly",
+                        ),
+                      ),
+                    })}{" "}
                 {/* The dialog moves what it can and says why it skips the rest. */}
                 <Button
                   size="xs"
@@ -344,11 +361,13 @@ function AboutVersionSection() {
                   disabled={updateRun !== null}
                   onClick={() => setSwitchChannel(selectedUpdateChannel)}
                 >
-                  Review
+                  {t("Review")}
                 </Button>
               </>
             ) : (
-              "Switches this app and every connected machine whose database the target release supports."
+              t(
+                "Switches this app and every connected machine whose database the target release supports.",
+              )
             )
           }
           managed={updatesDenial}
@@ -364,14 +383,14 @@ function AboutVersionSection() {
               <SelectTrigger
                 size="sm"
                 className="w-full sm:w-40"
-                aria-label="Update track"
+                aria-label={t("Update track")}
                 disabled={switchChannel !== null || updateRun !== null}
               >
-                <SelectValue>{channelSwitchLabel(selectedUpdateChannel)}</SelectValue>
+                <SelectValue>{t(channelSwitchLabel(selectedUpdateChannel))}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
-                  Stable
+                  {t("Stable")}
                 </SelectItem>
                 <SelectItem
                   hideIndicator
@@ -398,12 +417,14 @@ function AboutVersionSection() {
                 );
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Update track">
-                <SelectValue>{HOSTED_APP_CHANNEL_LABEL}</SelectValue>
+              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label={t("Update track")}>
+                <SelectValue>
+                  {HOSTED_APP_CHANNEL_LABEL ? t(HOSTED_APP_CHANNEL_LABEL) : null}
+                </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
-                  Latest
+                  {t("Latest")}
                 </SelectItem>
                 <SelectItem hideIndicator value="nightly">
                   Nightly
@@ -576,9 +597,12 @@ export function useSettingsRestore(onRestored?: () => void) {
     if (changedSettingLabels.length === 0) return;
     const api = readLocalApi();
     const confirmed = await (api ?? ensureLocalApi()).dialogs.confirm(
-      ["Restore default settings?", `This will reset: ${changedSettingLabels.join(", ")}.`].join(
-        "\n",
-      ),
+      [
+        t("Restore default settings?"),
+        t("This will reset: {settings}.", {
+          settings: changedSettingLabels.map((label) => t(label)).join(", "),
+        }),
+      ].join("\n"),
       { variant: "destructive" },
     );
     if (!confirmed) return;
@@ -597,8 +621,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Couldn’t restore theme settings",
-          description: "Try again.",
+          title: t("Couldn’t restore theme settings"),
+          description: t("Try again."),
         }),
       );
     };
@@ -737,7 +761,7 @@ function AutoSettleDaysInput({
         }
       }}
       onBlur={() => setDraft(String(value))}
-      aria-label="Days of inactivity before auto-settle"
+      aria-label={t("Days of inactivity before auto-settle")}
     />
   );
 }
@@ -757,7 +781,7 @@ export function LegacyFeaturesSection() {
             onCheckedChange={(checked) => {
               updateSettings({ planModeEnabled: Boolean(checked) });
             }}
-            aria-label="Plan mode (legacy)"
+            aria-label={t("Plan mode (legacy)")}
           />
         }
       />
@@ -770,7 +794,7 @@ export function LegacyFeaturesSection() {
             onCheckedChange={(checked) =>
               updateSettings({ contextWindowMeterEnabled: Boolean(checked) })
             }
-            aria-label="Context window indicator (legacy)"
+            aria-label={t("Context window indicator (legacy)")}
           />
         }
       />
@@ -785,8 +809,53 @@ export function GeneralSettingsPanel() {
     readLastEnabledProjectGroupingMode(),
   );
 
+  const [showAdvanced, setShowAdvanced] = useShowAdvancedSettings();
+  const locale = getLocale();
+
   return (
     <SettingsPageContainer>
+      <SettingsSection id="language" title="Language">
+        <SettingsRow
+          id="language-select"
+          title="Language"
+          description="Choose the app language. The app reloads to apply it."
+          control={
+            <Select
+              value={locale}
+              onValueChange={(value) => {
+                const option = LOCALE_OPTIONS.find((candidate) => candidate.id === value);
+                if (option && option.id !== locale) setLocale(option.id);
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label={t("Language")}>
+                <SelectValue>
+                  {LOCALE_OPTIONS.find((option) => option.id === locale)?.label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {LOCALE_OPTIONS.map((option) => (
+                  <SelectItem hideIndicator key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          }
+        />
+        <SettingsRow
+          id="show-basic-settings-only"
+          title="Show only the basics"
+          description="Hide developer sections from the settings menu to keep it short."
+          control={
+            <Switch
+              checked={!showAdvanced}
+              onCheckedChange={(checked) => setShowAdvanced(!checked)}
+              aria-label={t("Show only the basics")}
+            />
+          }
+        />
+      </SettingsSection>
+
       <SettingsSection id="notifications" title="Notifications">
         <NotificationSettings />
         <SettingsRow
@@ -796,7 +865,7 @@ export function GeneralSettingsPanel() {
             <Switch
               checked={settings.inAppNotificationsEnabled}
               onCheckedChange={(checked) => updateSettings({ inAppNotificationsEnabled: checked })}
-              aria-label="In-app notifications"
+              aria-label={t("In-app notifications")}
             />
           }
         />
@@ -834,7 +903,7 @@ export function GeneralSettingsPanel() {
                   ),
                 });
               }}
-              aria-label="Project grouping"
+              aria-label={t("Project grouping")}
             />
           }
         />
@@ -863,15 +932,15 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-44" aria-label="Project order">
+              <SelectTrigger size="sm" className="w-full sm:w-44" aria-label={t("Project order")}>
                 <SelectValue>
-                  {SIDEBAR_PROJECT_SORT_ORDER_LABELS[settings.sidebarProjectSortOrder]}
+                  {t(SIDEBAR_PROJECT_SORT_ORDER_LABELS[settings.sidebarProjectSortOrder])}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 {SidebarProjectSortOrder.literals.map((sortOrder) => (
                   <SelectItem hideIndicator key={sortOrder} value={sortOrder}>
-                    {SIDEBAR_PROJECT_SORT_ORDER_LABELS[sortOrder]}
+                    {t(SIDEBAR_PROJECT_SORT_ORDER_LABELS[sortOrder])}
                   </SelectItem>
                 ))}
               </SelectPopup>
@@ -900,7 +969,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ sidebarWorkingShelfEnabled: Boolean(checked) })
               }
-              aria-label="Working section"
+              aria-label={t("Working section")}
             />
           }
         />
@@ -928,7 +997,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadUnpin: Boolean(checked) })
               }
-              aria-label="Confirm thread unpinning"
+              aria-label={t("Confirm thread unpinning")}
             />
           }
         />
@@ -953,7 +1022,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadArchive: Boolean(checked) })
               }
-              aria-label="Confirm thread archiving"
+              aria-label={t("Confirm thread archiving")}
             />
           }
         />
@@ -978,7 +1047,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadDelete: Boolean(checked) })
               }
-              aria-label="Confirm thread deletion"
+              aria-label={t("Confirm thread deletion")}
             />
           }
         />
@@ -1008,14 +1077,16 @@ export function GeneralSettingsPanel() {
                 <SelectTrigger
                   size="sm"
                   className="w-full sm:w-40"
-                  aria-label="Quit shortcut behavior"
+                  aria-label={t("Quit shortcut behavior")}
                 >
-                  <SelectValue>{QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit]}</SelectValue>
+                  <SelectValue>
+                    {t(QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit])}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   {Object.entries(QUIT_CONFIRMATION_MODE_LABELS).map(([value, label]) => (
                     <SelectItem hideIndicator key={value} value={value}>
-                      {label}
+                      {t(label)}
                     </SelectItem>
                   ))}
                 </SelectPopup>
@@ -1050,18 +1121,22 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Timestamp format">
-                <SelectValue>{TIMESTAMP_FORMAT_LABELS[settings.timestampFormat]}</SelectValue>
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-40"
+                aria-label={t("Timestamp format")}
+              >
+                <SelectValue>{t(TIMESTAMP_FORMAT_LABELS[settings.timestampFormat])}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="locale">
-                  {TIMESTAMP_FORMAT_LABELS.locale}
+                  {t(TIMESTAMP_FORMAT_LABELS.locale)}
                 </SelectItem>
                 <SelectItem hideIndicator value="12-hour">
-                  {TIMESTAMP_FORMAT_LABELS["12-hour"]}
+                  {t(TIMESTAMP_FORMAT_LABELS["12-hour"])}
                 </SelectItem>
                 <SelectItem hideIndicator value="24-hour">
-                  {TIMESTAMP_FORMAT_LABELS["24-hour"]}
+                  {t(TIMESTAMP_FORMAT_LABELS["24-hour"])}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1076,8 +1151,11 @@ export function ChatSettingsPanel() {
   const modifierLabel = isMacPlatform(navigator.platform) ? "⌘" : "Ctrl";
   const sendShortcutOptions = [
     { value: "enter", label: "Enter" },
-    { value: "mod-enter-multiline", label: `${modifierLabel} + Enter for multiline prompts` },
-    { value: "mod-enter", label: `${modifierLabel} + Enter always` },
+    {
+      value: "mod-enter-multiline",
+      label: t("{modifier} + Enter for multiline prompts", { modifier: modifierLabel }),
+    },
+    { value: "mod-enter", label: t("{modifier} + Enter always", { modifier: modifierLabel }) },
   ] as const;
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -1107,7 +1185,7 @@ export function ChatSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ composerRichTextEnabled: Boolean(checked) })
               }
-              aria-label="Rich text composer"
+              aria-label={t("Rich text composer")}
             />
           }
         />
@@ -1135,7 +1213,7 @@ export function ChatSettingsPanel() {
               <SelectTrigger
                 size="sm"
                 className="w-auto min-w-0 max-w-full"
-                aria-label="Send shortcut"
+                aria-label={t("Send shortcut")}
               >
                 <SelectValue>
                   {
@@ -1179,7 +1257,7 @@ export function ChatSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ showSkillsInSlashMenu: Boolean(checked) })
                 }
-                aria-label="Show skills in slash menu"
+                aria-label={t("Show skills in slash menu")}
               />
             }
           />
@@ -1190,10 +1268,16 @@ export function ChatSettingsPanel() {
         <SettingsRow
           {...searchableSetting("follow-up-behavior")}
           description={
-            "Queue follow-ups while the agent runs or steer the current run. " +
+            t("Queue follow-ups while the agent runs or steer the current run.") +
+            " " +
             (settings.sendShortcut === "mod-enter-multiline"
-              ? `Press ${modifierLabel} + Enter for single-line prompts or ${modifierLabel} + Shift + Enter for multiline prompts to do the opposite for one message.`
-              : `Press ${modifierLabel}${settings.sendShortcut === "mod-enter" ? " + Shift" : ""} + Enter to do the opposite for one message.`)
+              ? t(
+                  "Press {modifier} + Enter for single-line prompts or {modifier} + Shift + Enter for multiline prompts to do the opposite for one message.",
+                  { modifier: modifierLabel },
+                )
+              : t("Press {keys} + Enter to do the opposite for one message.", {
+                  keys: `${modifierLabel}${settings.sendShortcut === "mod-enter" ? " + Shift" : ""}`,
+                }))
           }
           resetAction={
             settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior ? (
@@ -1216,14 +1300,18 @@ export function ChatSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-auto min-w-0" aria-label="Follow-up behavior">
+              <SelectTrigger
+                size="sm"
+                className="w-auto min-w-0"
+                aria-label={t("Follow-up behavior")}
+              >
                 <SelectValue>
-                  {settings.followUpBehavior === "queue" ? "Queue" : "Steer"}
+                  {settings.followUpBehavior === "queue" ? t("Queue") : t("Steer")}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem value="queue">Queue</SelectItem>
-                <SelectItem value="steer">Steer</SelectItem>
+                <SelectItem value="queue">{t("Queue")}</SelectItem>
+                <SelectItem value="steer">{t("Steer")}</SelectItem>
               </SelectPopup>
             </Select>
           }
@@ -1259,7 +1347,7 @@ function DiffColorsSettingsRow() {
                 updateSettings({ diffColorScheme: value });
             }}
           >
-            <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Diff colors">
+            <SelectTrigger size="sm" className="w-full min-w-0" aria-label={t("Diff colors")}>
               <span
                 aria-hidden="true"
                 className={
@@ -1272,12 +1360,12 @@ function DiffColorsSettingsRow() {
                 <span className="size-2 rounded-full bg-diff-addition" />
               </span>
               <SelectValue>
-                {settings.diffColorScheme === "blue-orange" ? "Blue & orange" : "Red & green"}
+                {settings.diffColorScheme === "blue-orange" ? t("Blue & orange") : t("Red & green")}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
-              <SelectItem value="red-green">Red & green (default)</SelectItem>
-              <SelectItem value="blue-orange">Blue & orange</SelectItem>
+              <SelectItem value="red-green">{t("Red & green (default)")}</SelectItem>
+              <SelectItem value="blue-orange">{t("Blue & orange")}</SelectItem>
             </SelectPopup>
           </Select>
         </div>
@@ -1313,15 +1401,15 @@ export function DiffsSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Diff layout">
-                <SelectValue>{DIFF_LAYOUT_LABELS[settings.diffLayout]}</SelectValue>
+              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label={t("Diff layout")}>
+                <SelectValue>{t(DIFF_LAYOUT_LABELS[settings.diffLayout])}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="stacked">
-                  {DIFF_LAYOUT_LABELS.stacked}
+                  {t(DIFF_LAYOUT_LABELS.stacked)}
                 </SelectItem>
                 <SelectItem hideIndicator value="split">
-                  {DIFF_LAYOUT_LABELS.split}
+                  {t(DIFF_LAYOUT_LABELS.split)}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1348,7 +1436,7 @@ export function DiffsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ diffIgnoreWhitespace: Boolean(checked) })
               }
-              aria-label="Hide whitespace changes by default"
+              aria-label={t("Hide whitespace changes by default")}
             />
           }
         />
@@ -1379,16 +1467,18 @@ export function DiffsSettingsPanel() {
               <SelectTrigger
                 size="sm"
                 className="w-full sm:w-40"
-                aria-label="Default diff file state"
+                aria-label={t("Default diff file state")}
               >
-                <SelectValue>{settings.diffFilesCollapsed ? "Collapsed" : "Expanded"}</SelectValue>
+                <SelectValue>
+                  {settings.diffFilesCollapsed ? t("Collapsed") : t("Expanded")}
+                </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="expanded">
-                  Expanded
+                  {t("Expanded")}
                 </SelectItem>
                 <SelectItem hideIndicator value="collapsed">
-                  Collapsed
+                  {t("Collapsed")}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1419,7 +1509,7 @@ export function DiffsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ proactivePanelsEnabled: Boolean(checked) })
               }
-              aria-label="Open pull requests and changes panels proactively"
+              aria-label={t("Open pull requests and changes panels proactively")}
             />
           }
         />
@@ -1465,12 +1555,16 @@ function ScopedCompactIdleThreadsRow() {
             if (mode) updateSettings({ idleCompaction: mode.value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Compact idle threads">
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-56"
+            aria-label={t("Compact idle threads")}
+          >
             <SelectValue>
               {(value: string | null) =>
                 value === null
-                  ? "Mixed"
-                  : IDLE_COMPACTION_MODES.find((mode) => mode.value === value)?.label
+                  ? t("Mixed")
+                  : t(IDLE_COMPACTION_MODES.find((mode) => mode.value === value)?.label ?? "")
               }
             </SelectValue>
           </SelectTrigger>
@@ -1483,7 +1577,7 @@ function ScopedCompactIdleThreadsRow() {
                 // A server from before modes has only the on/off switch, so it cannot store "Never".
                 disabled={mode.value === "off" && !idleCompaction.neverAvailable}
               >
-                {mode.label}
+                {t(mode.label)}
               </SelectItem>
             ))}
           </SelectPopup>
@@ -1579,9 +1673,9 @@ export function ThreadsSettingsPanel() {
               value={mixedAddProjectBaseDirectory ? "" : settings.addProjectBaseDirectory}
               onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
               normalizeDraft={resolvePastedPath}
-              placeholder={mixedAddProjectBaseDirectory ? "Mixed" : "~/"}
+              placeholder={mixedAddProjectBaseDirectory ? t("Mixed") : "~/"}
               spellCheck={false}
-              aria-label="Add project base directory"
+              aria-label={t("Add project base directory")}
             />
           }
         />
@@ -1608,7 +1702,7 @@ export function ThreadsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ autoResumeLimitedThreads: Boolean(checked) })
               }
-              aria-label="Resume after usage limits"
+              aria-label={t("Resume after usage limits")}
             />
           }
         />
@@ -1624,7 +1718,7 @@ export function ThreadsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ snoozeLimitedThreads: Boolean(checked) })
               }
-              aria-label="Snooze until limits reset"
+              aria-label={t("Snooze until limits reset")}
             />
           }
         />
@@ -1657,7 +1751,7 @@ export function ThreadsSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ sidebarAutoSettleOnMerge: Boolean(checked) })
                 }
-                aria-label="Auto-settle merged threads"
+                aria-label={t("Auto-settle merged threads")}
               />
             }
           />
@@ -1690,7 +1784,7 @@ export function ThreadsSettingsPanel() {
                     sidebarAutoSettleAfterDays: checked ? AUTO_SETTLE_DEFAULT_DAYS : null,
                   })
                 }
-                aria-label="Auto-settle inactive threads"
+                aria-label={t("Auto-settle inactive threads")}
               />
             }
           />
@@ -1721,7 +1815,7 @@ export function ThreadsSettingsPanel() {
                   onCheckedChange={(checked) =>
                     updateSettings({ sidebarAutoSettleKeepPullRequests: checked })
                   }
-                  aria-label="Keep threads with a PR"
+                  aria-label={t("Keep threads with a PR")}
                 />
               }
             />
@@ -1751,11 +1845,11 @@ export function ThreadsSettingsPanel() {
           control={
             !hasServerTargets ? (
               <span className="text-sm text-muted-foreground">
-                Connect an environment to choose its text generation model.
+                {t("Connect an environment to choose its text generation model.")}
               </span>
             ) : !hasTextGenerationProvider ? (
               <span className="text-sm text-muted-foreground">
-                No text generation providers available.
+                {t("No text generation providers available.")}
               </span>
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -1767,7 +1861,7 @@ export function ThreadsSettingsPanel() {
                   instanceEntries={textGenerationModelInstanceEntries}
                   modelOptionsByInstance={textGenerationModelOptionsByInstance}
                   triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-                  {...(mixedTextGenerationModel ? { triggerLabel: "Mixed" } : {})}
+                  {...(mixedTextGenerationModel ? { triggerLabel: t("Mixed") } : {})}
                   getModelDisabledReason={textGenerationModelDisabledReason}
                   {...(environmentId
                     ? {
@@ -1784,7 +1878,7 @@ export function ThreadsSettingsPanel() {
                     if (reason) {
                       toastManager.add({
                         type: "error",
-                        title: "Text generation model not saved",
+                        title: t("Text generation model not saved"),
                         description: reason,
                       });
                       return;
@@ -1846,7 +1940,7 @@ export function ThreadsSettingsPanel() {
             description={
               mixedResponseStreamingMode
                 ? "The selected targets use different streaming modes."
-                : RESPONSE_STREAMING_MODE_DESCRIPTIONS[settings.responseStreamingMode]
+                : t(RESPONSE_STREAMING_MODE_DESCRIPTIONS[settings.responseStreamingMode])
             }
             resetAction={
               settings.responseStreamingMode !== DEFAULT_UNIFIED_SETTINGS.responseStreamingMode ? (
@@ -1869,19 +1963,23 @@ export function ThreadsSettingsPanel() {
                   }
                 }}
               >
-                <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Response streaming">
+                <SelectTrigger
+                  size="sm"
+                  className="w-full sm:w-56"
+                  aria-label={t("Response streaming")}
+                >
                   <SelectValue>
                     {(value: ResponseStreamingMode | null) =>
-                      value === null ? "Mixed" : RESPONSE_STREAMING_MODE_LABELS[value]
+                      value === null ? t("Mixed") : t(RESPONSE_STREAMING_MODE_LABELS[value])
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   <SelectItem hideIndicator value="turn">
-                    {RESPONSE_STREAMING_MODE_LABELS.turn}
+                    {t(RESPONSE_STREAMING_MODE_LABELS.turn)}
                   </SelectItem>
                   <SelectItem hideIndicator value="paragraph">
-                    {RESPONSE_STREAMING_MODE_LABELS.paragraph}
+                    {t(RESPONSE_STREAMING_MODE_LABELS.paragraph)}
                   </SelectItem>
                 </SelectPopup>
               </Select>
@@ -1929,7 +2027,7 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ enableProviderUpdateChecks: Boolean(checked) })
               }
-              aria-label="Check provider versions"
+              aria-label={t("Check provider versions")}
             />
           }
         />
@@ -1940,7 +2038,7 @@ export function MaintenanceSettingsPanel() {
           description="Automatically resume interrupted threads after an update, crash, or machine restart on the selected environments."
           status={
             !hasServerTargets
-              ? "All selected connected environments must support restart continuation."
+              ? t("All selected connected environments must support restart continuation.")
               : undefined
           }
           resetAction={
@@ -1966,7 +2064,7 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ continueThreadsAfterServerUpdate: Boolean(checked) })
               }
-              aria-label="Continue threads after restarts"
+              aria-label={t("Continue threads after restarts")}
             />
           }
         />
@@ -1994,7 +2092,7 @@ export function MaintenanceSettingsPanel() {
               size="sm"
               variant="outline"
             >
-              View diagnostics
+              {t("View diagnostics")}
             </Button>
           }
         />
@@ -2005,14 +2103,16 @@ export function MaintenanceSettingsPanel() {
 
 export function AboutSettingsPanel() {
   const primaryPolicy = usePrimaryManagedPolicy();
-  const telemetryOff = managedTelemetryOffMessage(primaryPolicy);
   return (
     <SettingsPageContainer>
       <SettingsSection id="about" title="App">
         {primaryPolicy ? (
           <SettingsRow
             title="Organization"
-            description={`This environment is managed by ${primaryPolicy.organization}. Some settings and features follow its policy.`}
+            description={t(
+              "This environment is managed by {organization}. Some settings and features follow its policy.",
+              { organization: primaryPolicy.organization },
+            )}
             control={
               primaryPolicy.supportUrl ? (
                 <Button
@@ -2022,7 +2122,7 @@ export function AboutSettingsPanel() {
                   size="sm"
                   variant="outline"
                 >
-                  Get help
+                  {t("Get help")}
                 </Button>
               ) : null
             }
@@ -2039,37 +2139,22 @@ export function AboutSettingsPanel() {
             />
           </>
         )}
-        <MobileAppSettingsRow />
+        {/* norai: the T3 phone-app QR codes and the t3.codes privacy link are not ours, so Acerca de leaves them out. */}
       </SettingsSection>
 
       <SettingsSection id="legal" title="Legal">
         <SettingsRow
-          {...searchableSetting("privacy-policy")}
-          description={
-            telemetryOff === undefined
-              ? "How we handle your data, including the anonymous usage data T3 Code collects."
-              : `How we handle your data. ${telemetryOff}`
-          }
-          control={
-            <Button
-              render={<a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer noopener" />}
-              size="sm"
-              variant="outline"
-            >
-              View policy
-            </Button>
-          }
-        />
-        <SettingsRow
           {...searchableSetting("open-source-licenses")}
-          description="Notices for dependencies, assets, and optional tools used by T3 Code."
+          description={t("Notices for dependencies, assets, and optional tools used by {app}.", {
+            app: APP_BASE_NAME,
+          })}
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}
               size="sm"
               variant="outline"
             >
-              View licenses
+              {t("View licenses")}
             </Button>
           }
         />

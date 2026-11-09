@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -412,7 +413,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
       {...props}
     >
       <MorphIcon className="size-4" icon={isOpen ? PanelLeftClose : PanelLeft} />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">{t("Toggle Sidebar")}</span>
     </Button>
   );
 }
@@ -436,8 +437,8 @@ function SidebarRail({
   const suppressClickRef = React.useRef(false);
   const resolvedResizable = sidebarInstance?.resizable ?? null;
   const canResize = resolvedResizable !== null && open;
-  const railLabel = canResize ? "Resize Sidebar" : "Toggle Sidebar";
-  const railTitle = canResize ? "Drag to resize sidebar" : "Toggle Sidebar";
+  const railLabel = canResize ? t("Resize Sidebar") : t("Toggle Sidebar");
+  const railTitle = canResize ? t("Drag to resize sidebar") : t("Toggle Sidebar");
   const resize = useResizeDrag<HTMLButtonElement>((event) => {
     const options = resolvedResizable;
     if (!options || !open) return null;

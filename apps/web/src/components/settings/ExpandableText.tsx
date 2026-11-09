@@ -2,6 +2,7 @@ import { InlineButton } from "../ui/button";
 import { useId, useState } from "react";
 
 import { cn } from "../../lib/utils";
+import { t } from "~/i18n";
 
 export function ExpandableText({
   text,
@@ -39,7 +40,7 @@ export function ExpandableText({
           className="mt-1"
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? "Show less" : expandLabel}
+          {expanded ? t("Show less") : t(expandLabel)}
         </InlineButton>
       ) : null}
     </div>

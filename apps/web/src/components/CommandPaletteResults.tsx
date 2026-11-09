@@ -3,6 +3,7 @@ import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { ChevronRightIcon } from "lucide-react";
 import { type ReactNode, type RefObject, useState } from "react";
 import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import { textDirection } from "~/textDirection";
 import { shortcutLabelForCommand } from "../keybindings";
 import {
@@ -39,8 +40,8 @@ function CommandPaletteEmptyState(props: { emptyStateMessage?: string; isActions
     <div className="py-10 text-center text-sm text-muted-foreground">
       {props.emptyStateMessage ??
         (props.isActionsOnly
-          ? "No matching actions."
-          : "No matching commands, projects, or threads.")}
+          ? t("No matching actions.")
+          : t("No matching commands, projects, or threads."))}
     </div>
   );
 }
@@ -54,7 +55,7 @@ export function CommandPaletteResults(props: CommandPaletteResultsProps) {
     <CommandList>
       {props.groups.map((group) => (
         <CommandGroup items={group.items} key={group.value}>
-          {group.label ? <CommandGroupLabel>{group.label}</CommandGroupLabel> : null}
+          {group.label ? <CommandGroupLabel>{t(group.label)}</CommandGroupLabel> : null}
           <CommandCollection>
             {(item) =>
               item.disabled ? (

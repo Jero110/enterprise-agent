@@ -8,6 +8,8 @@ import { createModelSelection } from "@t3tools/shared/model";
 import { BotIcon, PencilRulerIcon } from "lucide-react";
 import { type ComponentProps, memo, useId, useRef, useState } from "react";
 
+import { t } from "~/i18n";
+
 import type { ContextWindowSnapshot } from "../../lib/contextWindow";
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { Menu, MenuPopup, MenuTrigger } from "../ui/menu";
@@ -54,8 +56,8 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   const RuntimeModeIcon = runtimeModeOption.icon;
   const interactionModeTooltip =
     props.interactionMode === "plan"
-      ? "Plan mode. Click to return to normal build mode"
-      : "Default mode. Click to enter plan mode";
+      ? t("Plan mode. Click to return to normal build mode")
+      : t("Default mode. Click to enter plan mode");
 
   const interactionModeToggle = props.showInteractionModeToggle ? (
     <Tooltip>
@@ -89,7 +91,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
           data-composer-control-label
           className={size === "xs" ? "sr-only" : "sr-only sm:not-sr-only"}
         >
-          {props.interactionMode === "plan" ? "Plan" : "Build"}
+          {props.interactionMode === "plan" ? t("Plan") : t("Build")}
         </span>
       </TooltipTrigger>
       <TooltipPopup side="top">{interactionModeTooltip}</TooltipPopup>
@@ -97,7 +99,10 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   ) : null;
 
   // The chip opens the same Permissions toggle used in the model picker and the overflow menu.
-  const permissionsTooltip = `Permissions: ${runtimeModeOption.label}. ${runtimeModeOption.description}`;
+  const permissionsTooltip = t("Permissions: {mode}. {description}", {
+    mode: runtimeModeOption.label,
+    description: runtimeModeOption.description,
+  });
   const permissionsChip = (
     <Menu
       open={open}
@@ -117,7 +122,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
                   size={size}
                   // Mirrors the model trigger's trailing pe-1 so the gaps on both sides of the chip match.
                   className="ps-1.5"
-                  aria-label={`Permissions: ${runtimeModeOption.label}`}
+                  aria-label={t("Permissions: {mode}", { mode: runtimeModeOption.label })}
                 />
               }
             />
@@ -176,9 +181,9 @@ export function ComposerPermissionsSection(props: {
   const descriptionId = useId();
   return (
     <div data-composer-permissions className="grid w-72 gap-1.5 px-2 py-1.5">
-      <div className="font-medium text-muted-foreground text-xs">Permissions</div>
+      <div className="font-medium text-muted-foreground text-xs">{t("Permissions")}</div>
       <MenuPrimitive.RadioGroup
-        aria-label="Permissions"
+        aria-label={t("Permissions")}
         value={props.runtimeMode}
         onValueChange={(value: RuntimeMode) => {
           if (value !== props.runtimeMode) props.onRuntimeModeChange(value);

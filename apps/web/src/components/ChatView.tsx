@@ -1,3 +1,5 @@
+import { t, threadTitleForDisplay } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import { ChildThreadApprovals } from "./chat/ChildThreadApprovals";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
@@ -259,6 +261,8 @@ import {
 import { useEnvironmentShellHasSnapshot } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
+import { TeamWorkCard } from "./home/TeamWorkCard";
+import { TodayPanel } from "./home/TodayPanel";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import {
   BranchRestoreConfirmHost,
@@ -712,7 +716,7 @@ export default function ChatView(props: ChatViewProps) {
   ] = useState<Record<string, boolean>>({});
   const legendListRef = useRef<LegendListRef | null>(null);
   const conversationArea = workspaceAreaProps("conversation", 1, "Conversation");
-  const composerArea = workspaceAreaProps("composer", 2, "Message input");
+  const composerArea = workspaceAreaProps("composer", 2, t("Message input"));
   const [composerOverlayElement, setComposerOverlayElement] = useState<HTMLDivElement | null>(null);
   const [composerTimelineInset, setComposerTimelineInset] = useState(0);
   const composerTimelineInsetRef = useRef(0);
@@ -2474,7 +2478,7 @@ export default function ChatView(props: ChatViewProps) {
   const compactDisabled = compactThreadUnavailable;
   const compactDisabledReason = compactDisabled
     ? !canOperateThread
-      ? "This connection cannot change threads."
+      ? t("This connection cannot change threads.")
       : !activeProject
         ? "Choose a project before compacting"
         : !manualCompactionProviderAvailable
@@ -2782,7 +2786,7 @@ export default function ChatView(props: ChatViewProps) {
         : serverConfig === null
           ? "Side chats are not ready yet. Try again in a moment."
           : serverConfig.environment.capabilities.sideChats !== true
-            ? "Update this environment's T3 Code server to use side chats."
+            ? t("Update {app} on this computer to use side chats.", { app: APP_BASE_NAME })
             : sideChatsOffered && !isServerThread
               ? "Side chats start after the first message."
               : sideChat.available &&
@@ -3265,7 +3269,11 @@ export default function ChatView(props: ChatViewProps) {
             environmentId={activeThread.environmentId}
             projectId={activeThread.projectId}
           />
-          <EnterpriseHeaderControls threadId={activeThread.id} skills={timelineSkills} />
+          <EnterpriseHeaderControls
+            threadId={activeThread.id}
+            projectId={activeThread.projectId ?? null}
+            skills={timelineSkills}
+          />
         </>
       }
     />
@@ -3330,7 +3338,7 @@ export default function ChatView(props: ChatViewProps) {
             {isElectron && rightPanelControlsAtRoot ? (
               <span
                 aria-hidden
-                className="pointer-events-none fixed top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] h-[var(--workspace-topbar-height)] w-28 [-webkit-app-region:no-drag]"
+                className="pointer-events-none fixed top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] h-[var(--workspace-topbar-height)] w-72 [-webkit-app-region:no-drag]"
               />
             ) : null}
             {!rightPanelControlsAtRoot && !rightPanelControlsInPanel ? panelLayoutControls : null}
@@ -3339,7 +3347,7 @@ export default function ChatView(props: ChatViewProps) {
               activeThreadEnvironmentId={activeThread.environmentId}
               activeThreadId={activeThread.id}
               isServerThread={isServerThread}
-              activeThreadTitle={activeThread.title}
+              activeThreadTitle={threadTitleForDisplay(activeThread.title)}
               activeThreadLinkOrigin={activeThreadShell?.linkOrigin?.label ?? null}
               activeProject={activeProject ?? null}
               parentThreadLink={headerParentThreadLink}
@@ -3636,17 +3644,17 @@ export default function ChatView(props: ChatViewProps) {
                               isRevertingCheckpoint={isRevertingCheckpoint}
                               sendDisabledReason={
                                 !canOperateThread
-                                  ? "This connection cannot change threads."
+                                  ? t("This connection cannot change threads.")
                                   : isEnvironmentChanging
-                                    ? "Preparing machine"
+                                    ? t("Preparing machine")
                                     : isRevertingCheckpoint
-                                      ? "Rewinding conversation"
+                                      ? t("Rewinding conversation")
                                       : feedbackUploading
-                                        ? "Sending feedback"
+                                        ? t("Sending feedback")
                                         : threadDetailLoading
-                                          ? "Messages loading"
+                                          ? t("Messages loading")
                                           : worktreeSetupBlocksSend
-                                            ? "Preparing worktree"
+                                            ? t("Preparing worktree")
                                             : projectCloneSendBlockReason
                               }
                               isPreparingWorktree={isPreparingWorktree && !sendQueuesBehindSetup}
@@ -3823,10 +3831,32 @@ export default function ChatView(props: ChatViewProps) {
                           )}
                         </div>
                       </div>
-                      {isDraftHeroState && composerBannerItems.length > 0 ? (
-                        // Out of flow, like the headline, so a notice never moves the centered composer.
-                        <div className="absolute inset-x-0 top-full flex flex-col gap-1 pt-4">
-                          <ComposerBannerStack items={composerBannerItems} detached />
+                      {isDraftHeroState ? (
+                        // Out of flow, like the headline, so notices and home cards never move
+                        // the centered composer. Notices go first, above the home cards.
+                        <div className="absolute inset-x-0 top-full flex flex-col gap-4 pt-4">
+                          {composerBannerItems.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              <ComposerBannerStack items={composerBannerItems} detached />
+                            </div>
+                          ) : null}
+                          {!(isLocalDraftThread && activeProject === null) ? (
+                            // Two boxes side by side, the same height; "Today's summary" takes the
+                            // whole row when there is no team project. Short windows hide them.
+                            <section
+                              aria-label={t("Your day")}
+                              className="hidden gap-3 sm:[&:has(>:nth-child(2))]:grid-cols-2 [@media(min-height:40rem)]:grid"
+                              data-home-cards
+                            >
+                              {activeProject && !activeProjectIsScratch ? (
+                                <TeamWorkCard
+                                  environmentId={environmentId}
+                                  projectId={activeProject.id}
+                                />
+                              ) : null}
+                              <TodayPanel />
+                            </section>
+                          ) : null}
                         </div>
                       ) : null}
                     </ComposerSurface.Shell>

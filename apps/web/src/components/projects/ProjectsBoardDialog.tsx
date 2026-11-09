@@ -13,6 +13,7 @@ import {
 import { useState, type CSSProperties, type DragEvent, type KeyboardEvent } from "react";
 
 import { requestConfirmDialog } from "~/confirmDialog";
+import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import {
   PROJECT_TASK_PRIORITIES,
@@ -36,9 +37,9 @@ const STATUS_STYLE: Record<ProjectTaskStatus, { pill: string; column: string }> 
     pill: "border border-border bg-background text-muted-foreground",
     column: "bg-muted/60",
   },
-  in_progress: { pill: "bg-fuchsia-600 text-white", column: "bg-fuchsia-500/8" },
+  in_progress: { pill: "bg-primary text-primary-foreground", column: "bg-primary/6" },
   blocked: { pill: "bg-red-500 text-white", column: "bg-red-500/8" },
-  complete: { pill: "bg-emerald-500 text-white", column: "bg-emerald-500/8" },
+  complete: { pill: "bg-emerald-700 text-white", column: "bg-emerald-500/8" },
 };
 
 const PRIORITY_COLOR: Record<ProjectTaskPriority, string> = {
@@ -48,7 +49,8 @@ const PRIORITY_COLOR: Record<ProjectTaskPriority, string> = {
   low: "text-muted-foreground",
 };
 
-const PALETTE = ["#f97316", "#0ea5e9", "#52525b", "#a855f7", "#16a34a", "#e11d48", "#ca8a04"];
+// sky-700 and yellow-700: white initials on the lighter shades were hard to read.
+const PALETTE = ["#f97316", "#0369a1", "#52525b", "#a855f7", "#16a34a", "#e11d48", "#a16207"];
 
 function paletteColor(key: string): string {
   let hash = 0;
@@ -63,9 +65,16 @@ function formatDue(dueDate: string): string {
   return DUE_FORMAT.format(new Date(year!, month! - 1, day!));
 }
 
+/** Today as YYYY-MM-DD in local time; toISOString is UTC, already tomorrow after 18:00 in CDMX. */
+function localToday(): string {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 function isOverdue(task: ProjectTask): boolean {
   if (task.dueDate === null || task.status === "complete") return false;
-  return task.dueDate < new Date().toISOString().slice(0, 10);
+  return task.dueDate < localToday();
 }
 
 function splitList(value: string): string[] {
@@ -85,7 +94,8 @@ function Avatars({ initials }: { readonly initials: ReadonlyArray<string> }) {
   }
   return (
     <span className="flex -space-x-1.5">
-      {initials.map((initial) => (
+      {/* The same initials twice ("AM, AM") would be one person twice and a duplicate key. */}
+      {[...new Set(initials)].map((initial) => (
         <span
           key={initial}
           className="flex size-6 items-center justify-center rounded-full text-3xs font-medium text-white ring-2 ring-background"
@@ -108,7 +118,9 @@ function TaskCard(props: { readonly task: ProjectTask; readonly onOpen: () => vo
       onClick={props.onOpen}
       className="w-full cursor-pointer rounded-lg border border-border/70 bg-card p-3 text-left shadow-xs transition-colors hover:border-border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
-      <p className="text-sm font-medium leading-snug text-foreground">{task.title}</p>
+      <p className="break-words text-sm font-medium leading-snug text-foreground [overflow-wrap:anywhere]">
+        {task.title}
+      </p>
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
         <Avatars initials={task.assignees} />
         {task.dueDate !== null ? (
@@ -125,16 +137,17 @@ function TaskCard(props: { readonly task: ProjectTask; readonly onOpen: () => vo
         {task.priority !== null ? (
           <span className="inline-flex items-center gap-1 rounded-md border border-border/70 px-1.5 py-0.5">
             <FlagIcon className={cn("size-3 fill-current", PRIORITY_COLOR[task.priority])} />
-            {PROJECT_TASK_PRIORITY_LABELS[task.priority]}
+            {t(PROJECT_TASK_PRIORITY_LABELS[task.priority], undefined, "priority")}
           </span>
         ) : null}
-        {task.tags.map((tag) => (
+        {[...new Set(task.tags)].map((tag) => (
           <Badge
             key={tag}
             variant="label"
+            className="max-w-full"
             style={{ "--label": paletteColor(tag) } as CSSProperties}
           >
-            {tag}
+            <span className="min-w-0 truncate">{tag}</span>
           </Badge>
         ))}
       </div>
@@ -153,7 +166,13 @@ function BoardColumn(props: {
   const [dragOver, setDragOver] = useState(false);
   const style = STATUS_STYLE[props.status];
   const submit = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") setAdding(false);
+    if (event.key === "Escape") {
+      // Close only this input, not the whole dialog.
+      event.stopPropagation();
+      event.preventDefault();
+      setAdding(false);
+      return;
+    }
     if (event.key !== "Enter") return;
     const title = event.currentTarget.value.trim();
     if (title) props.onAddTask(title);
@@ -167,7 +186,7 @@ function BoardColumn(props: {
   };
   return (
     <section
-      aria-label={PROJECT_TASK_STATUS_LABELS[props.status]}
+      aria-label={t(PROJECT_TASK_STATUS_LABELS[props.status])}
       className={cn(
         "flex max-h-full w-72 shrink-0 flex-col rounded-xl p-2",
         style.column,
@@ -177,12 +196,16 @@ function BoardColumn(props: {
         event.preventDefault();
         setDragOver(true);
       }}
-      onDragLeave={() => setDragOver(false)}
+      onDragLeave={(event) => {
+        // Passing over a card inside the column is not leaving it; this keeps the outline steady.
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        setDragOver(false);
+      }}
       onDrop={drop}
     >
       <header className="flex items-center gap-2 px-1 pb-2 pt-1">
         <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold uppercase", style.pill)}>
-          {PROJECT_TASK_STATUS_LABELS[props.status]}
+          {t(PROJECT_TASK_STATUS_LABELS[props.status])}
         </span>
         <span className="text-xs text-muted-foreground">{props.tasks.length}</span>
       </header>
@@ -194,8 +217,10 @@ function BoardColumn(props: {
           <Input
             autoFocus
             size="sm"
-            placeholder="Task name, Enter to add"
-            aria-label={`New task in ${PROJECT_TASK_STATUS_LABELS[props.status]}`}
+            placeholder={t("Task name, Enter to add")}
+            aria-label={t("New task in {column}", {
+              column: t(PROJECT_TASK_STATUS_LABELS[props.status]),
+            })}
             onKeyDown={submit}
             onBlur={() => setAdding(false)}
           />
@@ -207,7 +232,7 @@ function BoardColumn(props: {
             onClick={() => setAdding(true)}
           >
             <PlusIcon />
-            Add Task
+            {t("Add Task")}
           </Button>
         )}
       </div>
@@ -217,7 +242,7 @@ function BoardColumn(props: {
 
 const FIELD = "flex flex-col gap-1 text-xs font-medium text-muted-foreground";
 const NATIVE_SELECT =
-  "h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground dark:bg-input/32";
+  "h-7 rounded-lg border border-input bg-background px-2 text-sm text-foreground dark:bg-input/32";
 
 function TaskEditor(props: {
   readonly board: ProjectBoard;
@@ -230,8 +255,9 @@ function TaskEditor(props: {
   const update = (patch: Partial<ProjectTask>) => updateTask(board.id, task.id, patch);
   const remove = async () => {
     const confirmed =
-      (await requestConfirmDialog(`Delete "${task.title}"?`, { variant: "destructive" })) ??
-      window.confirm(`Delete "${task.title}"?`);
+      (await requestConfirmDialog(t('Delete "{title}"?', { title: task.title }), {
+        variant: "destructive",
+      })) ?? window.confirm(t('Delete "{title}"?', { title: task.title }));
     if (!confirmed) return;
     deleteTask(board.id, task.id);
     props.onClose();
@@ -240,9 +266,9 @@ function TaskEditor(props: {
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogPopup className="w-[min(520px,94vw)]" bottomStickOnMobile={false}>
         <div className="flex flex-col gap-4 p-6">
-          <DialogTitle>Edit task</DialogTitle>
+          <DialogTitle>{t("Edit task")}</DialogTitle>
           <label className={FIELD}>
-            Title
+            {t("Title")}
             <Input
               defaultValue={task.title}
               onBlur={(event) => {
@@ -252,7 +278,7 @@ function TaskEditor(props: {
             />
           </label>
           <label className={FIELD}>
-            Description
+            {t("Description")}
             <Textarea
               defaultValue={task.description}
               onBlur={(event) => update({ description: event.currentTarget.value })}
@@ -260,7 +286,7 @@ function TaskEditor(props: {
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className={FIELD}>
-              Status
+              {t("Status")}
               <select
                 className={NATIVE_SELECT}
                 value={task.status}
@@ -268,13 +294,13 @@ function TaskEditor(props: {
               >
                 {PROJECT_TASK_STATUSES.map((status) => (
                   <option key={status} value={status}>
-                    {PROJECT_TASK_STATUS_LABELS[status]}
+                    {t(PROJECT_TASK_STATUS_LABELS[status])}
                   </option>
                 ))}
               </select>
             </label>
             <label className={FIELD}>
-              Priority
+              {t("Priority")}
               <select
                 className={NATIVE_SELECT}
                 value={task.priority ?? ""}
@@ -287,23 +313,24 @@ function TaskEditor(props: {
                   })
                 }
               >
-                <option value="">None</option>
+                <option value="">{t("None", undefined, "priority")}</option>
                 {PROJECT_TASK_PRIORITIES.map((priority) => (
                   <option key={priority} value={priority}>
-                    {PROJECT_TASK_PRIORITY_LABELS[priority]}
+                    {t(PROJECT_TASK_PRIORITY_LABELS[priority], undefined, "priority")}
                   </option>
                 ))}
               </select>
             </label>
             <label className={FIELD}>
-              Assignees (initials, comma separated)
+              {t("Assignees (initials, comma separated)")}
               <Input
+                placeholder={t("e.g. AM, JR")}
                 defaultValue={task.assignees.join(", ")}
                 onBlur={(event) => update({ assignees: splitList(event.currentTarget.value) })}
               />
             </label>
             <label className={FIELD}>
-              Due date
+              {t("Due date")}
               <Input
                 type="date"
                 defaultValue={task.dueDate ?? ""}
@@ -313,7 +340,7 @@ function TaskEditor(props: {
           </div>
           <label className={FIELD}>
             <span className="inline-flex items-center gap-1">
-              <TagIcon className="size-3" /> Tags (comma separated)
+              <TagIcon className="size-3" /> {t("Tags (comma separated)")}
             </span>
             <Input
               defaultValue={task.tags.join(", ")}
@@ -323,10 +350,10 @@ function TaskEditor(props: {
           <div className="flex items-center justify-between pt-1">
             <Button size="sm" variant="destructive-outline" onClick={() => void remove()}>
               <Trash2Icon />
-              Delete
+              {t("Delete")}
             </Button>
             <Button size="sm" onClick={props.onClose}>
-              Done
+              {t("Done")}
             </Button>
           </div>
         </div>
@@ -345,6 +372,8 @@ function BoardView() {
   const updateTask = useProjectBoards((state) => state.updateTask);
   const [query, setQuery] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const loading = useProjectBoards((state) => state.loading);
+  const unavailable = useProjectBoards((state) => state.unavailable);
   const [creatingBoard, setCreatingBoard] = useState(false);
   const board = boards.find((entry) => entry.id === activeBoardId) ?? boards[0];
   const editingTask = board?.tasks.find((task) => task.id === editingTaskId);
@@ -358,7 +387,10 @@ function BoardView() {
         task.assignees.some((assignee) => assignee.toLowerCase().includes(needle)),
     ) ?? [];
   const removeBoard = async (target: ProjectBoard) => {
-    const message = `Delete board "${target.name}" and its ${target.tasks.length} tasks?`;
+    const message = t('Delete board "{name}" and its {count} tasks?', {
+      name: target.name,
+      count: target.tasks.length,
+    });
     const confirmed =
       (await requestConfirmDialog(message, { variant: "destructive" })) ?? window.confirm(message);
     if (confirmed) deleteBoard(target.id);
@@ -371,20 +403,26 @@ function BoardView() {
             autoFocus
             size="sm"
             className="w-56"
-            placeholder="Board name, Enter to create"
-            aria-label="New board name"
+            placeholder={t("Board name, Enter to create")}
+            aria-label={t("New board name")}
             onBlur={() => setCreatingBoard(false)}
             onKeyDown={(event) => {
-              if (event.key === "Escape") setCreatingBoard(false);
+              if (event.key === "Escape") {
+                // Close only this input, not the whole dialog.
+                event.stopPropagation();
+                event.preventDefault();
+                setCreatingBoard(false);
+                return;
+              }
               if (event.key !== "Enter") return;
               const name = event.currentTarget.value.trim();
               if (name) addBoard(name);
               setCreatingBoard(false);
             }}
           />
-        ) : (
+        ) : boards.length > 0 ? (
           <select
-            aria-label="Board"
+            aria-label={t("Board")}
             className={NATIVE_SELECT}
             value={board?.id ?? ""}
             onChange={(event) => selectBoard(event.target.value)}
@@ -395,15 +433,15 @@ function BoardView() {
               </option>
             ))}
           </select>
-        )}
-        <Button size="xs" variant="ghost" onClick={() => setCreatingBoard(true)}>
+        ) : null}
+        <Button size="sm" variant="ghost" onClick={() => setCreatingBoard(true)}>
           <PlusIcon />
-          New board
+          {t("New board")}
         </Button>
         {board ? (
-          <Button size="xs" variant="ghost-destructive" onClick={() => void removeBoard(board)}>
+          <Button size="sm" variant="ghost-destructive" onClick={() => void removeBoard(board)}>
             <Trash2Icon />
-            Delete board
+            {t("Delete board")}
           </Button>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
@@ -411,8 +449,8 @@ function BoardView() {
           <Input
             size="sm"
             className="w-48"
-            placeholder="Search tasks"
-            aria-label="Search tasks"
+            placeholder={t("Search tasks")}
+            aria-label={t("Search tasks")}
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
@@ -426,7 +464,12 @@ function BoardView() {
               status={status}
               tasks={visibleTasks.filter((task) => task.status === status)}
               onOpenTask={(task) => setEditingTaskId(task.id)}
-              onDropTask={(taskId) => updateTask(board.id, taskId, { status })}
+              onDropTask={(taskId) => {
+                // A card dropped back into its own column (or an unknown id) needs no save.
+                const dropped = board.tasks.find((task) => task.id === taskId);
+                if (dropped === undefined || dropped.status === status) return;
+                updateTask(board.id, taskId, { status });
+              }}
               onAddTask={(title) =>
                 addTask(board.id, {
                   title,
@@ -441,8 +484,18 @@ function BoardView() {
             />
           ))}
         </div>
-      ) : (
-        <p className="p-6 text-sm text-muted-foreground">No boards yet. Create one to start.</p>
+      ) : loading ? (
+        <p className="p-6 text-sm text-muted-foreground">{t("Loading board…")}</p>
+      ) : unavailable ? null : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            {t("No boards yet. Create one to start.")}
+          </p>
+          <Button onClick={() => setCreatingBoard(true)}>
+            <PlusIcon />
+            {t("Create your first board")}
+          </Button>
+        </div>
       )}
       {board && editingTask ? (
         <TaskEditor
@@ -456,7 +509,7 @@ function BoardView() {
   );
 }
 
-/** Project boards the user keeps here; mentioning a board, task or tag in a message gives the agent that context. */
+/** This project's boards, saved on the connected server; the composer attaches the tasks a message talks about. */
 export function ProjectsBoardButton({
   environmentId,
   projectId,
@@ -466,14 +519,14 @@ export function ProjectsBoardButton({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label="Proyectos"
+              aria-label={t("Projects")}
               className="[-webkit-app-region:no-drag]"
               onClick={() => setOpen(true)}
             />
@@ -481,17 +534,41 @@ export function ProjectsBoardButton({
         >
           <SquareKanbanIcon className="size-4" />
         </TooltipTrigger>
-        <TooltipPopup side="bottom">Proyectos</TooltipPopup>
+        <TooltipPopup side="bottom">{t("Projects")}</TooltipPopup>
       </Tooltip>
+      <ProjectsBoardDialog
+        environmentId={environmentId}
+        projectId={projectId}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
+  );
+}
+
+export function ProjectsBoardDialog({
+  environmentId,
+  projectId,
+  open,
+  onOpenChange,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPopup
         className="flex h-[min(860px,92dvh)] w-[min(1280px,96vw)] max-w-none flex-col overflow-hidden"
         bottomStickOnMobile={false}
       >
         <div className="shrink-0 border-b border-border/60 px-6 py-4">
-          <DialogTitle>Proyectos</DialogTitle>
+          <DialogTitle>{t("Projects")}</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Boards belong to this project on the connected server. Ask your agent to read the cards.
-            Browser boards can be imported; the original browser copy is kept.
+            {t(
+              "Boards belong to this project on the connected server. Ask your agent to read the cards.",
+            )}
           </p>
         </div>
         {open && (

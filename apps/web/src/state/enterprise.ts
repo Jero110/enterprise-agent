@@ -4,6 +4,7 @@ import {
 } from "@t3tools/client-runtime/state/enterprise";
 import { createEnterpriseFileCommands } from "@t3tools/client-runtime/state/enterpriseFiles";
 
+import { t } from "~/i18n";
 import { connectionAtomRuntime } from "../connection/runtime";
 import { useQuietThreadShells } from "./entities";
 import { usePrimaryEnvironmentId } from "./environments";
@@ -26,11 +27,11 @@ export function useEnterpriseStatus() {
   };
 }
 
-/** The message a failed enterprise call carries, without its tag. */
+/** The message a failed enterprise call carries, without its tag, in the user's language when known. */
 export function enterpriseFailureMessage(failure: unknown): string {
   return failure instanceof Error && failure.message.length > 0
-    ? failure.message
-    : "The enterprise hub request failed.";
+    ? t(failure.message)
+    : t("The enterprise hub request failed.");
 }
 
 export function useOwnThreadShells() {

@@ -15,6 +15,7 @@ import {
 import { enterpriseEnvironment, enterpriseFailureMessage } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
+import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -28,6 +29,9 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { toastManager } from "../ui/toast";
+import { parseEnterpriseInvite } from "./invite";
+
+const INVITE_PREFIX = "t3-enterprise-v1.";
 
 export function ConnectEnterpriseDialog({
   environmentId,
@@ -70,7 +74,8 @@ export function ConnectEnterpriseDialog({
       ? undefined
       : window.location.origin;
   const hubUrl = hubUrlInput ?? "";
-  const ready = email.trim().length > 0 && hubUrl.trim().length > 0;
+  const ready =
+    email.trim().length > 0 && (hubUrl.trim().length > 0 || token.trim().startsWith(INVITE_PREFIX));
 
   const handleOpenChange = (next: boolean) => {
     if (!next && busy) return;
@@ -85,9 +90,23 @@ export function ConnectEnterpriseDialog({
   const submit = async () => {
     if (busy || !ready) return;
     let origin: string | undefined;
-    const tokenless = token.trim().length === 0;
+    // A pasted "Create invite" string carries both the address and the token.
+    const pastedInvite = [hubUrl, token]
+      .map((value) => value.trim())
+      .find((value) => value.startsWith(INVITE_PREFIX));
+    const invite = pastedInvite === undefined ? null : parseEnterpriseInvite(pastedInvite);
+    if (pastedInvite !== undefined && invite === null) {
+      setError(t("Check the team address."));
+      return;
+    }
+    const rawAddress = invite?.link.url ?? hubUrl.trim();
+    const address = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawAddress)
+      ? rawAddress
+      : `http://${rawAddress}`;
+    const submittedToken = (invite?.token ?? token).trim();
+    const tokenless = submittedToken.length === 0;
     try {
-      origin = resolveEnterpriseHubOrigin(hubUrl, { tokenless });
+      origin = resolveEnterpriseHubOrigin(address, { tokenless });
       const isOwnHost = configured && ownUrl !== undefined && URL.parse(ownUrl)?.origin === origin;
       if (isOwnHost) {
         origin = undefined;
@@ -100,8 +119,8 @@ export function ConnectEnterpriseDialog({
             resolveEnterpriseHubOrigin(window.location.origin, { tokenless });
         }
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Enter a secure environment URL.");
+    } catch {
+      setError(t("Check the team address."));
       return;
     }
     setBusy(true);
@@ -111,7 +130,7 @@ export function ConnectEnterpriseDialog({
       input: {
         ...(origin === undefined ? {} : { hubUrl: origin }),
         email: email.trim(),
-        ...(token.trim().length > 0 ? { token: token.trim() } : {}),
+        ...(submittedToken.length > 0 ? { token: submittedToken } : {}),
       },
     });
     if (result._tag === "Success") {
@@ -119,8 +138,10 @@ export function ConnectEnterpriseDialog({
       setBusy(false);
       toastManager.add({
         type: "success",
-        title: `Connected as ${result.value.displayName}`,
-        description: [result.value.teamName, result.value.role].filter(Boolean).join(" · "),
+        title: t("Connected as {name}", { name: result.value.displayName }),
+        description: [result.value.teamName, t(result.value.role, undefined, "role")]
+          .filter(Boolean)
+          .join(" · "),
       });
       handleOpenChange(false);
     } else {
@@ -134,16 +155,17 @@ export function ConnectEnterpriseDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Connect Enterprise</DialogTitle>
+          <DialogTitle>{t("Join your team")}</DialogTitle>
           <DialogDescription>
-            Connect with your Enterprise host URL and work email. Your name, team and permissions
-            load automatically.
+            {t(
+              "Your admin gives you the team address. Your name, area and permissions load on their own.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <form
             id={formId}
-            className="space-y-3"
+            className="space-y-4"
             autoComplete="off"
             onSubmit={(event) => {
               event.preventDefault();
@@ -151,26 +173,31 @@ export function ConnectEnterpriseDialog({
             }}
           >
             <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Host URL</span>
+              <span className="block text-xs font-medium text-foreground">{t("Team address")}</span>
               <Input
-                type="url"
+                type="text"
+                inputMode="url"
                 value={hubUrl}
                 onChange={(event) => setHubUrlInput(event.target.value)}
-                placeholder="https://hub.example.com/pair#token=…"
+                placeholder="http://192.168.0.10:13779"
                 disabled={busy}
                 autoFocus
                 nativeInput
                 spellCheck={false}
               />
+              <span className="block text-xs text-muted-foreground">
+                {t("Your admin gives you this, for example http://192.168.0.10:13779")}
+              </span>
             </label>
             <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Email</span>
+              <span className="block text-xs font-medium text-foreground">
+                {t("Your work email")}
+              </span>
               <Input
                 type="email"
-
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@company.com"
+                placeholder={t("you@company.com")}
                 disabled={busy}
                 nativeInput
                 spellCheck={false}
@@ -178,7 +205,7 @@ export function ConnectEnterpriseDialog({
             </label>
             <label className="block space-y-1.5">
               <span className="block text-xs font-medium text-foreground">
-                Enterprise token (optional)
+                {t("Invite code (optional)")}
               </span>
               <Input
                 type="password"
@@ -188,6 +215,9 @@ export function ConnectEnterpriseDialog({
                 nativeInput
                 spellCheck={false}
               />
+              <span className="block text-xs text-muted-foreground">
+                {t("Only if your admin gave you one.")}
+              </span>
             </label>
             {error ? (
               <p role="alert" className="text-xs text-destructive-foreground">
@@ -198,10 +228,10 @@ export function ConnectEnterpriseDialog({
         </DialogPanel>
         <DialogFooter variant="bare">
           <DialogClose disabled={busy} render={<Button variant="outline" type="button" />}>
-            Cancel
+            {t("Cancel")}
           </DialogClose>
           <Button form={formId} type="submit" disabled={busy || !ready}>
-            {busy ? "Connecting…" : "Connect"}
+            {busy ? t("Joining…") : t("Join")}
           </Button>
         </DialogFooter>
       </DialogPopup>

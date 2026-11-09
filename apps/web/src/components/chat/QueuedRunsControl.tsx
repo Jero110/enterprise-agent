@@ -1,4 +1,5 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { APP_BASE_NAME } from "~/branding";
 import { deriveThreadQueueWorkflowState } from "@t3tools/client-runtime/state/thread-workflows";
 import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
 import {
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 import * as DateTime from "effect/DateTime";
 import { useId, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import { t } from "~/i18n";
 
 import { useAssetUrls } from "../../assets/assetUrls";
 import { threadEnvironment } from "../../state/threads";
@@ -435,7 +437,9 @@ function QueuedMessage(props: {
   return (
     <>
       {attribution === "t3code" ? (
-        <p className="me-1 text-2xs text-muted-foreground/70">Sent by T3 Code</p>
+        <p className="me-1 text-2xs text-muted-foreground/70">
+          {t("Sent by {name}", { name: APP_BASE_NAME })}
+        </p>
       ) : null}
       {presentation?.guestName === undefined ? null : (
         <GuestMessageName name={presentation.guestName} />

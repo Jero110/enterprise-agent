@@ -22,6 +22,7 @@ import {
 import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
 import { resolveWorkGroupScrollAnchor } from "@t3tools/client-runtime/work-log/scroll-anchor";
 import type { WorkflowOpening } from "@t3tools/client-runtime/state/subagentRuntime";
+import { t } from "~/i18n";
 import { observeResize } from "~/lib/observeResize";
 import { useStableCallback } from "~/hooks/useStableCallback";
 
@@ -1281,7 +1282,9 @@ const ConversationTimeline = memo(function ConversationTimeline({
           className="flex h-full items-center justify-center ps-(--chat-lane-inset-start) pe-(--chat-lane-inset-end)"
           style={{ paddingBottom: emptyPlaceholderInset }}
         >
-          <p className="text-sm text-muted-foreground">Send a message to start the conversation.</p>
+          <p className="text-sm text-muted-foreground">
+            {t("Send a message to start the conversation.")}
+          </p>
         </div>
       </>
     );
@@ -1693,7 +1696,7 @@ function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "at
           {row.label}
           {error ? ` · ${error}` : ""}
         </span>
-        <span className="text-2xs text-muted-foreground">Cut off by a steer</span>
+        <span className="text-2xs text-muted-foreground">{t("Cut off by a steer")}</span>
       </button>
       {loading ? <WorkHistorySkeleton /> : null}
     </div>

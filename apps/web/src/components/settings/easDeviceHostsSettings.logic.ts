@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   EasDeviceHostConfig,
   type EasDeviceHostConfig as EasDeviceHostConfigType,
@@ -37,6 +38,12 @@ export function updateEasDeviceHosts(
 
 export function easSessionLimits(host: EasDeviceHostConfigType) {
   const sessions =
-    host.maxConcurrentSessions === 1 ? "1 session" : `${host.maxConcurrentSessions} sessions`;
-  return `Up to ${sessions} at once, each stopped after ${host.maxSessionMinutes} min or ${host.idleMinutes} idle min`;
+    host.maxConcurrentSessions === 1
+      ? t("1 session")
+      : t("{count} sessions", { count: host.maxConcurrentSessions });
+  return t("Up to {sessions} at once, each stopped after {minutes} min or {idle} idle min", {
+    sessions,
+    minutes: host.maxSessionMinutes,
+    idle: host.idleMinutes,
+  });
 }

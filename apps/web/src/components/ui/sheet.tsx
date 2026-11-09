@@ -28,6 +28,12 @@ function SheetBackdrop({ className, ...props }: SheetPrimitive.Backdrop.Props) {
   );
 }
 
+/**
+ * `docked` is a non-modal side panel under the window's top bar: no backdrop, the page stays
+ * usable, and it slides fully in from its edge. Pair it with `modal={false}` on `Sheet`.
+ */
+type SheetVariant = "default" | "inset" | "docked";
+
 function SheetViewport({
   className,
   side,
@@ -35,7 +41,7 @@ function SheetViewport({
   ...props
 }: SheetPrimitive.Viewport.Props & {
   side?: "right" | "left" | "top" | "bottom";
-  variant?: "default" | "inset";
+  variant?: SheetVariant;
 }) {
   return (
     <SheetPrimitive.Viewport
@@ -46,6 +52,8 @@ function SheetViewport({
         side === "left" && "flex justify-start",
         side === "right" && "flex justify-end",
         variant === "inset" && "sm:p-4",
+        // A docked panel leaves the page around it usable.
+        variant === "docked" && "pointer-events-none",
         className,
       )}
       data-slot="sheet-viewport"
@@ -69,7 +77,7 @@ function SheetPopup({
   keepMounted?: boolean;
   transitionDurationMs?: number;
   side?: "right" | "left" | "top" | "bottom";
-  variant?: "default" | "inset";
+  variant?: SheetVariant;
 }) {
   const transitionStyle =
     transitionDurationMs === undefined
@@ -79,14 +87,16 @@ function SheetPopup({
 
   return (
     <SheetPortal keepMounted={keepMounted}>
-      <SheetBackdrop
-        className={
-          instant
-            ? "transition-none! data-ending-style:opacity-100! data-starting-style:opacity-100!"
-            : undefined
-        }
-        style={transitionStyle}
-      />
+      {variant !== "docked" && (
+        <SheetBackdrop
+          className={
+            instant
+              ? "transition-none! data-ending-style:opacity-100! data-starting-style:opacity-100!"
+              : undefined
+          }
+          style={transitionStyle}
+        />
+      )}
       <SheetViewport side={side} variant={variant}>
         <SheetPrimitive.Popup
           className={cn(
@@ -101,6 +111,11 @@ function SheetPopup({
               "col-start-2 w-[calc(100%-(--spacing(12)))] max-w-md border-s data-ending-style:translate-x-8 data-starting-style:translate-x-8",
             variant === "inset" &&
               "before:hidden sm:rounded-2xl sm:border sm:before:rounded-[calc(var(--radius-2xl)-1px)] sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
+            variant === "docked" &&
+              "pointer-events-auto mt-(--workspace-topbar-height) h-[calc(100%-var(--workspace-topbar-height))] max-h-[calc(100%-var(--workspace-topbar-height))] max-w-none overflow-hidden border-t bg-background shadow-xl duration-300 ease-out before:hidden motion-reduce:transition-opacity",
+            variant === "docked" &&
+              side === "right" &&
+              "w-full data-ending-style:translate-x-full data-starting-style:translate-x-full sm:w-100 sm:rounded-tl-xl motion-reduce:data-ending-style:translate-x-0 motion-reduce:data-starting-style:translate-x-0",
             instant &&
               "transition-none! will-change-auto! data-ending-style:translate-x-0! data-starting-style:translate-x-0! data-ending-style:translate-y-0! data-starting-style:translate-y-0! data-ending-style:opacity-100! data-starting-style:opacity-100!",
             className,
@@ -139,10 +154,19 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
+function SheetTitle({
+  className,
+  size = "default",
+  ...props
+}: SheetPrimitive.Title.Props & { size?: "default" | "sm" }) {
   return (
     <SheetPrimitive.Title
-      className={cn("font-semibold text-xl leading-snug", className)}
+      className={cn(
+        "font-semibold text-xl leading-snug",
+        // For a compact panel header: one line that truncates.
+        size === "sm" && "truncate text-base leading-tight",
+        className,
+      )}
       data-slot="sheet-title"
       {...props}
     />

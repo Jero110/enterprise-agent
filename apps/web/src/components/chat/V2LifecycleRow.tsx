@@ -62,7 +62,8 @@ import { cn } from "~/lib/utils";
 import { TimelineSystemDivider } from "./TimelineSystemDivider";
 import { subagentResumedSince } from "./V2LifecycleRow.logic";
 import { Button, InlineButton } from "../ui/button";
-import { T3Wordmark } from "../T3Wordmark";
+import { NoraiSymbol } from "../NoraiSymbol";
+import { t } from "~/i18n";
 
 export type { HandoffTimelineRun } from "@t3tools/client-runtime/handoff";
 
@@ -115,15 +116,15 @@ export function V2LifecycleRow(props: {
             <MessageSquareIcon className="size-4 text-secondary-label" aria-hidden />
           </span>
           <span className="min-w-0 flex-1 truncate text-sm font-medium">
-            {item.title ?? "Created thread"}
+            {item.title ?? t("Created thread")}
           </span>
           <Button
             size="xs"
             variant="outline"
-            aria-label={`Open ${item.title ?? "created thread"}`}
+            aria-label={t("Open {title}", { title: item.title ?? t("created thread") })}
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >
-            Open chat
+            {t("Open chat")}
           </Button>
         </div>
       );
@@ -131,14 +132,19 @@ export function V2LifecycleRow(props: {
     return (
       <WorkLogRow
         data-v2-item-type={item.type}
-        icon={<T3Wordmark className="size-4 text-icon-muted" aria-hidden />}
-        label={<>Created thread{item.title ? ` · ${item.title}` : ""}</>}
+        icon={<NoraiSymbol className="size-4 text-icon-muted" aria-hidden />}
+        label={
+          <>
+            {t("Created thread")}
+            {item.title ? ` · ${item.title}` : ""}
+          </>
+        }
         trailing={
           <InlineButton
-            aria-label={`Open ${item.title ?? "created thread"}`}
+            aria-label={t("Open {title}", { title: item.title ?? t("created thread") })}
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >
-            Open chat
+            {t("Open chat")}
           </InlineButton>
         }
       />

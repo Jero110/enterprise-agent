@@ -14,6 +14,7 @@ import { TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "../../appearanceFonts";
 import { writeLocalStorageValue } from "../../hooks/useLocalStorage";
 import { commandLabel } from "./KeybindingsSettings.logic";
 import type { ResolvedSettingsScope } from "./settingsScope";
+import { t } from "~/i18n";
 
 export type SettingsPath =
   | "/settings/projects"
@@ -718,18 +719,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     desktopOnly: true,
   },
   {
-    id: "mobile-app",
-    title: "Mobile app",
-    to: "/settings/about",
-    searchTerms: ["phone tablet iPhone iPad iOS Android App Store Google Play QR"],
-  },
-  {
-    id: "privacy-policy",
-    title: "Privacy policy",
-    to: "/settings/about",
-    searchTerms: ["telemetry analytics usage data tracking legal opt out"],
-  },
-  {
     id: "telemetry-export",
     title: "OpenTelemetry export",
     to: "/settings/diagnostics",
@@ -935,7 +924,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "pull-request-links-open-in-app",
-    title: "Open pull requests in T3 Code",
+    title: "Open pull requests in Norai",
     to: "/settings/diffs",
     searchTerms: [
       `pr commit links ${SOURCE_CONTROL_HOST_LABELS} browser external click default pull request view panel`,
@@ -1183,6 +1172,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     secretsFeatureOnly: true,
   },
   {
+    id: "cite-wiki-sources",
+    title: "Cite team wiki sources",
+    to: "/settings/enterprise",
+    scope: "environment-defaults",
+    searchTerms: ["fuentes sources citations references knowledge pages answers enterprise"],
+  },
+  {
     id: "archive",
     title: "Archived threads",
     to: "/settings/archived",
@@ -1372,26 +1368,31 @@ export function searchSettings(
   return settingsForThisPlatform(items)
     .flatMap((item, index) => {
       const title = normalizeSearchText(item.title);
+      // Titles stay English for matching; the shown (translated) text is searchable too.
+      const shownTitle = normalizeSearchText(t(item.title));
       const fields = [
         title,
         normalizeSearchText(SETTINGS_SECTION_LABELS[item.to]),
         ...(item.searchTerms ?? []).map(normalizeSearchText),
+        shownTitle,
+        normalizeSearchText(t(SETTINGS_SECTION_LABELS[item.to])),
       ];
       if (!queryTokens.every((token) => fields.some((field) => field.includes(token)))) return [];
 
       const exactPhraseField = fields.findIndex((field) => field.includes(normalizedQuery));
-      const rank =
-        title === normalizedQuery
+      const titleRank = (candidate: string) =>
+        candidate === normalizedQuery
           ? 5
-          : title.startsWith(normalizedQuery)
+          : candidate.startsWith(normalizedQuery)
             ? 4
-            : title.includes(normalizedQuery)
+            : candidate.includes(normalizedQuery)
               ? 3
-              : queryTokens.every((token) => title.includes(token))
+              : queryTokens.every((token) => candidate.includes(token))
                 ? 2
                 : exactPhraseField >= 0
                   ? 1
                   : 0;
+      const rank = Math.max(titleRank(title), titleRank(shownTitle));
       return [{ item, index, rank }];
     })
     .toSorted(

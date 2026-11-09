@@ -5,6 +5,7 @@ import {
   T3_CODE_BROWSER_TOOL_INSTRUCTIONS,
   T3_CODE_DEVICE_TOOL_INSTRUCTIONS,
   T3_CODE_ORCHESTRATION_SECTIONS,
+  T3_CODE_WIKI_SOURCES_INSTRUCTIONS,
 } from "@t3tools/provider-core/server/orchestrationInstructions";
 
 /** Codex silently truncates additionalContext values over 1,000 tokens, counted as UTF-8 bytes / 4. */
@@ -41,6 +42,7 @@ export interface CodexRuntimeInfo {
 export function buildCodexAdditionalContext(
   runtime: CodexRuntimeInfo,
   toolsAvailable: boolean | T3CodeToolAvailability = true,
+  citeWikiSources = true,
 ): Record<string, V2TurnStartParams__AdditionalContextEntry> {
   const tools = toolInstructions(toolsAvailable);
   // Split values to fit per-entry caps; number keys because Codex emits them in key order.
@@ -56,5 +58,8 @@ export function buildCodexAdditionalContext(
       value: buildRuntimeInstructions({ harness: "Codex", ...runtime }),
     },
     ...(tools ? { t3_code_tools: { kind: "application", value: tools } } : {}),
+    ...(citeWikiSources
+      ? { t3_code_wiki_sources: { kind: "application", value: T3_CODE_WIKI_SOURCES_INSTRUCTIONS } }
+      : {}),
   };
 }

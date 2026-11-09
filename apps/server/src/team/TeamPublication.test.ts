@@ -9,6 +9,8 @@ import * as Result from "effect/Result";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
+
 import * as TeamPublication from "./TeamPublication.ts";
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 import * as EnterpriseHub from "../enterprise/EnterpriseHub.ts";
@@ -40,9 +42,14 @@ const summary = (threadId: string, parentThreadId: string | null = null) => ({
 const messages = [
   { role: "assistant" as const, text: "compact text", createdAt: "2026-11-05T00:00:00Z" },
 ];
+const bruno = "ent.test.bruno@gmail.com";
+const ines = "ent.test.ines@gmail.com";
+const gerry = "ent.test.gerry@gmail.com";
+const jero = "jeronimo.deli@gmail.com";
+const moreMembers = [bruno, ines, gerry];
 const enroll = Effect.gen(function* () {
   const hub = yield* EnterpriseHub.EnterpriseHub;
-  for (const email of [hugo, juan, ana, "jeronimo.deli@gmail.com"]) {
+  for (const email of [hugo, juan, ana, "jeronimo.deli@gmail.com", ...moreMembers]) {
     yield* hub.enroll(email, { email, token: "ACME-BANK-DEV-2026" });
   }
 });
@@ -118,6 +125,59 @@ describe("TeamPublication hub", () => {
     }).pipe(Effect.provide(layer)),
   );
 
+  it.effect("summary shares store and serve only the request and the result", () =>
+    Effect.gen(function* () {
+      yield* enroll;
+      const pub = yield* TeamPublication.TeamPublication;
+      const sql = yield* SqlClient.SqlClient;
+      const transcript = [
+        { role: "user" as const, text: "Find last promo's %", createdAt: "2026-11-09T10:00:00Z" },
+        { role: "assistant" as const, text: "Searching Ventas", createdAt: "2026-11-09T10:01:00Z" },
+        { role: "user" as const, text: "private follow-up", createdAt: "2026-11-09T10:05:00Z" },
+        {
+          role: "assistant" as const,
+          text: "The promo was 15%.\nWorked for 7 min",
+          createdAt: "2026-11-09T10:09:00Z",
+        },
+      ];
+      yield* pub.report(hugo, {
+        summaries: [summary("parent"), summary("child", "parent")],
+        snapshots: [],
+      });
+      yield* pub.publish(hugo, { threadId: "parent", status: "summary" });
+      yield* pub.report(hugo, {
+        summaries: [],
+        snapshots: ["parent", "child"].map((threadId) => ({ threadId, messages: transcript })),
+      });
+      expect((yield* pub.list(juan)).map((thread) => thread.publicationStatus)).toEqual([
+        "summary",
+        "summary",
+      ]);
+      const expected = [
+        { role: "user", text: "Find last promo's %", createdAt: "2026-11-09T10:09:00Z" },
+        { role: "assistant", text: "The promo was 15%.", createdAt: "2026-11-09T10:09:00Z" },
+      ];
+      for (const threadId of ["parent", "child"]) {
+        expect((yield* pub.get(juan, { ownerEmail: hugo, threadId })).messages).toEqual(expected);
+      }
+      const stored = yield* sql<{
+        readonly snapshot_json: string;
+      }>`SELECT snapshot_json FROM enterprise_team_threads WHERE snapshot_json IS NOT NULL`;
+      expect(stored).toHaveLength(2);
+      for (const row of stored) expect(row.snapshot_json).not.toContain("private follow-up");
+      // Switching views drops the stored snapshot instead of serving it under the new view.
+      yield* pub.publish(hugo, { threadId: "parent", status: "read-only" });
+      expect(yield* denied(pub.get(juan, { ownerEmail: hugo, threadId: "parent" }))).toBe(true);
+      yield* pub.report(hugo, {
+        summaries: [],
+        snapshots: [{ threadId: "parent", messages: transcript }],
+      });
+      expect((yield* pub.get(juan, { ownerEmail: hugo, threadId: "parent" })).messages).toEqual(
+        transcript,
+      );
+    }).pipe(Effect.provide(layer)),
+  );
+
   it.effect("rechecks current membership and rejects cyclic lineage", () =>
     Effect.gen(function* () {
       yield* enroll;
@@ -167,5 +227,74 @@ describe("TeamPublication hub", () => {
         );
       }).pipe(Effect.provide(at), Effect.scoped);
     }).pipe(Effect.scoped, Effect.provide(base)),
+  );
+
+  it.effect("a share names who reads it; bosses read shares, nobody reads what isn't shared", () =>
+    Effect.gen(function* () {
+      yield* enroll;
+      const pub = yield* TeamPublication.TeamPublication;
+      const sees = (viewer: string) =>
+        Effect.gen(function* () {
+          const listed = (yield* pub.list(viewer)).some((thread) => thread.threadId === "parent");
+          const readable = !(yield* denied(
+            pub.get(viewer, { ownerEmail: hugo, threadId: "parent" }),
+          ));
+          expect(listed).toBe(readable);
+          return readable;
+        });
+      const who = Effect.gen(function* () {
+        const result: Record<string, boolean> = {};
+        for (const viewer of [juan, ines, bruno, ana, gerry, jero])
+          result[viewer] = yield* sees(viewer);
+        return result;
+      });
+      yield* pub.report(hugo, { summaries: [summary("parent")], snapshots: [] });
+      // Hugo (Frontend) shares only with Bruno, from Ledger.
+      yield* pub.publish(hugo, {
+        threadId: "parent",
+        status: "read-only",
+        audienceKeys: [teamMemberKey(bruno)],
+      });
+      yield* pub.report(hugo, { summaries: [], snapshots: [{ threadId: "parent", messages }] });
+      expect(yield* who).toEqual({
+        [juan]: false,
+        [ines]: false,
+        [bruno]: true,
+        [ana]: false,
+        [gerry]: true,
+        [jero]: true,
+      });
+      expect((yield* pub.list(hugo))[0]?.audienceKeys).toEqual([teamMemberKey(bruno)]);
+      expect((yield* pub.list(bruno))[0]?.audienceKeys).toBeUndefined();
+      expect(
+        yield* denied(
+          pub.publish(hugo, {
+            threadId: "parent",
+            status: "read-only",
+            audienceKeys: [teamMemberKey("outsider@example.com")],
+          }),
+        ),
+      ).toBe(true);
+      // Back to the whole team: Bruno loses access, Hugo's teammates gain it.
+      yield* pub.publish(hugo, { threadId: "parent", status: "summary" });
+      yield* pub.report(hugo, { summaries: [], snapshots: [{ threadId: "parent", messages }] });
+      expect(yield* who).toEqual({
+        [juan]: true,
+        [ines]: true,
+        [bruno]: false,
+        [ana]: false,
+        [gerry]: true,
+        [jero]: true,
+      });
+      yield* pub.publish(hugo, { threadId: "parent", status: "unpublished" });
+      expect(yield* who).toEqual({
+        [juan]: false,
+        [ines]: false,
+        [bruno]: false,
+        [ana]: false,
+        [gerry]: false,
+        [jero]: false,
+      });
+    }).pipe(Effect.provide(layer)),
   );
 });

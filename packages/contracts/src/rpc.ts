@@ -67,6 +67,12 @@ import {
   TeamPublicationResult,
 } from "./teamActivity.ts";
 import {
+  TeamMessage,
+  TeamMessageDecideInput,
+  TeamMessageReference,
+  TeamMessageSendInput,
+} from "./teamMessages.ts";
+import {
   ChatGptReconnectProfileInput,
   ChatGptReconnectProfile,
   ChatGptImportProfileInput,
@@ -556,6 +562,10 @@ export const WS_METHODS = {
   teamThreadGet: "team.thread.get",
   teamThreadContinue: "team.thread.continue",
   teamThreadPublish: "team.thread.publish",
+  teamMessagesList: "team.messages.list",
+  teamMessageSend: "team.message.send",
+  teamMessageRead: "team.message.read",
+  teamMessageDecide: "team.message.decide",
   projectBoardGet: "projectBoard.get",
   projectBoardSave: "projectBoard.save",
   enterpriseStatus: "enterprise.status",
@@ -936,6 +946,26 @@ const WsTeamThreadContinueRpc = Rpc.make(WS_METHODS.teamThreadContinue, {
 const WsTeamThreadPublishRpc = Rpc.make(WS_METHODS.teamThreadPublish, {
   payload: TeamThreadPublishInput,
   success: TeamPublicationResult,
+  error: enterpriseError,
+});
+const WsTeamMessagesListRpc = Rpc.make(WS_METHODS.teamMessagesList, {
+  payload: Schema.Struct({}),
+  success: Schema.Array(TeamMessage),
+  error: enterpriseError,
+});
+const WsTeamMessageSendRpc = Rpc.make(WS_METHODS.teamMessageSend, {
+  payload: TeamMessageSendInput,
+  success: TeamMessage,
+  error: enterpriseError,
+});
+const WsTeamMessageReadRpc = Rpc.make(WS_METHODS.teamMessageRead, {
+  payload: TeamMessageReference,
+  success: TeamMessage,
+  error: enterpriseError,
+});
+const WsTeamMessageDecideRpc = Rpc.make(WS_METHODS.teamMessageDecide, {
+  payload: TeamMessageDecideInput,
+  success: TeamMessage,
   error: enterpriseError,
 });
 
@@ -2202,6 +2232,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsTeamThreadGetRpc,
   WsTeamThreadContinueRpc,
   WsTeamThreadPublishRpc,
+  WsTeamMessagesListRpc,
+  WsTeamMessageSendRpc,
+  WsTeamMessageReadRpc,
+  WsTeamMessageDecideRpc,
   WsProjectBoardGetRpc,
   WsProjectBoardSaveRpc,
   WsEnterpriseStatusRpc,

@@ -65,6 +65,7 @@ import * as OtlpEndpointCheck from "./observability/OtlpEndpointCheck.ts";
 import * as PairingGrantStore from "./auth/PairingGrantStore.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as TeamContinuation from "./team/TeamContinuation.ts";
+import * as TeamMessenger from "./team/TeamMessenger.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import * as ProjectBoards from "./project/ProjectBoards.ts";
 import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
@@ -691,6 +692,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(PairingGrantStore.PairingGrantStore)({}),
   Layer.mock(EnterpriseClient.EnterpriseClient)({}),
   Layer.mock(TeamContinuation.TeamContinuation)({}),
+  Layer.mock(TeamMessenger.TeamMessenger)({}),
   Layer.mock(TeamReporter.TeamReporter)({}),
   Layer.mock(ThreadKnowledge.ThreadKnowledge)({}),
   Layer.mock(ProjectBoards.ProjectBoards)({}),

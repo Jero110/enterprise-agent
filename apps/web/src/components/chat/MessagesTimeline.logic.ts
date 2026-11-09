@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
 import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
 import { isLiveSubagentTurnItem } from "@t3tools/client-runtime/state/subagentRuntime";
@@ -131,11 +132,43 @@ function workEntryReadPaths(entry: WorkLogEntry, workspaceRoot: string | undefin
   );
 }
 
+const TOOL_LABEL_FIXED: Readonly<Record<string, () => string>> = {
+  "Ran command": () => t("Ran command"),
+  "Read file": () => t("Read file"),
+  "Changed files": () => t("Changed files"),
+  "Searched files": () => t("Searched files"),
+  "Searched the web": () => t("Searched the web"),
+  Thinking: () => t("Thinking", undefined, "timeline"),
+  "Checkpoint captured": () => t("Checkpoint captured"),
+};
+
+/**
+ * Shows the tool labels built in English (shared packages, server) in the UI language. Only
+ * known fixed labels and the "Read …", "Searched …" and "Changed N files" shapes are rewritten.
+ */
+function localizeToolLabel(label: string): string {
+  const more = /^(.+) \+(\d+) more$/.exec(label);
+  if (more) {
+    return t("{label} +{count} more", { label: localizeToolLabel(more[1]!), count: more[2]! });
+  }
+  const fixed = TOOL_LABEL_FIXED[label];
+  if (fixed) return fixed();
+  const changed = /^Changed (\d+) files$/.exec(label);
+  if (changed) return t("Changed {count} files", { count: changed[1]! });
+  const searchedFiles = /^Searched files (.+)$/.exec(label);
+  if (searchedFiles) return t("Searched files {target}", { target: searchedFiles[1]! });
+  const searched = /^Searched (.+)$/.exec(label);
+  if (searched) return t("Searched {target}", { target: searched[1]! });
+  const read = /^Read (.+)$/.exec(label);
+  if (read) return t("Read {target}", { target: read[1]! });
+  return label;
+}
+
 export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string | undefined) {
   if (entry.itemType === "system_notice") return entry.label;
   if (entry.itemType === "reasoning" || entry.tone === "thinking") {
     const thought = entry.detail?.trim().replace(/\s+/g, " ");
-    return thought || entry.label;
+    return thought || localizeToolLabel(entry.label);
   }
   const toolPresentation = resolveWorkEntryToolPresentation(entry);
   if (toolPresentation) return toolPresentation.displayName;
@@ -146,11 +179,11 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
       entry.itemType === "file_search"
         ? entry.label
         : formatSearchToolLabel(workEntryToolDataRecord(entry));
-    if (searchLabel) return searchLabel;
+    if (searchLabel) return localizeToolLabel(searchLabel);
   }
   const readPaths = action === "read" ? workEntryReadPaths(entry, workspaceRoot) : [];
   if (action === "read" && readPaths[0]) {
-    return formatReadToolLabel(readPaths[0], readPaths.length - 1);
+    return localizeToolLabel(formatReadToolLabel(readPaths[0], readPaths.length - 1));
   }
   const providerRetry =
     entry.projectedItem?.item.type === "error" && entry.projectedItem.item.retry !== undefined;
@@ -172,10 +205,10 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
       : `${path} +${entry.changedFiles!.length - 1} more`;
   }
   if (action === "read" && !entry.viewedImagePath) {
-    return "Read file";
+    return t("Read file");
   }
   const heading = normalizeCompactToolLabel(entry.toolTitle || entry.label);
-  return `${heading.charAt(0).toUpperCase()}${heading.slice(1)}`;
+  return localizeToolLabel(`${heading.charAt(0).toUpperCase()}${heading.slice(1)}`);
 }
 
 export function threadReadTargetId(entry: Pick<WorkLogEntry, "structuredPayload">) {
@@ -1175,11 +1208,11 @@ function deriveTurnFolds(input: {
     const duration = elapsedMs !== null ? formatDuration(elapsedMs) : null;
     const label = isLatestInterruptedTurn
       ? duration
-        ? `You stopped after ${duration}`
-        : "You stopped this response"
+        ? t("You stopped after {duration}", { duration })
+        : t("You stopped this response")
       : duration
-        ? `Worked for ${duration}`
-        : "Worked";
+        ? t("Worked for {duration}", { duration })
+        : t("Worked");
 
     // The top row keeps the whole turn's time, steers included. Work after a
     // steer folds under its own row below that steer, keyed apart from the run

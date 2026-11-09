@@ -1,4 +1,5 @@
 import { threadPullRequestLinkMode } from "@t3tools/client-runtime/thread-pull-request-compatibility";
+import { APP_BASE_NAME } from "~/branding";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 
 import {
@@ -262,6 +263,7 @@ import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "~/components/pullRequest/pullRequestListPreferences";
 import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
 import { threadRecentUse } from "@t3tools/shared/paletteSearch";
+import { t } from "~/i18n";
 
 const EMPTY_BROWSE_ENTRIES: FilesystemBrowseResult["entries"] = [];
 const ADD_PROJECT_ENTRY_GROUP = "add-project";
@@ -347,10 +349,10 @@ function CommandPaletteDialog(props: {
     <CommandDialogPopup
       aria-label={
         props.mode === "files"
-          ? "File picker"
+          ? t("File picker")
           : props.mode === "content"
-            ? "Search project contents"
-            : "Command palette"
+            ? t("Search project contents")
+            : t("Command palette")
       }
       className={cn("overflow-hidden", props.mode === "content" && "h-105")}
       data-command-palette="true"
@@ -857,7 +859,7 @@ function OpenCommandPaletteDialog(props: {
           kind: "action" as const,
           value: NEW_THREAD_NO_PROJECT_VALUE,
           searchTerms: ["no project", "without project", "none"],
-          title: "No project",
+          title: t("No project"),
           icon: <MessageSquareDashedIcon className={ITEM_ICON_CLASS} />,
           shortcutCommand: "chat.newWithoutProject" as const,
           run: () => startScratchThread(scratchTargetEnvironmentId),
@@ -996,8 +998,8 @@ function OpenCommandPaletteDialog(props: {
         kind: "action",
         value: `action:add-project:${environmentId}:local`,
         searchTerms: ["local", "folder", "directory", "browse"],
-        title: "Local folder",
-        description: "Browse a folder on disk",
+        title: t("Local folder"),
+        description: t("Browse a folder on disk"),
         icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
         keepOpen: true,
         run: async () => {
@@ -1011,8 +1013,8 @@ function OpenCommandPaletteDialog(props: {
         kind: "action",
         value: `action:add-project:${environmentId}:new`,
         searchTerms: ["new project", "create", "empty", "repository", "git init"],
-        title: "New project",
-        description: "Start a new Git repository from a name",
+        title: t("New project"),
+        description: t("Start a new Git repository from a name"),
         icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
         keepOpen: true,
         run: async () => {
@@ -1197,7 +1199,7 @@ function OpenCommandPaletteDialog(props: {
                 kind: "action",
                 value: "action:add-project:connect-environment",
                 searchTerms: ["connect", "environment", "connection", "settings"],
-                title: "Connect an environment",
+                title: t("Connect an environment"),
                 description: "No connected environment can add a project",
                 icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
                 keepOpen: true,
@@ -1242,10 +1244,10 @@ function OpenCommandPaletteDialog(props: {
         searchTerms: ["new thread", "chat", "create", "draft"],
         title: (
           <>
-            New thread in <span className="font-semibold">{activeProjectTitle}</span>
+            {t("New thread in")} <span className="font-semibold">{activeProjectTitle}</span>
           </>
         ),
-        searchTitle: `New thread in ${activeProjectTitle}`,
+        searchTitle: `${t("New thread in")} ${activeProjectTitle}`,
         icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
         shortcutCommand: "chat.newLocal",
         run: async () => {
@@ -1263,10 +1265,10 @@ function OpenCommandPaletteDialog(props: {
       kind: "submenu",
       value: "action:new-thread-in",
       searchTerms: ["new thread", "project", "pick", "choose", "select"],
-      title: "New thread in...",
+      title: t("New thread in..."),
       icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
       addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
-      groups: [{ value: NEW_THREAD_IN_GROUP, label: "Projects", items: projectThreadItems }],
+      groups: [{ value: NEW_THREAD_IN_GROUP, label: t("Projects"), items: projectThreadItems }],
     });
   }
 
@@ -1275,7 +1277,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:new-thread-without-project",
       searchTerms: ["new thread", "no project", "without project", "none", "chat"],
-      title: "New thread without a project",
+      title: t("New thread without a project"),
       icon: <MessageSquareDashedIcon className={ITEM_ICON_CLASS} />,
       shortcutCommand: "chat.newWithoutProject",
       run: () => startScratchThread(scratchTargetEnvironmentId),
@@ -1287,8 +1289,10 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:triage",
       searchTerms: ["triage", "bug", "issue", "report", "broken", "debug", "help", "support"],
-      title: "Triage an issue",
-      description: "An agent investigates a T3 Code problem and helps file an issue",
+      title: t("Triage an issue"),
+      description: t("An agent looks into a problem with {app} and helps you report it", {
+        app: APP_BASE_NAME,
+      }),
       icon: <BugIcon className={ITEM_ICON_CLASS} />,
       run: () => startTriage(triageEnvironmentId),
     });
@@ -1298,7 +1302,7 @@ function OpenCommandPaletteDialog(props: {
     actionItems.push({
       kind: "action",
       value: "find-current-thread",
-      title: "Find in current thread",
+      title: t("Find in current thread"),
       searchTerms: ["find", "search", "messages", "plans"],
       icon: <TextSearchIcon className={ITEM_ICON_CLASS} />,
       shortcutCommand: "chat.find",
@@ -1338,7 +1342,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:copy-prompt-link",
       searchTerms: ["copy", "share", "prompt", "link"],
-      title: "Copy prompt link",
+      title: t("Copy prompt link"),
       icon: <LinkIcon className={ITEM_ICON_CLASS} />,
       run: () => copyPromptLink(plainPromptLink),
     });
@@ -1349,7 +1353,7 @@ function OpenCommandPaletteDialog(props: {
           kind: "action",
           value: "action:copy-prompt-link-with-context",
           searchTerms: ["copy", "share", "prompt", "link", "repository", "model"],
-          title: "Copy prompt link with repo and model",
+          title: t("Copy prompt link with repo and model"),
           icon: <LinkIcon className={ITEM_ICON_CLASS} />,
           run: () => copyPromptLink(contextLink),
         });
@@ -1366,7 +1370,9 @@ function OpenCommandPaletteDialog(props: {
           ? ["copy", "pull request", "link", "reference"]
           : ["copy", "thread", "thread id", "reference"],
       title:
-        activeThreadReferenceCopyTarget.kind === "pull-request" ? "Copy PR link" : "Copy thread",
+        activeThreadReferenceCopyTarget.kind === "pull-request"
+          ? t("Copy PR link")
+          : t("Copy thread"),
       description: activeThreadReferenceCopyTarget.description,
       icon: <LinkIcon className={ITEM_ICON_CLASS} />,
       shortcutCommand: "thread.copyReference",
@@ -1383,7 +1389,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:link-pull-request",
       searchTerms: ["link", "pull request", "pr", "attach", "stack"],
-      title: "Link pull request to thread",
+      title: t("Link pull request to thread"),
       icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
       run: async () => {
         openLinkPullRequestDialog(threadRef);
@@ -1393,7 +1399,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:open-thread-pull-requests",
       searchTerms: ["pull requests", "linked", "stack", "prs"],
-      title: "Show linked pull requests",
+      title: t("Show linked pull requests"),
       disabled: visibleThreadPullRequests(activeThread.pullRequests).length === 0,
       icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
       run: async () => {
@@ -1408,7 +1414,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:share-thread-with-guest",
       searchTerms: ["share", "guest", "invite", "link", "teammate"],
-      title: "Share with guest",
+      title: t("Share with guest"),
       icon: <UserPlusIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
         openGuestShareDialog(threadRef);
@@ -1422,7 +1428,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:restart-agent-session",
       searchTerms: ["restart", "reset", "reload", "agent", "session", "skills", "plugins", "mcp"],
-      title: "Restart agent session",
+      title: t("Restart agent session"),
       icon: <RotateCcwIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
         const { environmentId } = thread;
@@ -1435,8 +1441,8 @@ function OpenCommandPaletteDialog(props: {
         }
         toastManager.add({
           type: "success",
-          title: "Agent session will restart",
-          description: "Your next message starts a fresh session.",
+          title: t("Agent session will restart"),
+          description: t("Your next message starts a fresh session."),
         });
         const project = projectByKey.get(`${environmentId}:${thread.projectId}`);
         if (!project) return;
@@ -1457,7 +1463,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:open-file-picker",
     searchTerms: ["go to file", "open file", "file picker", "find file", "quick open"],
-    title: "Go to file",
+    title: t("Go to file"),
     icon: <FileSearchIcon className={ITEM_ICON_CLASS} />,
     keepOpen: true,
     shortcutCommand: "filePicker.toggle",
@@ -1470,7 +1476,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:search-project-contents",
     searchTerms: ["search project", "find in files", "grep", "content search", "text search"],
-    title: "Search project contents",
+    title: t("Search project contents"),
     icon: <TextSearchIcon className={ITEM_ICON_CLASS} />,
     keepOpen: true,
     shortcutCommand: "projectSearch.toggle",
@@ -1484,7 +1490,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:new-project",
       searchTerms: ["new project", "create project", "empty", "repository", "repo", "git init"],
-      title: "New project",
+      title: t("New project"),
       icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
       keepOpen: true,
       run: async () => {
@@ -1515,7 +1521,7 @@ function OpenCommandPaletteDialog(props: {
       "url",
       "environment",
     ],
-    title: "Add project",
+    title: t("Add project"),
     icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
     keepOpen: true,
     run: async () => {
@@ -1529,7 +1535,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:add-project:wsl-folder",
       searchTerms: ["add project", "open", "wsl", "linux", "folder", "directory"],
-      title: "Open WSL folder",
+      title: t("Open WSL folder"),
       description: wslAddProjectEnvironmentOption.label,
       icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
       keepOpen: true,
@@ -1564,7 +1570,7 @@ function OpenCommandPaletteDialog(props: {
         "merge",
         "branch",
       ],
-      title: "Open pull requests",
+      title: t("Open pull requests"),
       icon: <PullRequestGlyph.pullRequest className={ITEM_ICON_CLASS} />,
       run: async () => {
         await navigate({ to: "/pull-requests", search: readPullRequestListPreferences() });
@@ -1576,7 +1582,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:usage",
     searchTerms: ["usage", "use", "tokens", "cost", "spend", "limits", "stats", "analytics"],
-    title: "Open usage",
+    title: t("Open usage"),
     icon: <ChartNoAxesColumnIcon className={ITEM_ICON_CLASS} />,
     shortcutCommand: "usage.open",
     run: async () => {
@@ -1585,7 +1591,8 @@ function OpenCommandPaletteDialog(props: {
   });
 
   for (const direction of [1, -1] as const) {
-    const title = direction === 1 ? "Focus Next Workspace Area" : "Focus Previous Workspace Area";
+    const title =
+      direction === 1 ? t("Focus Next Workspace Area") : t("Focus Previous Workspace Area");
     actionItems.push({
       kind: "action",
       value: `action:workspace-focus:${direction}`,
@@ -1603,7 +1610,7 @@ function OpenCommandPaletteDialog(props: {
     kind: "action",
     value: "action:settings",
     searchTerms: ["settings", "preferences", "configuration", "keybindings"],
-    title: "Open settings",
+    title: t("Open settings"),
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
       await navigate({ to: "/settings" });
@@ -1626,7 +1633,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:project-pin",
       searchTerms: ["pin", "unpin", "project", "favorite"],
-      title: currentProjectGroup.pinned ? "Unpin project" : "Pin project",
+      title: currentProjectGroup.pinned ? t("Unpin project") : t("Pin project"),
       description: currentProjectGroup.displayName,
       icon: currentProjectGroup.pinned ? (
         <PinOffIcon className={ITEM_ICON_CLASS} />
@@ -1654,7 +1661,7 @@ function OpenCommandPaletteDialog(props: {
         "remove",
         "t3.json",
       ],
-      title: "Project settings",
+      title: t("Project settings"),
       description: contextualProjectGroup.displayName,
       icon: <FolderIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
@@ -2257,8 +2264,8 @@ function OpenCommandPaletteDialog(props: {
               kind: "action",
               value: "new-project:existing",
               searchTerms: [],
-              title: "Add existing project",
-              description: "Open a folder or clone a repository",
+              title: t("Add existing project"),
+              description: t("Open a folder or clone a repository"),
               icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
               titleTrailingContent: (
                 <ChevronRightIcon className="-me-0.5 ms-auto size-4 shrink-0 text-muted-foreground/70" />
@@ -2337,9 +2344,11 @@ function OpenCommandPaletteDialog(props: {
 
   const inputPlaceholder =
     newProjectFlow !== null
-      ? "Project name"
-      : (remoteProjectInputPlaceholder(addProjectCloneFlow) ??
-        getCommandPaletteInputPlaceholder(paletteMode));
+      ? t("Project name")
+      : t(
+          remoteProjectInputPlaceholder(addProjectCloneFlow) ??
+            getCommandPaletteInputPlaceholder(paletteMode),
+        );
   const isSubmenu = paletteMode === "submenu" || paletteMode === "submenu-browse";
   const hasHighlightedBrowseItem = highlightedItemValue?.startsWith("browse:") ?? false;
   const canWriteSourceControl = useEnvironmentScope(
@@ -2762,7 +2771,7 @@ function OpenCommandPaletteDialog(props: {
       />
     ) : null;
 
-  const footerActionLabel =
+  const untranslatedFooterActionLabel =
     newProjectFlow !== null
       ? highlightedItemValue === null
         ? "Create"
@@ -2774,6 +2783,8 @@ function OpenCommandPaletteDialog(props: {
         : !canSubmitBrowsePath || hasHighlightedBrowseItem
           ? "Select"
           : undefined;
+  const footerActionLabel =
+    untranslatedFooterActionLabel === undefined ? undefined : t(untranslatedFooterActionLabel);
 
   const footerTrailing = canOpenProjectFromFileManager ? (
     <CommandFooterAction

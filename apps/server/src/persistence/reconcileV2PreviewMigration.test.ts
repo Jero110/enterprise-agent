@@ -66,6 +66,11 @@ describe("V2 preview upgrade", () => {
         [84, "RunRecords"],
         [85, "ThreadKnowledgeOff"],
         [86, "EnterpriseAreaRoles"],
+        [87, "ProjectBoards"],
+        [88, "TeamPublicationSummary"],
+        [89, "TeamMessages"],
+        [90, "TeamMessageTasks"],
+        [91, "TeamThreadAudience"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -175,6 +180,11 @@ describe("V2 preview upgrade", () => {
         [84, "RunRecords"],
         [85, "ThreadKnowledgeOff"],
         [86, "EnterpriseAreaRoles"],
+        [87, "ProjectBoards"],
+        [88, "TeamPublicationSummary"],
+        [89, "TeamMessages"],
+        [90, "TeamMessageTasks"],
+        [91, "TeamThreadAudience"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

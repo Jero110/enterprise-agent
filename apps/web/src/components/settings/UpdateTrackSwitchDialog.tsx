@@ -30,6 +30,7 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
+import { t } from "~/i18n";
 
 /** Moves this app and every connected machine to `channel`. */
 export function UpdateTrackSwitchDialog({
@@ -44,22 +45,27 @@ export function UpdateTrackSwitchDialog({
   if (AsyncResult.isSuccess(release) && release.value !== null) {
     return <SwitchPlan release={{ channel, ...release.value }} onClose={onClose} />;
   }
-  const label = channelSwitchLabel(channel);
+  const label = t(channelSwitchLabel(channel));
   return (
     <AlertDialog open onOpenChange={(open) => !open && onClose()}>
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Switch to {label}</AlertDialogTitle>
+          <AlertDialogTitle>{t("Switch to {label}", { label })}</AlertDialogTitle>
           <AlertDialogDescription>
             {AsyncResult.isFailure(release)
               ? npmReleaseFailureMessage(release.cause)
               : AsyncResult.isSuccess(release)
-                ? `Could not find the latest ${label} release in this environment's npm registry.`
-                : "Checking releases…"}
+                ? t(
+                    "Could not find the latest {label} release in this environment's npm registry.",
+                    {
+                      label,
+                    },
+                  )
+                : t("Checking releases…")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>{t("Cancel")}</AlertDialogClose>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
@@ -81,7 +87,7 @@ function SwitchPlan({
   const switchesLocal = crossesLocal && !updatesOff;
   const [checking, setChecking] = useState(false);
   const everything = useUpdateEverything(switchesLocal ? release.version : null, release);
-  const label = channelSwitchLabel(release.channel);
+  const label = t(channelSwitchLabel(release.channel));
   // This app's reinstall restarts every server it hosts, so each of their databases must allow it.
   const localBlocked = localSwitchBlockReason(
     APP_VERSION,
@@ -100,7 +106,11 @@ function SwitchPlan({
     setChecking(true);
     const fail = (description: string) =>
       toastManager.add(
-        stackedThreadToast({ type: "error", title: `Could not switch to ${label}`, description }),
+        stackedThreadToast({
+          type: "error",
+          title: t("Could not switch to {label}", { label }),
+          description,
+        }),
       );
     const prepared = await prepareLocalTrackSwitch(bridge, {
       channel: release.channel,
@@ -132,8 +142,11 @@ function SwitchPlan({
                   !acceptsTrackSwitchRelease(downloadedVersion, release.channel, release.version)
                 ) {
                   reportError(
-                    "Could not install update",
-                    `This app downloaded ${downloadedVersion ?? "nothing"}, not ${release.version} or newer.`,
+                    t("Could not install update"),
+                    t("This app downloaded {downloaded}, not {version} or newer.", {
+                      downloaded: downloadedVersion ?? t("nothing"),
+                      version: release.version,
+                    }),
                   );
                   return false;
                 }
@@ -144,7 +157,7 @@ function SwitchPlan({
     );
     if (result._tag === "Failure") {
       const error = squashAtomCommandFailure(result);
-      fail(error instanceof Error ? error.message : "An unexpected error occurred.");
+      fail(error instanceof Error ? error.message : t("An unexpected error occurred."));
     }
   };
 
@@ -152,26 +165,32 @@ function SwitchPlan({
     <UpdateEverythingDialog
       open
       onOpenChange={(open) => !open && !checking && onClose()}
-      title={`Switch to ${label}?`}
+      title={t("Switch to {label}?", { label })}
       version={release.version}
       providerCount={0}
       rows={everything.rows}
       notes={[
         ...(everything.rows.length === 0 && !crossesLocal
-          ? [`Every connected machine is already on ${label}. This only saves the track.`]
+          ? [
+              t("Every connected machine is already on {label}. This only saves the track.", {
+                label,
+              }),
+            ]
           : []),
         ...(crossesLocal && updatesOff
-          ? ["This app's updates are off here, so reinstall it yourself to switch."]
+          ? [t("This app's updates are off here, so reinstall it yourself to switch.")]
           : []),
         ...(switchesLocal && isMacPlatform(navigator.platform)
-          ? ["If T3 Code does not reopen after it restarts, open it again."]
+          ? [t("If T3 Code does not reopen after it restarts, open it again.")]
           : []),
       ]}
       restarts={everything.restarts}
-      confirmLabel={checking ? "Checking…" : `Switch to ${label}`}
+      confirmLabel={checking ? t("Checking…") : t("Switch to {label}", { label })}
       busy={checking}
       disabledReason={
-        !switchesLocal || localBlocked === null ? null : `This app cannot switch: ${localBlocked}.`
+        !switchesLocal || localBlocked === null
+          ? null
+          : t("This app cannot switch: {reason}.", { reason: localBlocked })
       }
       onConfirm={() => void run()}
     />

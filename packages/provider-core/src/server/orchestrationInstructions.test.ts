@@ -4,10 +4,28 @@ import {
   T3_CODE_DEVICE_TOOL_INSTRUCTIONS,
   T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH,
   T3_CODE_ORCHESTRATION_INSTRUCTIONS,
+  T3_CODE_WIKI_SOURCES_INSTRUCTIONS,
   t3AcpPromptWithInstructions,
   t3OrchestrationPrompt,
   t3OrchestrationSystemPrompt,
 } from "./orchestrationInstructions.ts";
+
+describe("Team wiki sources instructions", () => {
+  it("cite each wiki page used by title, layer and path, in the user's language", () => {
+    for (const intent of [
+      "`knowledge_search`",
+      "`knowledge_get`",
+      '"Fuentes" in Spanish',
+      "`- <title> · <area>`",
+      "company for `global/` pages",
+      "No wiki content used: no list.",
+    ]) {
+      assert.include(T3_CODE_WIKI_SOURCES_INSTRUCTIONS, intent);
+    }
+    // Opt-in per session: the shared orchestration block never carries it.
+    assert.notInclude(T3_CODE_ORCHESTRATION_INSTRUCTIONS, "## Team wiki sources");
+  });
+});
 
 describe("T3 device instructions", () => {
   it("route device work through device_open and give Claude the line that loads the tools", () => {

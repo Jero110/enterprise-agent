@@ -1,11 +1,12 @@
 import { useAtomValue } from "@effect/atom-react";
+import { t } from "~/i18n";
 import { serverUpdateStateAtom } from "@t3tools/client-runtime/state/server";
 import { EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { AsyncResult, Atom } from "effect/reactivity";
 
-import { APP_VERSION } from "~/branding";
+import { APP_BASE_NAME, APP_VERSION } from "~/branding";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { desktopUpdateStateAtom } from "~/state/desktopUpdate";
 import { serverEnvironment } from "~/state/server";
@@ -341,8 +342,11 @@ export function startDesktopUpdateLaunchNotice(): () => void {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Update did not apply",
-          description: `T3 Code is still on ${APP_VERSION}. Install ${notAppliedVersion} again from the update button.`,
+          title: t("Update did not apply"),
+          description: t(
+            "{app} is still on {current}. Install {next} again from the update button.",
+            { app: APP_BASE_NAME, current: APP_VERSION, next: notAppliedVersion },
+          ),
         }),
       );
     },

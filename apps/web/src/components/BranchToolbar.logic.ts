@@ -9,6 +9,8 @@ import * as Schema from "effect/Schema";
 import { sanitizeNewRefName } from "@t3tools/shared/git";
 import { workspaceRelativeFilePath } from "@t3tools/shared/path";
 import { toSortableTimestamp } from "@t3tools/client-runtime/state/thread-sort";
+
+import { t } from "~/i18n";
 export { deriveLocalBranchNameFromRemoteRef, sanitizeNewRefName } from "@t3tools/shared/git";
 
 export interface EnvironmentOption {
@@ -90,7 +92,18 @@ export function resolveContextStripLabelsCompact(input: {
 }
 
 export function resolveEnvModeLabel(mode: EnvMode): string {
-  return mode === "worktree" ? "New worktree" : "Current checkout";
+  return mode === "worktree" ? t("New worktree") : t("Current checkout");
+}
+
+/** A plain-language explanation of where the agent works, for tooltips. */
+export function resolveWorkspaceDescription(
+  activeWorktreePath: string | null,
+  effectiveEnvMode: EnvMode,
+): string {
+  if (activeWorktreePath) return t("The agent works in this chat's own copy of the project.");
+  return effectiveEnvMode === "worktree"
+    ? t("The agent works on a separate copy, so your folder stays untouched until you decide.")
+    : t("The agent works directly in your project folder.");
 }
 
 export const WORKTREE_SUBMODULES_LABELS: Record<WorktreeSubmodules, string> = {
@@ -100,15 +113,15 @@ export const WORKTREE_SUBMODULES_LABELS: Record<WorktreeSubmodules, string> = {
 };
 
 export function resolveCurrentWorkspaceLabel(activeWorktreePath: string | null): string {
-  return activeWorktreePath ? "Current worktree" : resolveEnvModeLabel("local");
+  return activeWorktreePath ? t("Current worktree") : resolveEnvModeLabel("local");
 }
 
 export function resolveLockedWorkspaceLabel(
   activeWorktreePath: string | null,
   effectiveEnvMode: EnvMode,
 ): string {
-  if (activeWorktreePath) return "Worktree";
-  return effectiveEnvMode === "worktree" ? resolveEnvModeLabel("worktree") : "Local checkout";
+  if (activeWorktreePath) return t("Worktree");
+  return effectiveEnvMode === "worktree" ? resolveEnvModeLabel("worktree") : t("Local checkout");
 }
 
 export interface PreviousWorktreeSeed {
@@ -212,13 +225,13 @@ export function resolveBranchTriggerLabel(input: {
     startFromOrigin,
   } = input;
   if (!resolvedActiveBranch) {
-    return "Select ref";
+    return t("Select ref");
   }
   if (effectiveEnvMode === "worktree" && !activeWorktreePath) {
     // Only the server can determine a local branch's configured remote.
     return startFromOrigin && resolvedActiveBranchIsRemote === false
-      ? `From ${resolvedActiveBranch} (remote)`
-      : `From ${resolvedActiveBranch}`;
+      ? t("From {branch} (remote)", { branch: resolvedActiveBranch })
+      : t("From {branch}", { branch: resolvedActiveBranch });
   }
   return resolvedActiveBranch;
 }

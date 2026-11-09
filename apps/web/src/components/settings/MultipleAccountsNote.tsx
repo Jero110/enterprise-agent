@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { t } from "~/i18n";
 import type { EnvironmentId, ProviderDriverKind } from "@t3tools/contracts";
 import { InfoIcon } from "lucide-react";
 
@@ -34,14 +35,16 @@ export function MultipleAccountsNote({
       <InfoIcon aria-hidden />
       <AlertDescription>
         <p>
-          We do not recommend managing multiple {providerName} accounts in T3 Code.{" "}
+          {t("We do not recommend managing multiple {name} accounts in T3 Code.", {
+            name: providerName ?? "",
+          })}{" "}
           <a
             href={MULTIPLE_ACCOUNTS_FAQ_URL}
             target="_blank"
             rel="noreferrer"
             className="underline underline-offset-2 hover:text-foreground"
           >
-            More info
+            {t("More info")}
           </a>
         </p>
       </AlertDescription>

@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
 import {
@@ -389,7 +390,7 @@ function SidebarControl() {
                 "pointer-events-auto",
                 isSidebarVisible && stageBackdropVariant && "relative top-auto translate-y-0",
               )}
-              aria-label="Toggle main sidebar"
+              aria-label={t("Toggle main sidebar")}
             />
           }
         />
