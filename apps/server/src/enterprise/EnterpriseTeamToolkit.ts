@@ -42,7 +42,7 @@ export const EnterpriseTeamToolkit = Toolkit.make(
     ...shared,
     description:
       "List the people in this environment's Enterprise (name, team and memberKey) so you can address a card to one of them with enterprise_card_send. Requires an active calling thread.",
-    parameters: Schema.Struct({}),
+    parameters: Tool.EmptyParams,
     success: hubResult(Schema.Struct({ colleagues: Schema.Array(Colleague) })),
   }).annotate(Tool.Readonly, true),
   Tool.make("enterprise_card_send", {

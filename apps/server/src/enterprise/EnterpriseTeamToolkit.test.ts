@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
 
+import { advertisedJsonSchema } from "../mcp/advertisedJsonSchema.ts";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import { liveThreadShell } from "../mcp/McpToolAccess.testkit.ts";
@@ -306,3 +307,8 @@ it.effect("refuses to send a card before the environment joins an enterprise", (
     Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
   ),
 );
+
+it("advertises every tool with an object schema, as the MCP server requires at startup", () => {
+  for (const tool of Object.values(EnterpriseTeamToolkit.tools))
+    expect(advertisedJsonSchema(tool), tool.name).toMatchObject({ type: "object" });
+});
