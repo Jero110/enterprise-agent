@@ -56,6 +56,33 @@ describe("EnterpriseStore", () => {
     }).pipe(Effect.provide(layerMemoryStore)),
   );
 
+  it.effect("org apply computes changes from the state at write time", () =>
+    Effect.gen(function* () {
+      const store = yield* seedAcme;
+      const plan = {
+        areas: (yield* store.listTeams).map((team) => ({ ...team })),
+        people: (yield* store.listMembers).map((member) => ({
+          email: member.email,
+          displayName: member.displayName,
+          areaId: member.teamId,
+          role: member.role,
+          reportsTo: member.reportsTo,
+        })),
+      };
+      yield* store.moveMember("ent.test.ana@gmail.com", "risk");
+      const changes = yield* store.applyOrg({ plan, actor: "jeronimo.deli@gmail.com" });
+      expect(changes).toContainEqual(
+        expect.objectContaining({
+          kind: "person",
+          id: "ent.test.ana@gmail.com",
+          change: "changed",
+        }),
+      );
+      expect((yield* store.getMember("ent.test.ana@gmail.com"))?.teamId).toBe("ledger");
+      expect(yield* store.applyOrg({ plan, actor: "jeronimo.deli@gmail.com" })).toEqual([]);
+    }).pipe(Effect.provide(layerMemoryStore)),
+  );
+
   it.effect("reseeding does not undo what an admin changed", () =>
     Effect.gen(function* () {
       const store = yield* seedAcme;

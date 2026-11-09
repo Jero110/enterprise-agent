@@ -292,11 +292,12 @@ const make = Effect.gen(function* () {
           message: `organization.yaml must keep you (${admin.email}) as an admin.`,
         });
       }
-      const changes = OrgImport.diff(plan, {
-        teams: yield* store.listTeams,
-        members: yield* store.listMembers,
-      });
-      if (apply && changes.length > 0) yield* store.applyOrg({ plan, changes, actor: admin.email });
+      const changes = apply
+        ? yield* store.applyOrg({ plan, actor: admin.email })
+        : OrgImport.diff(plan, {
+            teams: yield* store.listTeams,
+            members: yield* store.listMembers,
+          });
       return { applied: apply, changes };
     },
   );

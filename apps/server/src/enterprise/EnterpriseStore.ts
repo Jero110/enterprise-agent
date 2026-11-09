@@ -11,7 +11,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as ServerConfig from "../config.ts";
-import type { OrgPlan } from "./OrgImport.ts";
+import { diff, type OrgPlan } from "./OrgImport.ts";
 
 export const normalizeEmail = (email: string): string => email.toLowerCase().trim();
 
@@ -133,9 +133,8 @@ export class EnterpriseStore extends Context.Service<
     /** Writes the changed rows of an org import in one transaction; removed people are revoked. */
     readonly applyOrg: (input: {
       readonly plan: OrgPlan;
-      readonly changes: ReadonlyArray<EnterpriseOrgChange>;
       readonly actor: string;
-    }) => Effect.Effect<void>;
+    }) => Effect.Effect<ReadonlyArray<EnterpriseOrgChange>>;
   }
 >()("t3/enterprise/EnterpriseStore") {}
 
@@ -461,7 +460,8 @@ const make = Effect.gen(function* () {
   );
 
   const applyOrg: EnterpriseStore["Service"]["applyOrg"] = Effect.fn("EnterpriseStore.applyOrg")(
-    function* ({ plan, changes, actor }) {
+    function* ({ plan, actor }) {
+      const changes = diff(plan, { teams: yield* listTeams, members: yield* listMembers });
       const now = yield* nowIso;
       const touched = (kind: EnterpriseOrgChange["kind"], id: string) =>
         changes.some((change) => change.kind === kind && change.id === id);
@@ -501,6 +501,7 @@ const make = Effect.gen(function* () {
           yield* sql`DELETE FROM enterprise_teams WHERE id = ${change.id}`;
         }
       }
+      return changes;
     },
     (effect) => sql.withTransaction(effect),
     Effect.orDie,
