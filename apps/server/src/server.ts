@@ -80,6 +80,7 @@ import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import * as EnterpriseHubClient from "./enterprise/EnterpriseHubClient.ts";
 import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
 import * as EnterpriseIngestion from "./enterprise/EnterpriseIngestion.ts";
+import * as AiLayer from "./knowledge/AiLayer.ts";
 import * as EnterpriseStore from "./enterprise/EnterpriseStore.ts";
 import * as EnterpriseToolkit from "./enterprise/EnterpriseToolkit.ts";
 import * as EnterpriseCliToolkit from "./enterprise/EnterpriseCliToolkit.ts";
@@ -792,6 +793,8 @@ const layerMemberMcp = McpHttpServer.layerMcpTransport(
 );
 
 const layerHubMcp = Layer.mergeAll(
+  EnterpriseIngestion.layerTracking.pipe(Layer.provide(ProjectionStoreV2.layer)),
+  AiLayer.layerGeneration.pipe(Layer.provide(AiLayer.layer)),
   EnterpriseBootstrapHttp.layer.pipe(Layer.provide(EnterpriseBootstrap.layer)),
   McpHttpServer.layerMcpTransport(
     Layer.mergeAll(

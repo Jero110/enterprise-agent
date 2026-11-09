@@ -217,7 +217,8 @@ describe("EnterpriseHub", () => {
         kind: "create",
         scope: "global",
         path: "global/ingestion-test.md",
-        content: "# Sources",
+        content:
+          "---\ntitle: Sources\ndescription: Source index\narea: general\nlayer: business\nprivate: false\n---\n# Sources",
         reason: "Map sources",
         evidence: [],
       } as const;
@@ -231,6 +232,16 @@ describe("EnterpriseHub", () => {
         status: "running",
       });
       expect(yield* hub.ingestionList("thread-1")).toHaveProperty("documents");
+      for (const content of [
+        "# No frontmatter",
+        proposal.content.replace("general", "unknown"),
+        proposal.content.replace("business", "unknown"),
+        proposal.content.replace("general", "ledger"),
+      ]) {
+        expect(yield* codeOf(hub.ingestionPropose("thread-1", { ...proposal, content }))).toBe(
+          "invalid_proposal",
+        );
+      }
       const first = yield* hub.ingestionPropose("thread-1", proposal);
       expect(first).toMatchObject({
         proposedBy: JERO,
@@ -246,7 +257,12 @@ describe("EnterpriseHub", () => {
       const repeated = yield* hub.ingestionPropose("thread-repeat", proposal);
       expect(repeated.id).toBe(first.id);
       expect(
-        yield* codeOf(hub.ingestionPropose("thread-repeat", { ...proposal, content: "# Changed" })),
+        yield* codeOf(
+          hub.ingestionPropose("thread-repeat", {
+            ...proposal,
+            content: proposal.content + "\nChanged",
+          }),
+        ),
       ).toBe("conflict");
       yield* store.saveIngestionRun({
         id: "run-2",
