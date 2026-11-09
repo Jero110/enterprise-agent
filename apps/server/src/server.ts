@@ -80,6 +80,7 @@ import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import * as EnterpriseHubClient from "./enterprise/EnterpriseHubClient.ts";
 import * as EnterpriseHub from "./enterprise/EnterpriseHub.ts";
 import * as EnterpriseIngestion from "./enterprise/EnterpriseIngestion.ts";
+import * as IngestionSources from "./enterprise/IngestionSources.ts";
 import * as AiLayer from "./knowledge/AiLayer.ts";
 import * as EnterpriseStore from "./enterprise/EnterpriseStore.ts";
 import * as EnterpriseToolkit from "./enterprise/EnterpriseToolkit.ts";
@@ -792,6 +793,10 @@ const layerMemberMcp = McpHttpServer.layerMcpTransport(
   ),
 );
 
+const layerEnterpriseIngestion = EnterpriseIngestion.layer.pipe(
+  Layer.provide(IngestionSources.layerPinned),
+);
+
 const layerHubMcp = Layer.mergeAll(
   EnterpriseIngestion.layerTracking.pipe(Layer.provide(ProjectionStoreV2.layer)),
   AiLayer.layerGeneration.pipe(Layer.provide(AiLayer.layer)),
@@ -805,7 +810,7 @@ const layerHubMcp = Layer.mergeAll(
     ),
   ),
 ).pipe(
-  Layer.provide(EnterpriseIngestion.layer),
+  Layer.provide(layerEnterpriseIngestion),
   Layer.provide(EnterpriseHub.layer),
   Layer.provide(TeamPublication.layer),
   Layer.provide(RunRecords.layer),
@@ -838,7 +843,7 @@ const layerHubTeamReporter = HubTeamReporter.layer.pipe(
   Layer.provide(EnterpriseStore.layerHub),
 );
 const layerEnterpriseHubClient = EnterpriseHubClient.layer.pipe(
-  Layer.provide(EnterpriseIngestion.layer),
+  Layer.provide(layerEnterpriseIngestion),
   Layer.provide(EnterpriseHub.layer),
   Layer.provide(TeamPublication.layer),
   Layer.provide(RunRecords.layer),

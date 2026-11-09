@@ -8,12 +8,7 @@ import {
   type EnterpriseIngestStartResult,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as NodeDnsPromises from "node:dns/promises";
-import * as NodeNet from "node:net";
-import { isPublicFaviconHost } from "@t3tools/shared/hostClassification";
+import * as IngestionSources from "./IngestionSources.ts";
 import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -62,7 +57,7 @@ Never approve, apply, delegate mutations, or write knowledge or source files dir
 Use grep/read on the raw sources; a map is not a substitute for evidence.
 Each create/update must include YAML frontmatter: title, description, area, layer, private, optional links.
 Propose ONLY in the selected destination; the server rejects other scopes. For personal, use scope personal and paths personal/<owner member key>/<concept>.md. For general use scope global and paths global/<concept>.md. For an area use that area id and paths areas/<area>/<concept>.md. Never move content to another scope. Area frontmatter is general for global, the area id for an area, or personal for personal. The four layers are fixed: Metrics, Business, AI, Data. Frontmatter layer values must be lowercase: metrics, business, ai, data.
-For Meet transcripts preserve speaker attribution, decisions, owners, action items and timestamps; do not invent owners.
+For Meet transcripts or text meeting notes preserve the date, invitees, summary, speaker attribution, timestamps, decisions and their status (ACORDADA/agreed versus pending), next steps with their stated owners, and details. A pending decision is not approved; a next step is not an executed task. Never invent owners, approval or execution.
 Extract deterministic facts first, verify cited file/line offsets in raw sources, preserve provenance and confidence.
 Propose links only with evidence; never fuse concepts by name alone.
 Compare the existing node index and pending proposals before creating: prefer updates, move-scope or links over duplicates.
@@ -89,7 +84,7 @@ const make = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const proposals = yield* KnowledgeProposals.KnowledgeProposals;
   const digest = yield* Digest.Digest;
-  const http = yield* HttpClient.HttpClient;
+  const publicSources = yield* IngestionSources.IngestionSources;
   const fail = (message: string) => new EnterpriseError({ code: "ingestion_failed", message });
   const finish = Effect.fn("EnterpriseIngestion.finish")(function* (
     threadId: string,
@@ -180,69 +175,20 @@ const make = Effect.gen(function* () {
         }
       });
       if (input.folder !== undefined) yield* scan(folder);
+      const skippedSources: Array<{ path: string; reason: string }> = [];
       for (const [index, raw] of urls.entries()) {
-        const url = yield* Effect.try({
-          try: () => new URL(raw),
-          catch: () => fail("Choose a valid public HTTPS URL."),
-        });
-        if (
-          url.protocol !== "https:" ||
-          url.username ||
-          url.password ||
-          url.port ||
-          url.search ||
-          !url.hostname.includes(".") ||
-          NodeNet.isIP(url.hostname.replace(/^\[|\]$/g, "")) ||
-          !isPublicFaviconHost(url.hostname)
-        )
-          return yield* fail("Choose a public HTTPS URL without credentials.");
-        const addresses = yield* Effect.tryPromise({
-          try: () => NodeDnsPromises.lookup(url.hostname, { all: true }),
-          catch: () => fail("Could not resolve a public URL."),
-        });
-        if (
-          addresses.length === 0 ||
-          addresses.some(({ address }) => !isPublicFaviconHost(address))
-        )
-          return yield* fail("URL resolves to a non-public address.");
-        const response = yield* http.execute(HttpClientRequest.get(url.toString())).pipe(
-          Effect.provideService(FetchHttpClient.RequestInit, {
-            redirect: "manual",
-            credentials: "omit",
-          }),
-          Effect.timeout("10 seconds"),
-          Effect.mapError(() => fail("Could not fetch the public URL.")),
-        );
-        if (response.status !== 200)
-          return yield* fail("Public source unavailable; authenticated pages are not supported.");
-        const contentType = response.headers["content-type"]?.split(";")[0]?.trim().toLowerCase();
-        if (
-          !contentType ||
-          !["text/plain", "text/markdown", "text/x-markdown"].includes(contentType)
-        )
-          return yield* fail("Only public plain-text or Markdown URLs are supported.");
-        if (Number(response.headers["content-length"] ?? 0) > 1_000_000)
-          return yield* fail("Public source exceeds 1 MB.");
-        const bytes = yield* response.stream.pipe(
-          Stream.runFoldEffect(
-            () => new Uint8Array(),
-            (acc, chunk) => {
-              if (acc.byteLength + chunk.byteLength > 1_000_000)
-                return fail("Public source exceeds 1 MB.");
-              const combined = new Uint8Array(acc.byteLength + chunk.byteLength);
-              combined.set(acc);
-              combined.set(chunk, acc.byteLength);
-              return Effect.succeed(combined);
-            },
-          ),
-          Effect.timeout("10 seconds"),
-          Effect.mapError(() => fail("Could not read a bounded public source.")),
-        );
-        const file = path.join(staging, `url-${index}.txt`);
-        yield* fs
-          .writeFile(file, bytes)
-          .pipe(Effect.mapError(() => fail("Could not stage the source.")));
-        yield* addSource(file, bytes);
+        const loaded = yield* publicSources.load(raw, destination);
+        skippedSources.push(...loaded.skipped);
+        for (const source of loaded.files) {
+          const file = path.join(staging, "urls", String(index), source.path);
+          yield* fs
+            .makeDirectory(path.dirname(file), { recursive: true })
+            .pipe(Effect.mapError(() => fail("Could not stage the source.")));
+          yield* fs
+            .writeFile(file, source.bytes)
+            .pipe(Effect.mapError(() => fail("Could not stage the source.")));
+          yield* addSource(file, source.bytes);
+        }
       }
       const available = yield* store.listProposals;
       let uploadedCount = 0;
@@ -349,7 +295,7 @@ const make = Effect.gen(function* () {
         );
       if (sources.length === 0 && !note) {
         yield* finish(threadId, "completed");
-        return { runId: id, threadId };
+        return { runId: id, threadId, skippedSources };
       }
       yield* threads
         .dispatch({
@@ -375,7 +321,7 @@ const make = Effect.gen(function* () {
           Effect.mapError(() => fail("Could not start the ingestion turn.")),
           Effect.tapError(() => finish(threadId, "failed")),
         );
-      return { runId: id, threadId };
+      return { runId: id, threadId, skippedSources };
     }),
   });
 });
