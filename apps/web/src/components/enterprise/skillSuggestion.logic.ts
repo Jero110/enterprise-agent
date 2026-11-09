@@ -80,14 +80,51 @@ export function noteWithoutSkillCommand(text: string): string {
     .trim();
 }
 
+/** Spanish words people type for a topic, mapped to the English words skills usually use. */
+const TOPIC_SYNONYMS: Readonly<Record<string, ReadonlyArray<string>>> = {
+  presentacion: ["presentation", "slides", "deck", "pptx"],
+  presentaciones: ["presentation", "slides", "deck", "pptx"],
+  diapositivas: ["slides", "presentation", "deck"],
+  hoja: ["spreadsheet", "excel", "xlsx"],
+  hojas: ["spreadsheet", "excel", "xlsx"],
+  excel: ["spreadsheet", "xlsx"],
+  documento: ["document", "docx", "word"],
+  documentos: ["document", "docx", "word"],
+  reporte: ["report", "document"],
+  reportes: ["report", "document"],
+  correo: ["email", "mail"],
+  correos: ["email", "mail"],
+  diseno: ["design", "frontend", "ui"],
+  imagen: ["image", "imagegen"],
+  imagenes: ["image", "imagegen"],
+  ventas: ["sales", "copywriting"],
+  textos: ["copywriting", "copy"],
+  pruebas: ["test", "testing"],
+};
+
+/** Words share a stem when their first five letters match: "presentaciones" ~ "presentations". */
+function stemOf(word: string): string {
+  return word.length > 5 ? word.slice(0, 5) : word;
+}
+
+function stemsOf(text: string): ReadonlySet<string> {
+  return new Set(
+    normalize(text)
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length >= 3)
+      .map(stemOf),
+  );
+}
+
 function skillScore(skill: ServerProviderSkill, queryWords: ReadonlyArray<string>): number {
   if (queryWords.length === 0) return 0;
-  const name = normalize(`${skill.name} ${skill.displayName ?? ""}`);
-  const description = normalize(`${skill.shortDescription ?? ""} ${skill.description ?? ""}`);
+  const name = stemsOf(`${skill.name} ${skill.displayName ?? ""}`);
+  const description = stemsOf(`${skill.shortDescription ?? ""} ${skill.description ?? ""}`);
   let score = 0;
   for (const word of queryWords) {
-    if (name.includes(word)) score += 3;
-    else if (description.includes(word)) score += 1;
+    const candidates = [word, ...(TOPIC_SYNONYMS[word] ?? [])].map(stemOf);
+    if (candidates.some((candidate) => name.has(candidate))) score += 3;
+    else if (candidates.some((candidate) => description.has(candidate))) score += 1;
   }
   return score;
 }

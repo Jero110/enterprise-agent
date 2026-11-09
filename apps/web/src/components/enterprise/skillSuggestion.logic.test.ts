@@ -86,3 +86,23 @@ describe("rankSkillsForMessage", () => {
     ]);
   });
 });
+
+describe("rankSkillsForMessage across languages", () => {
+  it("puts an English-named skill first for a Spanish word with the same stem or topic", () => {
+    const skills = [
+      skill("contribution-triage", "Close ineligible pull requests"),
+      skill("copywriting", "Write marketing copy for landing pages"),
+      skill("presentations", "Build slide decks"),
+      skill("spreadsheets", "Edit Excel workbooks"),
+    ];
+    expect(
+      rankSkillsForMessage(skills, "te mando una skill para hacer presentaciones")[0]?.name,
+    ).toBe("presentations");
+    expect(rankSkillsForMessage(skills, "una skill para hojas de cálculo")[0]?.name).toBe(
+      "spreadsheets",
+    );
+    expect(rankSkillsForMessage(skills, "skill para textos de ventas")[0]?.name).toBe(
+      "copywriting",
+    );
+  });
+});
