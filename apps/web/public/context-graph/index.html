@@ -171,6 +171,77 @@
       .lc.off {
         color: var(--muted);
       }
+      .areas {
+        position: absolute;
+        top: 218px;
+        left: 20px;
+        display: flex;
+        max-height: min(45vh, 340px);
+        max-width: 160px;
+        flex-direction: column;
+        gap: 5px;
+        overflow: auto;
+      }
+      .areas:empty {
+        display: none;
+      }
+      .areas button {
+        width: 100%;
+        padding: 4px 10px;
+        overflow: hidden;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .areas button[aria-pressed="true"] {
+        border-color: #8995af;
+        background: #eef1f9;
+      }
+      .empty-stage {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+      }
+      .empty-stage[hidden] {
+        display: none;
+      }
+      .empty-stage .orbit {
+        position: absolute;
+        width: min(52vw, 430px);
+        height: min(16vw, 125px);
+        border: 2px dotted #adb7ce;
+        border-radius: 50%;
+        transform: rotate(-16deg);
+        opacity: 0.6;
+      }
+      .empty-stage .orbit:nth-child(1) {
+        margin-top: -205px;
+        border-color: #c6a1b2;
+      }
+      .empty-stage .orbit:nth-child(2) {
+        margin-top: -85px;
+        border-color: #bbaad0;
+      }
+      .empty-stage .orbit:nth-child(3) {
+        margin-top: 35px;
+        border-color: #839bc6;
+      }
+      .empty-stage .orbit:nth-child(4) {
+        margin-top: 155px;
+        border-color: #8fb4b3;
+      }
+      .empty-stage p {
+        position: absolute;
+        bottom: 64px;
+        padding: 8px 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel);
+        color: #666b78;
+        text-align: center;
+      }
       .key {
         position: absolute;
         left: 14px;
@@ -208,6 +279,17 @@
   </head>
   <body>
     <div id="g"></div>
+    <div
+      class="empty-stage"
+      id="empty-stage"
+      aria-label="Four empty knowledge layers; no accepted documents yet"
+    >
+      <div class="orbit"></div>
+      <div class="orbit"></div>
+      <div class="orbit"></div>
+      <div class="orbit"></div>
+      <p>AI layer ready · Documents appear after approval</p>
+    </div>
     <div class="bar">
       <h1>
         Current context <span>&middot; 4 layers &middot; <span id="n"></span> nodes</span>
@@ -221,6 +303,7 @@
       </div>
     </div>
     <div class="layers" id="layers"></div>
+    <div class="areas" id="areas" aria-label="Filter knowledge by area"></div>
     <div class="key">
       <span><i style="width: 3px; height: 3px; background: #9aa1a8"></i>Document</span>
     </div>
@@ -266,6 +349,7 @@
         nb.get(l.target).add(l.source);
       });
       const hidden = new Set();
+      let activeArea = null;
       let hover = null,
         sel = null;
       const scopes = { general: true, area: true, individual: true };
@@ -291,7 +375,14 @@
           .filter(Boolean)
           .slice(0, 6),
       });
-      const vis = (n) => n.proposal || n.proposalGroup || !hidden.has(ob(n).layer);
+      const vis = (n) => {
+        const node = ob(n);
+        return (
+          node.proposal ||
+          node.proposalGroup ||
+          (!hidden.has(node.layer) && (!activeArea || node.areaId === activeArea))
+        );
+      };
       const lit = (n) => {
         if (proposalMode && !n.proposal && !n.proposalGroup) return false;
         const f = hover || sel;
@@ -549,6 +640,37 @@
         );
       }
       renderChips();
+      function renderAreas() {
+        const counts = new Map();
+        for (const doc of docs) counts.set(doc.areaId, (counts.get(doc.areaId) || 0) + 1);
+        const areaPanel = document.getElementById("areas");
+        areaPanel.replaceChildren();
+        if (counts.size < 2) return;
+        for (const [id, count] of [
+          [null, docs.length],
+          ...[...counts].sort(([a], [b]) => a.localeCompare(b)),
+        ]) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.title = id || "All areas";
+          button.textContent = `${id || "All areas"} · ${count}`;
+          button.setAttribute("aria-pressed", String(activeArea === id));
+          button.onclick = () => {
+            activeArea = id;
+            if (sel && !vis(sel)) {
+              sel = null;
+              window.parent.postMessage({ type: "knowledge-selection-cleared" }, "*");
+            }
+            G.nodeVisibility((node) => vis(node)).linkVisibility(
+              (link) => vis(link.source) && vis(link.target),
+            );
+            renderAreas();
+            showRes();
+            redraw();
+          };
+          areaPanel.append(button);
+        }
+      }
       // finder: filter by name and fly the camera to the pick
       const q = document.getElementById("q"),
         res = document.getElementById("res");
@@ -618,6 +740,7 @@
       };
       function showNodes(previews) {
         proposalMode = false;
+        document.getElementById("empty-stage").hidden = previews.length > 0;
         nodes.length = 0;
         links.length = 0;
         docs.length = 0;
@@ -669,15 +792,21 @@
           }
         }
         sel = sel ? byId.get(sel.id) || null : null;
+        if (activeArea && !docs.some((doc) => doc.areaId === activeArea)) activeArea = null;
         hover = null;
         document.getElementById("n").textContent = nodes.length;
         G.graphData({ nodes, links });
         setTimeout(useShapes, 50);
         renderChips();
+        renderAreas();
+        G.nodeVisibility((node) => vis(node)).linkVisibility(
+          (link) => vis(link.source) && vis(link.target),
+        );
         refresh();
         showRes();
       }
       function showProposals(proposals) {
+        document.getElementById("empty-stage").hidden = true;
         proposalMode = true;
         for (let i = nodes.length - 1; i >= 0; i--) {
           if (nodes[i].proposal || nodes[i].proposalGroup) {

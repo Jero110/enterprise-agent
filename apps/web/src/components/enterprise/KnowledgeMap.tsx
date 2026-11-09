@@ -307,12 +307,12 @@ export function KnowledgeMap(props: {
         className={cn(
           "overflow-hidden rounded-xl border border-border/70",
           SHOW_KNOWLEDGE_GRAPH
-            ? "grid min-h-[470px] flex-1 bg-zinc-25 lg:grid-cols-[minmax(0,1fr)_230px]"
+            ? "grid min-h-[min(72vh,720px)] flex-1 bg-zinc-25 lg:grid-cols-[minmax(0,1fr)_250px]"
             : "bg-background",
         )}
       >
         {SHOW_KNOWLEDGE_GRAPH && (
-          <div className="relative min-h-[470px] overflow-hidden">
+          <div className="relative min-h-[min(72vh,720px)] overflow-hidden">
             {!ready && (
               <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
                 {t("Loading knowledge map…")}
@@ -323,7 +323,7 @@ export function KnowledgeMap(props: {
               title={t("Interactive 3D knowledge map")}
               sandbox="allow-scripts"
               src="/context-graph/index.html"
-              className="relative size-full min-h-[470px] border-0"
+              className="relative size-full min-h-[min(72vh,720px)] border-0"
               onLoad={() => {
                 setReady(true);
                 sync(scopes);
@@ -376,7 +376,7 @@ export function KnowledgeMap(props: {
           className={cn(
             "flex flex-col bg-background",
             SHOW_KNOWLEDGE_GRAPH &&
-              "max-h-[530px] border-t border-border/70 lg:border-t-0 lg:border-l",
+              "max-h-[min(72vh,720px)] border-t border-border/70 lg:border-t-0 lg:border-l",
           )}
           aria-label={t("Knowledge by source and layer")}
         >
