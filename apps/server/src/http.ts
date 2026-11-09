@@ -32,6 +32,7 @@ import { OtlpTracer, OtlpSerialization } from "effect/observability";
 
 import * as ServerConfig from "./config.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
+import { EnterpriseSession } from "./enterprise/EnterpriseSession.ts";
 import { ASSET_ROUTE_PREFIX, readMcpAppHtml, resolveAsset } from "./assets/AssetAccess.ts";
 import { sourceControlMediaResponse } from "./assets/sourceControlMediaResponse.ts";
 import { statMediaFile, streamMediaFile, type OpenMediaFile } from "./assets/MediaFile.ts";
@@ -312,6 +313,7 @@ const authenticateRawRouteWithScope =
     if (!session.scopes.includes(scope)) {
       return yield* failEnvironmentScopeRequired(scope);
     }
+    return session;
   });
 
 export const layerServerEnvironmentHttpApi = HttpApiBuilder.group(
@@ -484,7 +486,7 @@ export const layerProposalUploadRoute = Layer.unwrap(
       "POST",
       proposalRoute,
       Effect.gen(function* () {
-        yield* authenticateRawRouteWithScope(AuthOrchestrationOperateScope);
+        const session = yield* authenticateRawRouteWithScope(AuthOrchestrationOperateScope);
         const request = yield* HttpServerRequest.HttpServerRequest;
         const maxBytes = 56 * 1024 * 1024;
         if (Number(request.headers["content-length"] ?? 0) > maxBytes)
@@ -508,6 +510,7 @@ export const layerProposalUploadRoute = Layer.unwrap(
         ).pipe(Effect.orElseSucceed(() => null));
         if (!input) return HttpServerResponse.text("Invalid upload batch.", { status: 400 });
         return yield* client.proposalUpload(input).pipe(
+          Effect.provideService(EnterpriseSession, session.sessionId),
           Effect.map((proposal) =>
             HttpServerResponse.jsonUnsafe(proposal, { headers: { "Cache-Control": "no-store" } }),
           ),
@@ -548,7 +551,7 @@ export const layerProposalAttachmentRoute = Layer.unwrap(
       "GET",
       `${proposalRoute}/*`,
       Effect.gen(function* () {
-        yield* authenticateRawRouteWithScope(AuthOrchestrationReadScope);
+        const session = yield* authenticateRawRouteWithScope(AuthOrchestrationReadScope);
         const request = yield* HttpServerRequest.HttpServerRequest;
         const url = requestUrl(request);
         if (Option.isNone(url)) return HttpServerResponse.text("Bad Request", { status: 400 });
@@ -558,6 +561,7 @@ export const layerProposalAttachmentRoute = Layer.unwrap(
           );
         if (!match) return HttpServerResponse.text("Not Found", { status: 404 });
         return yield* client.proposalAttachment({ proposalId: match[1]!, fileId: match[2]! }).pipe(
+          Effect.provideService(EnterpriseSession, session.sessionId),
           Effect.map(proposalAttachmentResponse),
           Effect.catch((error) => Effect.succeed(proposalFailure(error))),
         );
