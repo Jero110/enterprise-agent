@@ -4,6 +4,7 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   ProviderInstanceId,
   EnvironmentId,
+  ThreadId,
   type ApplicationStoredEvent,
   type OrchestrationV2ServerCommand,
 } from "@t3tools/contracts";
@@ -211,12 +212,12 @@ describe("EnterpriseIngestion", () => {
         hubSessionId(hub).pipe(
           Effect.provideService(McpInvocationContext.McpInvocationContext, {
             environmentId: EnvironmentId.make("hub"),
-            capabilities: new Set(),
+            capabilities: new Set<never>(),
             issuedAt: 0,
             requestNamespace: "ingestion",
             client: undefined,
             thread: {
-              threadId: result.threadId,
+              threadId: ThreadId.make(result.threadId),
               providerSessionId: "ingestion",
               providerInstanceId: modelSelection.instanceId,
             },
