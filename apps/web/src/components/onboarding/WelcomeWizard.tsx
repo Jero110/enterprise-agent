@@ -248,7 +248,7 @@ export function WelcomeWizard({
           title={t("Set up Norai")}
           identity={
             <div className="flex items-baseline gap-1.5" role="img" aria-label="Norai">
-              <T3Wordmark className="h-5 w-auto shrink-0 text-primary" aria-hidden />
+              <T3Wordmark className="h-6 w-auto shrink-0 text-primary" aria-hidden />
             </div>
           }
         >

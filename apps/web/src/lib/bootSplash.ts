@@ -4,7 +4,8 @@
 
 /**
  * When the logo is fully drawn, measured from page start (see the #boot-logo animations in index.html).
- * The last wave ends at 1.9s; the extra 0.2s lets the finished logo sit for a beat before it fades.
+ * The last "orAi" pixel cell lands and the exact kit logo takes over at 1.9s; the extra 0.2s lets
+ * the finished logo sit for a beat before it fades.
  */
 const LOGO_DRAWN_MS = 2_100;
 const FADE_MS = 300;

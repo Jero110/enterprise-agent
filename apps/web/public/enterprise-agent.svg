@@ -1,7 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><title>Norai</title><rect width="200" height="200" rx="32" fill="#171A20"/><g transform="translate(10 10) scale(.9)" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="100" cy="100" r="84" stroke="#FFFFFF" stroke-width="7"/>
-  <circle cx="100" cy="100" r="70" stroke="#858B94" stroke-width="4"/>
-  <path d="M80 59a6 6 0 0 1 6-6h8v-5a6 6 0 0 1 12 0v5h14a6 6 0 0 1 0 12h-14v73a6 6 0 0 1-12 0V65h-8a6 6 0 0 1-6-6Z" fill="#FFFFFF" stroke="none"/>
-  <path d="M35 129c17-9 30-9 44 0 13 8 22 9 34 4 12-5 19-14 29-11 8 3 6 10 0 12-10 5-20-2-30-2-12 0-20 6-32 12-9 5-18 8-27 10" stroke="#C5CAD1" stroke-width="5"/>
-  <path d="M53 153c12-6 23-8 36-6 14 2 24 11 37 8 7-1 13-5 18-4" stroke="#FFFFFF" stroke-width="8"/>
-</g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="norAi"><title>norAi</title><rect width="64" height="64" rx="12" fill="#2A2927"/><g transform="translate(13.41 16.86) scale(0.12516)"><path fill="#E5E2DB" d="M0 242L0 73.81L73.81 0L167.74 0L167.74 71.02L71.27 71.02L71.27 242ZM167.74 71.02L239 71.02L239 171L317.04 171L246.04 242L167.74 242Z"/></g></svg>

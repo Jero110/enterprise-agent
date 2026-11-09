@@ -429,67 +429,76 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 96px;
+        width: 192px;
         height: 96px;
       }
 
-      /* The norai symbol from the brand kit draws itself: the outer circle and the inner ring
-         trace around, the mooring post rises, then the two waves run left to right. The drawn
-         SVG is the final logo. Done at 1.9s; LOGO_DRAWN_MS (2.1s) in src/lib/bootSplash.ts. */
+      /* The norAi logo from the brand kit builds itself: the left block of the "n" rises, the top
+         bar slides out, the right leg drops and the wedge sweeps out; then the pixel cells of
+         "orAi" pop in left to right. At 1.9s the exact kit logo replaces the moving pieces (same
+         shape, so nothing jumps). LOGO_DRAWN_MS (2.1s) in src/lib/bootSplash.ts. */
       #boot-logo {
-        width: 72px;
-        height: 72px;
+        width: 176px;
+        height: 85px;
         overflow: visible;
-        color: #171a20;
-        --ring: #a7adb6;
-        --wave: #69717d;
+        color: #2a2927;
         animation: boot-logo-breathe 2.4s ease-in-out 2.1s infinite;
         transform-origin: 50% 50%;
       }
       html.dark #boot-logo {
-        color: #ffffff;
-        --ring: #858b94;
-        --wave: #c5cad1;
+        color: #e5e2db;
       }
       html[data-theme-selected="true"] #boot-logo {
         color: var(--boot-foreground);
       }
-      .boot-logo-lines {
-        fill: none;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-      }
-      /* Hidden until its turn: a round cap would otherwise leave a dot at the start of an undrawn line. */
-      .boot-logo-line {
-        opacity: 0;
-        stroke-dasharray: 1 1;
-        stroke-dashoffset: 1;
-        animation: boot-logo-draw var(--t) cubic-bezier(0.45, 0, 0.2, 1) var(--d) forwards;
-      }
-      .boot-logo-post {
+      #boot-logo path {
         fill: currentColor;
-        opacity: 0;
-        transform-box: fill-box;
-        transform-origin: 50% 100%;
-        animation: boot-logo-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 0.75s forwards;
       }
-      @keyframes boot-logo-draw {
-        from {
-          opacity: 1;
-        }
-        to {
-          opacity: 1;
-          stroke-dashoffset: 0;
-        }
+      .boot-logo-piece {
+        transform-box: fill-box;
+        animation: var(--a) var(--t) cubic-bezier(0.2, 0.7, 0.2, 1) var(--d) both;
+      }
+      .boot-logo-cells rect {
+        fill: #fff;
+        transform-box: fill-box;
+        transform-origin: 50% 50%;
+        animation: boot-logo-pop 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) var(--d) both;
+      }
+      .boot-logo-build {
+        animation: boot-logo-hide 0s linear 1.9s forwards;
+      }
+      .boot-logo-final {
+        opacity: 0;
+        animation: boot-logo-show 0s linear 1.9s forwards;
       }
       @keyframes boot-logo-rise {
         from {
-          opacity: 0;
-          transform: translateY(18px) scaleY(0.6);
+          transform: scaleY(0);
         }
+      }
+      @keyframes boot-logo-slide {
+        from {
+          transform: scaleX(0);
+        }
+      }
+      @keyframes boot-logo-drop {
+        from {
+          transform: scaleY(0);
+        }
+      }
+      @keyframes boot-logo-pop {
+        from {
+          transform: scale(0);
+        }
+      }
+      @keyframes boot-logo-hide {
+        to {
+          opacity: 0;
+        }
+      }
+      @keyframes boot-logo-show {
         to {
           opacity: 1;
-          transform: translateY(0) scaleY(1);
         }
       }
       @keyframes boot-logo-breathe {
@@ -498,10 +507,10 @@
           transform: scale(1);
         }
         50% {
-          transform: scale(1.045);
+          transform: scale(1.03);
         }
       }
-      /* The drawing plays once and is short, so it stays; only the endless breathing stops. */
+      /* The build plays once and is short, so it stays; only the endless breathing stops. */
       @media (prefers-reduced-motion: reduce) {
         #boot-logo {
           animation: none;
@@ -755,43 +764,75 @@
     <!-- Sits above the app until the logo has finished drawing (src/lib/bootSplash.ts). -->
     <div id="boot-shell">
       <div id="boot-shell-card" aria-label="Norai splash screen">
-        <svg id="boot-logo" viewBox="0 0 200 200" aria-hidden="true">
-          <g class="boot-logo-lines">
+        <svg id="boot-logo" viewBox="0 0 500 242" aria-hidden="true">
+          <defs>
+            <mask id="boot-logo-cells" class="boot-logo-cells" maskUnits="userSpaceOnUse">
+              <rect x="252.61" y="118.65" width="18.45" height="16.68" style="--d: 1.14s" />
+              <rect x="257.85" y="103.98" width="19.16" height="16.68" style="--d: 1.15s" />
+              <rect x="257.86" y="133.33" width="19.15" height="16.68" style="--d: 1.16s" />
+              <rect x="266.89" y="148" width="33.32" height="16.68" style="--d: 1.21s" />
+              <rect x="266.91" y="89.3" width="33.3" height="16.68" style="--d: 1.19s" />
+              <rect x="290.83" y="133.33" width="18.64" height="16.68" style="--d: 1.25s" />
+              <rect x="290.85" y="103.98" width="18.64" height="16.68" style="--d: 1.24s" />
+              <rect x="295.99" y="118.65" width="19.14" height="16.68" style="--d: 1.26s" />
+              <rect x="316.73" y="89.3" width="22.28" height="16.68" style="--d: 1.3s" />
+              <rect x="326.99" y="118.65" width="19.22" height="16.68" style="--d: 1.34s" />
+              <rect x="327.51" y="133.33" width="18.71" height="16.68" style="--d: 1.34s" />
+              <rect x="316.72" y="148" width="40.47" height="16.68" style="--d: 1.35s" />
+              <rect x="327" y="103.98" width="25.01" height="16.68" style="--d: 1.34s" />
+              <rect x="341.99" y="89.3" width="32.02" height="16.68" style="--d: 1.38s" />
+              <rect x="359.99" y="103.98" width="19.18" height="16.68" style="--d: 1.41s" />
+              <rect x="380.8" y="133.33" width="18.41" height="16.68" style="--d: 1.48s" />
+              <rect x="380.82" y="148" width="18.39" height="16.68" style="--d: 1.49s" />
+              <rect x="385.91" y="103.98" width="19.09" height="16.68" style="--d: 1.48s" />
+              <rect x="389.86" y="89.3" width="18.58" height="16.68" style="--d: 1.48s" />
+              <rect x="394.98" y="74.63" width="33.44" height="16.68" style="--d: 1.51s" />
+              <rect x="398.8" y="59.95" width="26.21" height="16.68" style="--d: 1.51s" />
+              <rect x="385.93" y="118.65" width="52.08" height="16.68" style="--d: 1.53s" />
+              <rect x="414.98" y="89.3" width="19.16" height="16.68" style="--d: 1.55s" />
+              <rect x="418.92" y="103.98" width="19.08" height="16.68" style="--d: 1.57s" />
+              <rect x="423.99" y="133.33" width="19.24" height="16.68" style="--d: 1.59s" />
+              <rect x="423.99" y="148" width="19.27" height="16.68" style="--d: 1.6s" />
+              <rect x="455.68" y="89.3" width="29.7" height="16.68" style="--d: 1.67s" />
+              <rect x="451.99" y="148" width="48.03" height="16.68" style="--d: 1.71s" />
+              <rect x="466.74" y="118.65" width="18.6" height="16.68" style="--d: 1.69s" />
+              <rect x="466.74" y="133.33" width="18.6" height="16.68" style="--d: 1.7s" />
+              <rect x="466.73" y="59.95" width="18.63" height="16.68" style="--d: 1.67s" />
+              <rect x="466.72" y="103.98" width="18.66" height="16.68" style="--d: 1.69s" />
+            </mask>
+          </defs>
+          <g class="boot-logo-build">
             <path
-              class="boot-logo-line"
-              pathLength="1"
-              style="--d: 0.1s; --t: 0.9s"
-              stroke="currentColor"
-              stroke-width="7"
-              d="M100 16a84 84 0 1 1 0 168a84 84 0 1 1 0-168"
+              class="boot-logo-piece"
+              style="--a: boot-logo-rise; --t: 0.45s; --d: 0.1s; transform-origin: 50% 100%"
+              d="M0.98 242L0.98 73.81L72.25 2.54L72.25 242Z"
             />
             <path
-              class="boot-logo-line"
-              pathLength="1"
-              style="--d: 0.3s; --t: 0.8s"
-              stroke="var(--ring)"
-              stroke-width="4"
-              d="M100 30a70 70 0 1 0 0 140a70 70 0 1 0 0-140"
+              class="boot-logo-piece"
+              style="--a: boot-logo-slide; --t: 0.4s; --d: 0.45s; transform-origin: 0% 50%"
+              d="M70.25 4.54L74.79 0L168.72 0L168.72 71.02L70.25 71.02Z"
             />
             <path
-              class="boot-logo-post"
-              d="M80 59a6 6 0 0 1 6-6h8v-5a6 6 0 0 1 12 0v5h14a6 6 0 0 1 0 12h-14v73a6 6 0 0 1-12 0V65h-8a6 6 0 0 1-6-6Z"
+              class="boot-logo-piece"
+              style="--a: boot-logo-drop; --t: 0.4s; --d: 0.75s; transform-origin: 50% 0%"
+              d="M168.72 71.02L239.98 71.02L239.98 242L168.72 242Z"
             />
             <path
-              class="boot-logo-line"
-              pathLength="1"
-              style="--d: 1.1s; --t: 0.6s"
-              stroke="var(--wave)"
-              stroke-width="5"
-              d="M35 129c17-9 30-9 44 0 13 8 22 9 34 4 12-5 19-14 29-11 8 3 6 10 0 12-10 5-20-2-30-2-12 0-20 6-32 12-9 5-18 8-27 10"
+              class="boot-logo-piece"
+              style="--a: boot-logo-slide; --t: 0.3s; --d: 1.05s; transform-origin: 0% 50%"
+              d="M237.98 171L318.02 171L247.02 242L237.98 242Z"
             />
             <path
-              class="boot-logo-line"
-              pathLength="1"
-              style="--d: 1.3s; --t: 0.6s"
-              stroke="currentColor"
-              stroke-width="8"
-              d="M53 153c12-6 23-8 36-6 14 2 24 11 37 8 7-1 13-5 18-4"
+              mask="url(#boot-logo-cells)"
+              d="M399.8 75.63L399.8 63.55A2.6 2.6 0 0 1 402.4 60.95L421.4 60.95A2.6 2.6 0 0 1 424 63.55L424 75.63L425.7 75.63A1.7 1.7 0 0 1 427.4 77.33L427.4 90.3L430.5 90.3A2.6 2.6 0 0 1 433.1 92.9L433.1 104.98L435.05 104.98A1.95 1.95 0 0 1 437 106.93L437 134.33L439.6 134.33A2.6 2.6 0 0 1 442.2 136.93L442.2 161.08A2.6 2.6 0 0 1 439.6 163.68L427.6 163.68A2.6 2.6 0 0 1 425 161.08L425 134.33L398.2 134.33L398.2 161.08A2.6 2.6 0 0 1 395.6 163.68L384.4 163.68A2.6 2.6 0 0 1 381.8 161.08L381.8 136.88A2.55 2.55 0 0 1 384.35 134.33L386.9 134.33L386.9 106.98A2 2 0 0 1 388.9 104.98L390.9 104.98L390.9 92.85A2.55 2.55 0 0 1 393.45 90.3L396 90.3L396 77.53A1.9 1.9 0 0 1 397.9 75.63L399.8 75.63ZM467.7 73.03L467.7 63.55A2.6 2.6 0 0 1 470.3 60.95L481.8 60.95A2.6 2.6 0 0 1 484.4 63.55L484.4 73.03A2.6 2.6 0 0 1 481.8 75.63L470.3 75.63A2.6 2.6 0 0 1 467.7 73.03ZM416 103.03L416 90.3L407.4 90.3L407.4 103.28A1.7 1.7 0 0 1 405.7 104.98L404 104.98L404 119.65L419.9 119.65L419.9 104.98L417.95 104.98A1.95 1.95 0 0 1 416 103.03ZM267.9 104.98L267.9 92.9A2.6 2.6 0 0 1 270.5 90.3L296.6 90.3A2.6 2.6 0 0 1 299.2 92.9L299.2 104.98L305.9 104.98A2.6 2.6 0 0 1 308.5 107.58L308.5 119.65L311.5 119.65A2.6 2.6 0 0 1 314.1 122.25L314.1 131.73A2.6 2.6 0 0 1 311.5 134.33L308.5 134.33L308.5 146.4A2.6 2.6 0 0 1 305.9 149L299.2 149L299.2 161.08A2.6 2.6 0 0 1 296.6 163.68L270.5 163.68A2.6 2.6 0 0 1 267.9 161.08L267.9 149L261.5 149A2.6 2.6 0 0 1 258.9 146.4L258.9 134.33L256.2 134.33A2.6 2.6 0 0 1 253.6 131.73L253.6 122.25A2.6 2.6 0 0 1 256.2 119.65L258.9 119.65L258.9 107.58A2.6 2.6 0 0 1 261.5 104.98L267.9 104.98ZM291.8 117.05L291.8 104.98L276 104.98L276 117.05A2.6 2.6 0 0 1 273.4 119.65L270.1 119.65L270.1 134.33L273.4 134.33A2.6 2.6 0 0 1 276 136.93L276 149L291.8 149L291.8 136.93A2.6 2.6 0 0 1 294.4 134.33L297 134.33L297 119.65L294.4 119.65A2.6 2.6 0 0 1 291.8 117.05ZM317.7 102.38L317.7 92.9A2.6 2.6 0 0 1 320.3 90.3L335.4 90.3A2.6 2.6 0 0 1 338 92.9L338 104.98L343 104.98L343 92.9A2.6 2.6 0 0 1 345.6 90.3L370.4 90.3A2.6 2.6 0 0 1 373 92.9L373 104.98L375.6 104.98A2.6 2.6 0 0 1 378.2 107.58L378.2 117.05A2.6 2.6 0 0 1 375.6 119.65L363.6 119.65A2.6 2.6 0 0 1 361 117.05L361 104.98L351 104.98L351 117.05A2.6 2.6 0 0 1 348.4 119.65L345.2 119.65L345.2 149L353.6 149A2.6 2.6 0 0 1 356.2 151.6L356.2 161.08A2.6 2.6 0 0 1 353.6 163.68L320.3 163.68A2.6 2.6 0 0 1 317.7 161.08L317.7 151.6A2.6 2.6 0 0 1 320.3 149L328.2 149L328.2 104.98L320.3 104.98A2.6 2.6 0 0 1 317.7 102.38ZM456.7 102.38L456.7 92.9A2.6 2.6 0 0 1 459.3 90.3L481.8 90.3A2.6 2.6 0 0 1 484.4 92.9L484.4 149L496.4 149A2.6 2.6 0 0 1 499 151.6L499 161.08A2.6 2.6 0 0 1 496.4 163.68L455.6 163.68A2.6 2.6 0 0 1 453 161.08L453 151.6A2.6 2.6 0 0 1 455.6 149L467.7 149L467.7 104.98L459.3 104.98A2.6 2.6 0 0 1 456.7 102.38Z"
+            />
+          </g>
+          <g class="boot-logo-final">
+            <path
+              d="M0.98 242L0.98 73.81L74.79 0L168.72 0L168.72 71.02L72.25 71.02L72.25 242ZM168.72 71.02L239.98 71.02L239.98 171L318.02 171L247.02 242L168.72 242Z"
+            />
+            <path
+              d="M399.8 75.63L399.8 63.55A2.6 2.6 0 0 1 402.4 60.95L421.4 60.95A2.6 2.6 0 0 1 424 63.55L424 75.63L425.7 75.63A1.7 1.7 0 0 1 427.4 77.33L427.4 90.3L430.5 90.3A2.6 2.6 0 0 1 433.1 92.9L433.1 104.98L435.05 104.98A1.95 1.95 0 0 1 437 106.93L437 134.33L439.6 134.33A2.6 2.6 0 0 1 442.2 136.93L442.2 161.08A2.6 2.6 0 0 1 439.6 163.68L427.6 163.68A2.6 2.6 0 0 1 425 161.08L425 134.33L398.2 134.33L398.2 161.08A2.6 2.6 0 0 1 395.6 163.68L384.4 163.68A2.6 2.6 0 0 1 381.8 161.08L381.8 136.88A2.55 2.55 0 0 1 384.35 134.33L386.9 134.33L386.9 106.98A2 2 0 0 1 388.9 104.98L390.9 104.98L390.9 92.85A2.55 2.55 0 0 1 393.45 90.3L396 90.3L396 77.53A1.9 1.9 0 0 1 397.9 75.63L399.8 75.63ZM467.7 73.03L467.7 63.55A2.6 2.6 0 0 1 470.3 60.95L481.8 60.95A2.6 2.6 0 0 1 484.4 63.55L484.4 73.03A2.6 2.6 0 0 1 481.8 75.63L470.3 75.63A2.6 2.6 0 0 1 467.7 73.03ZM416 103.03L416 90.3L407.4 90.3L407.4 103.28A1.7 1.7 0 0 1 405.7 104.98L404 104.98L404 119.65L419.9 119.65L419.9 104.98L417.95 104.98A1.95 1.95 0 0 1 416 103.03ZM267.9 104.98L267.9 92.9A2.6 2.6 0 0 1 270.5 90.3L296.6 90.3A2.6 2.6 0 0 1 299.2 92.9L299.2 104.98L305.9 104.98A2.6 2.6 0 0 1 308.5 107.58L308.5 119.65L311.5 119.65A2.6 2.6 0 0 1 314.1 122.25L314.1 131.73A2.6 2.6 0 0 1 311.5 134.33L308.5 134.33L308.5 146.4A2.6 2.6 0 0 1 305.9 149L299.2 149L299.2 161.08A2.6 2.6 0 0 1 296.6 163.68L270.5 163.68A2.6 2.6 0 0 1 267.9 161.08L267.9 149L261.5 149A2.6 2.6 0 0 1 258.9 146.4L258.9 134.33L256.2 134.33A2.6 2.6 0 0 1 253.6 131.73L253.6 122.25A2.6 2.6 0 0 1 256.2 119.65L258.9 119.65L258.9 107.58A2.6 2.6 0 0 1 261.5 104.98L267.9 104.98ZM291.8 117.05L291.8 104.98L276 104.98L276 117.05A2.6 2.6 0 0 1 273.4 119.65L270.1 119.65L270.1 134.33L273.4 134.33A2.6 2.6 0 0 1 276 136.93L276 149L291.8 149L291.8 136.93A2.6 2.6 0 0 1 294.4 134.33L297 134.33L297 119.65L294.4 119.65A2.6 2.6 0 0 1 291.8 117.05ZM317.7 102.38L317.7 92.9A2.6 2.6 0 0 1 320.3 90.3L335.4 90.3A2.6 2.6 0 0 1 338 92.9L338 104.98L343 104.98L343 92.9A2.6 2.6 0 0 1 345.6 90.3L370.4 90.3A2.6 2.6 0 0 1 373 92.9L373 104.98L375.6 104.98A2.6 2.6 0 0 1 378.2 107.58L378.2 117.05A2.6 2.6 0 0 1 375.6 119.65L363.6 119.65A2.6 2.6 0 0 1 361 117.05L361 104.98L351 104.98L351 117.05A2.6 2.6 0 0 1 348.4 119.65L345.2 119.65L345.2 149L353.6 149A2.6 2.6 0 0 1 356.2 151.6L356.2 161.08A2.6 2.6 0 0 1 353.6 163.68L320.3 163.68A2.6 2.6 0 0 1 317.7 161.08L317.7 151.6A2.6 2.6 0 0 1 320.3 149L328.2 149L328.2 104.98L320.3 104.98A2.6 2.6 0 0 1 317.7 102.38ZM456.7 102.38L456.7 92.9A2.6 2.6 0 0 1 459.3 90.3L481.8 90.3A2.6 2.6 0 0 1 484.4 92.9L484.4 149L496.4 149A2.6 2.6 0 0 1 499 151.6L499 161.08A2.6 2.6 0 0 1 496.4 163.68L455.6 163.68A2.6 2.6 0 0 1 453 161.08L453 151.6A2.6 2.6 0 0 1 455.6 149L467.7 149L467.7 104.98L459.3 104.98A2.6 2.6 0 0 1 456.7 102.38Z"
             />
           </g>
         </svg>
