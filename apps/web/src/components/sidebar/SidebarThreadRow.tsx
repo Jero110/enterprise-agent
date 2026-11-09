@@ -242,6 +242,7 @@ function SidebarThreadTooltip({
   branchMismatch,
   terminalStatus,
   terminalProcessCount,
+  statusLabel,
 }: {
   thread: SidebarThreadSummary;
   project: ProjectFaviconProject | null;
@@ -259,6 +260,8 @@ function SidebarThreadTooltip({
   } | null;
   terminalStatus: TerminalStatusIndicator | null;
   terminalProcessCount: number;
+  /** Long status text when the row shows only a short word ("Aprobar"). */
+  statusLabel?: string | null;
 }) {
   const driverKind = providerEntry?.driverKind ?? null;
   const previousProviderNames = thread.providerInstanceHistory
@@ -277,6 +280,9 @@ function SidebarThreadTooltip({
           ) : null
         }
       >
+        {statusLabel ? (
+          <div className="min-w-0 font-medium text-foreground">{statusLabel}</div>
+        ) : null}
         {projectDisplayName ? (
           <div className="flex min-w-0 items-center gap-2">
             {project ? <ProjectFavicon project={project} className="size-3 shrink-0" /> : null}
@@ -779,6 +785,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         }
                       : null;
   const isWokeStatus = topStatus?.icon === "woke";
+  // The long forms ("Necesita tu aprobación") push the project name out of a default-width row;
+  // the row shows a short word and keeps the long form for its tooltip and aria-label.
+  const topStatusShortLabel =
+    status === "approval"
+      ? t("Approval", undefined, "sidebarStatus")
+      : status === "input"
+        ? t("Input", undefined, "sidebarStatus")
+        : (topStatus?.label ?? null);
+  const topStatusTitle =
+    topStatus && topStatusShortLabel !== topStatus.label ? topStatus.label : undefined;
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
     effectiveEnvMode: thread.worktreePath === null ? "local" : "worktree",
@@ -824,6 +840,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       branchMismatch={branchMismatch}
       terminalStatus={terminalStatus}
       terminalProcessCount={terminalProcessCount}
+      statusLabel={topStatusTitle ?? null}
     />
   );
 
@@ -1315,7 +1332,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         )}
                       >
                         <TopStatusIcon icon={topStatus.icon} className="size-3" />
-                        {topStatus.label}
+                        {topStatusShortLabel}
                       </span>
                     ) : (
                       <span className="text-xs">
@@ -1505,7 +1522,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                           {/* Not a live region: a collapsed sidebar is inert, so
                             BackgroundThreadAnnouncer and the open thread's
                             timeline speak status changes instead. */}
-                          {topStatus.label}
+                          {topStatusShortLabel}
                           {status === "working" ? (
                             <span aria-hidden>
                               <WorkingDuration startedAt={resolveWorkingStartedAt(thread)} />

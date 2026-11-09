@@ -12,6 +12,13 @@ import { ES_TEAM } from "./team";
 import { ES_TEAM_MESSAGES } from "./teamMessages";
 import { ES_WIKI_SOURCES } from "./wikiSources";
 
+import { ES_QA_COWORK } from "./qaCowork";
+import { ES_QA_HOME } from "./qaHome";
+import { ES_QA_HUB } from "./qaHub";
+import { ES_QA_BOARD } from "./qaBoard";
+import { ES_QA_SHELL } from "./qaShell";
+import { ES_QA_MOTION } from "./qaMotion";
+
 export const ES_DICTIONARY: Readonly<Record<string, string>> = {
   ...ES_SHELL,
   ...ES_CHAT,
@@ -26,4 +33,10 @@ export const ES_DICTIONARY: Readonly<Record<string, string>> = {
   ...ES_HUB_HEADER,
   ...ES_HUB_TEAM,
   ...ES_TEAM_MESSAGES,
+  ...ES_QA_COWORK,
+  ...ES_QA_HOME,
+  ...ES_QA_HUB,
+  ...ES_QA_BOARD,
+  ...ES_QA_SHELL,
+  ...ES_QA_MOTION,
 };

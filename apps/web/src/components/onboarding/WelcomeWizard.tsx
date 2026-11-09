@@ -245,9 +245,9 @@ export function WelcomeWizard({
         initialFocus={() => document.getElementById("onboarding-pairing-url") ?? true}
       >
         <WizardHeader
-          title={t("Set up Sequoia AI")}
+          title={t("Set up Norai")}
           identity={
-            <div className="flex items-baseline gap-1.5" role="img" aria-label="Sequoia AI">
+            <div className="flex items-baseline gap-1.5" role="img" aria-label="Norai">
               <T3Wordmark className="h-5 w-auto shrink-0 text-primary" aria-hidden />
             </div>
           }

@@ -1,6 +1,6 @@
 import { ES_DICTIONARY } from "./es";
 
-// Sequoia AI speaks Spanish by default. Strings are written in English in the code and
+// Norai speaks Spanish by default. Strings are written in English in the code and
 // passed through `t()`, which returns the Spanish text when the locale is "es".
 // Tests keep English so existing assertions on visible text stay valid.
 
@@ -11,7 +11,7 @@ export const LOCALE_OPTIONS: ReadonlyArray<{ readonly id: Locale; readonly label
   { id: "en", label: "English" },
 ];
 
-const STORAGE_KEY = "sequoia.locale";
+const STORAGE_KEY = "norai.locale";
 const DEFAULT_LOCALE: Locale = import.meta.env.MODE === "test" ? "en" : "es";
 
 function readStoredLocale(): Locale {

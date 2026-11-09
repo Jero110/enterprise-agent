@@ -144,6 +144,15 @@ describe("summarizeHomeDay", () => {
     expect(summary.recentChats).toEqual([]);
   });
 
+  it("counts a task finished during the current minute right away", () => {
+    const summary = summarizeHomeDay(
+      [thread("just-now", { startedAt: NOW - 2 * MINUTE, completedAt: NOW + 30_000 })],
+      NOW,
+    );
+    expect(summary.todayTasks).toBe(1);
+    expect(summary.weekTasks).toBe(1);
+  });
+
   it("lists chats waiting on the user first, even from earlier days", () => {
     const earlier = NOW - 3 * 24 * 60 * MINUTE;
     const summary = summarizeHomeDay(

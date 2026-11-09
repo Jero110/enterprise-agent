@@ -1,6 +1,7 @@
 import { ProviderInteractionMode, RuntimeMode } from "@t3tools/contracts";
 import { memo, useRef } from "react";
 import { EllipsisIcon } from "lucide-react";
+import { t } from "~/i18n";
 import {
   Menu,
   MenuPopup,
@@ -43,7 +44,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
             ref={triggerRef}
             size={size}
             className="shrink-0"
-            aria-label="More composer controls"
+            aria-label={t("More composer controls")}
             data-composer-shortcut={props.showPermissions !== false ? "composer.mode" : undefined}
           />
         }

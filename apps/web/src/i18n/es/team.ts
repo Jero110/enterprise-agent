@@ -188,7 +188,7 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "Your saved settings could not be loaded.": "No se pudo cargar tu configuración guardada.",
   Retry: "Reintentar",
   Reload: "Recargar",
-  "Set up Sequoia AI": "Configura Sequoia AI",
+  "Set up Norai": "Configura Norai",
   Connect: "Conectar",
   "onboarding::Agents": "Asistente",
   "1 thread": "1 chat",

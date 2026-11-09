@@ -121,6 +121,13 @@ function ProposalDetails({
   });
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
+  const sectionRef = useRef<HTMLElement>(null);
+  // Bring the chosen proposal into view: the list can sit far above or below its details.
+  // The parent keys this component on the proposal id, so mount covers every new selection.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- scrolls the DOM node into view when a proposal is selected
+  useEffect(() => {
+    sectionRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, []);
   const resolve = async (action: "approve" | "reject" | "revert") => {
     setBusy(true);
     const result = await decide({
@@ -139,10 +146,15 @@ function ProposalDetails({
                   who: personName(proposal.proposedBy),
                   area: areaName,
                 })
-              : t("Saved to {area} knowledge", { area: areaName })
+              : proposal.kind === "upload"
+                ? t("Files approved")
+                : t("Saved to {area} knowledge", { area: areaName })
             : action === "reject"
               ? t("Proposal rejected")
               : t("Change undone"),
+        ...(action === "approve" && proposal.kind === "upload"
+          ? { description: t("Approval does not process or add them to current context.") }
+          : {}),
       });
     } else if (!isAtomCommandInterrupted(result))
       toastManager.add({
@@ -183,6 +195,7 @@ function ProposalDetails({
   };
   return (
     <section
+      ref={sectionRef}
       aria-label={t("Proposal {id}", { id: proposal.id })}
       className="space-y-3 rounded-lg border p-4 text-sm"
     >
@@ -311,6 +324,7 @@ function ProposalList({
   readonly selected: string | null;
   readonly onSelect: (id: string) => void;
 }) {
+  if (proposals.length === 0) return null;
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-medium">
@@ -320,7 +334,7 @@ function ProposalList({
         <button
           key={proposal.id}
           type="button"
-          className="block w-full rounded border p-2 text-left text-sm"
+          className="block w-full rounded-lg hover:bg-muted aria-pressed:border-primary/50 aria-pressed:bg-primary/5 border p-2 text-left text-sm"
           aria-pressed={selected === proposal.id}
           onClick={() => onSelect(proposal.id)}
         >
@@ -354,6 +368,12 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
   const frame = useRef<HTMLIFrameElement>(null);
   const proposals = inbox.data?.proposals ?? [];
   const pending = proposals.filter((proposal) => proposal.status === "pending");
+  // Each pending proposal shows once: the ones you can decide first, then everything else you can see.
+  const assignedToYou = pending.filter(
+    (proposal) =>
+      proposal.canDecide === true ||
+      proposal.reviewers?.some((reviewer) => reviewer.email === identity?.email),
+  );
   const selectedProposal = proposals.find((proposal) => proposal.id === selected);
   const teams = org.data?.teams ?? [];
   const graphNodes = pendingGraphNodes(inbox.data?.proposals ?? [], teams);
@@ -494,7 +514,7 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
                 <button
                   type="button"
                   aria-pressed={selected === proposal.id}
-                  className="flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left hover:bg-muted"
+                  className="flex w-full items-start gap-3 border border-transparent px-2 py-1.5 text-left rounded-lg hover:bg-muted aria-pressed:border-primary/50 aria-pressed:bg-primary/5"
                   onClick={() => selectProposal(proposal.id)}
                 >
                   <span
@@ -529,54 +549,56 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           </ul>
         </section>
       )}
-      <section
-        aria-label={t("Pending context changes")}
-        className="overflow-hidden rounded-xl border bg-background"
-      >
-        <div className={cn(SHOW_KNOWLEDGE_GRAPH && "grid lg:grid-cols-[minmax(0,1fr)_230px]")}>
-          {SHOW_KNOWLEDGE_GRAPH && (
-            <iframe
-              ref={frame}
-              title={t("Interactive context changes graph")}
-              sandbox="allow-scripts"
-              src="/context-graph/index.html"
-              className="h-[470px] w-full border-0"
-            />
-          )}
-          <aside
-            aria-label={t("Pending proposals by scope")}
-            className={cn(
-              "space-y-3 p-4",
-              SHOW_KNOWLEDGE_GRAPH &&
-                "max-h-[470px] overflow-y-auto border-t lg:border-t-0 lg:border-l",
+      {SHOW_KNOWLEDGE_GRAPH && (
+        <section
+          aria-label={t("Pending context changes")}
+          className="overflow-hidden rounded-xl border bg-background"
+        >
+          <div className={cn(SHOW_KNOWLEDGE_GRAPH && "grid lg:grid-cols-[minmax(0,1fr)_230px]")}>
+            {SHOW_KNOWLEDGE_GRAPH && (
+              <iframe
+                ref={frame}
+                title={t("Interactive context changes graph")}
+                sandbox="allow-scripts"
+                src="/context-graph/index.html"
+                className="h-[470px] w-full border-0"
+              />
             )}
-          >
-            {graphGroups.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                {inbox.data ? t("No pending changes") : t("Loading proposals…")}
-              </p>
-            )}
-            {graphGroups.map(([groupId, groupLabel]) => (
-              <div key={groupId} className="space-y-1">
-                <h3 className="text-xs font-medium">{groupLabel}</h3>
-                {graphNodes
-                  .filter((node) => node.groupId === groupId)
-                  .map((node) => (
-                    <button
-                      key={node.id}
-                      type="button"
-                      aria-pressed={selected === node.proposalId}
-                      className="block w-full rounded border px-2 py-1 text-left text-xs hover:bg-muted"
-                      onClick={() => selectProposal(node.proposalId)}
-                    >
-                      {node.title}
-                    </button>
-                  ))}
-              </div>
-            ))}
-          </aside>
-        </div>
-      </section>
+            <aside
+              aria-label={t("Pending proposals by scope")}
+              className={cn(
+                "space-y-3 p-4",
+                SHOW_KNOWLEDGE_GRAPH &&
+                  "max-h-[470px] overflow-y-auto border-t lg:border-t-0 lg:border-l",
+              )}
+            >
+              {graphGroups.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {inbox.data ? t("No pending changes") : t("Loading proposals…")}
+                </p>
+              )}
+              {graphGroups.map(([groupId, groupLabel]) => (
+                <div key={groupId} className="space-y-1">
+                  <h3 className="text-xs font-medium">{groupLabel}</h3>
+                  {graphNodes
+                    .filter((node) => node.groupId === groupId)
+                    .map((node) => (
+                      <button
+                        key={node.id}
+                        type="button"
+                        aria-pressed={selected === node.proposalId}
+                        className="block w-full rounded-lg hover:bg-muted aria-pressed:border-primary/50 aria-pressed:bg-primary/5 border px-2 py-1 text-left text-xs"
+                        onClick={() => selectProposal(node.proposalId)}
+                      >
+                        {node.title}
+                      </button>
+                    ))}
+                </div>
+              ))}
+            </aside>
+          </div>
+        </section>
+      )}
       {selectedProposal && (
         <ProposalDetails
           key={selectedProposal.id}
@@ -597,20 +619,33 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           <div className="space-y-4">
             <ProposalList
               title={t("Assigned to you")}
-              proposals={pending.filter((proposal) =>
-                proposal.reviewers?.some((reviewer) => reviewer.email === identity?.email),
-              )}
+              proposals={assignedToYou}
               teams={teams}
               selected={selected}
               onSelect={selectProposal}
             />
             <ProposalList
               title={t("Authored by you")}
-              proposals={pending.filter((proposal) => proposal.proposedBy === identity?.email)}
+              proposals={pending.filter(
+                (proposal) =>
+                  !assignedToYou.includes(proposal) && proposal.proposedBy === identity?.email,
+              )}
               teams={teams}
               selected={selected}
               onSelect={selectProposal}
             />
+            {!SHOW_KNOWLEDGE_GRAPH && (
+              <ProposalList
+                title={t("Other pending changes")}
+                proposals={pending.filter(
+                  (proposal) =>
+                    !assignedToYou.includes(proposal) && proposal.proposedBy !== identity?.email,
+                )}
+                teams={teams}
+                selected={selected}
+                onSelect={selectProposal}
+              />
+            )}
             <ProposalList
               title={t("History")}
               proposals={proposals.filter((proposal) => proposal.status !== "pending")}

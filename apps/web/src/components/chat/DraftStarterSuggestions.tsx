@@ -1,5 +1,6 @@
 import { type ComposerThreadTarget, useComposerDraftStore } from "~/composerDraftStore";
 import { t } from "~/i18n";
+import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 
 // `prompt` is what lands in the composer; a trailing space leaves room to finish the sentence.
@@ -19,7 +20,10 @@ const STARTER_SUGGESTIONS = [
   },
 ] as const;
 
-/** Starter prompts under the empty-draft composer; hidden as soon as the draft has text. */
+/**
+ * Starter prompts under the empty-draft composer. They fade out once the draft has text but keep
+ * their space, so the home cards below never jump. Short windows leave them out entirely.
+ */
 export function DraftStarterSuggestions({
   draftTarget,
   onPick,
@@ -31,12 +35,16 @@ export function DraftStarterSuggestions({
   const promptIsEmpty = useComposerDraftStore(
     (store) => (store.getComposerDraft(draftTarget)?.prompt.trim().length ?? 0) === 0,
   );
-  if (!promptIsEmpty) return null;
   return (
     <div
       role="group"
       aria-label={t("Suggestions")}
-      className="flex flex-wrap justify-center gap-2"
+      aria-hidden={promptIsEmpty ? undefined : true}
+      inert={promptIsEmpty ? undefined : true}
+      className={cn(
+        "hidden flex-wrap justify-center gap-2 transition-[opacity,visibility] duration-200 motion-reduce:transition-none [@media(min-height:36rem)]:flex",
+        !promptIsEmpty && "pointer-events-none invisible opacity-0",
+      )}
       data-draft-starter-suggestions
     >
       {STARTER_SUGGESTIONS.map((suggestion) => (

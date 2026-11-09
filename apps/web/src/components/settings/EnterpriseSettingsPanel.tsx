@@ -9,7 +9,7 @@ import {
   type EnterpriseTeamSummary,
   type EnvironmentId,
 } from "@t3tools/contracts";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { t } from "~/i18n";
 
@@ -21,6 +21,7 @@ import {
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { ConnectEnterpriseDialog } from "../enterprise/ConnectEnterpriseDialog";
+import { ContextChanges } from "../enterprise/ContextChanges";
 import { createEnterpriseInvite } from "../enterprise/invite";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -45,6 +46,11 @@ export function EnterpriseSettingsPanel() {
           <IdentityRows environmentId={environmentId} identity={identity} error={error} />
         )}
       </SettingsSection>
+      {environmentId !== null && identity ? (
+        <SettingsSection title="Pending approval">
+          <ContextChanges environmentId={environmentId} />
+        </SettingsSection>
+      ) : null}
       <TeamWikiSection />
       {environmentId !== null && identity?.role === "admin" ? (
         <MembersSection environmentId={environmentId} />
@@ -91,10 +97,26 @@ function IdentityRows({
     label: "disconnect enterprise",
     reportFailure: false,
   });
+  // Disconnecting takes two clicks so one misclick does not drop the team connection.
+  const [confirming, setConfirming] = useState(false);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the confirmation step expires on its own after a few seconds
+  useEffect(() => {
+    if (!confirming) return;
+    const timer = window.setTimeout(() => setConfirming(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [confirming]);
   const leave = async () => {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
     setBusy(true);
-    await disconnect({ environmentId, input: {} });
+    const result = await disconnect({ environmentId, input: {} });
     setBusy(false);
+    if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+      toastManager.add({ type: "error", title: t("Could not disconnect") });
+    }
   };
   return (
     <>
@@ -109,7 +131,7 @@ function IdentityRows({
               disabled={busy}
               onClick={() => void leave()}
             >
-              {busy ? t("Disconnecting…") : t("Disconnect")}
+              {busy ? t("Disconnecting…") : confirming ? t("Sure? Disconnect") : t("Disconnect")}
             </Button>
           }
         />
@@ -125,7 +147,7 @@ function IdentityRows({
         />
       )}
       {error ? (
-        <SettingsRow title="The hub did not confirm your access" description={error} />
+        <SettingsRow title="The hub did not confirm your access" description={t(error)} />
       ) : null}
       <ConnectEnterpriseDialog
         environmentId={environmentId}
@@ -150,7 +172,7 @@ function MembersSection({ environmentId }: { readonly environmentId: Environment
           {t("Manage existing members")}
         </summary>
         {members.error ? (
-          <SettingsRow title="Could not load members" description={members.error} />
+          <SettingsRow title="Could not load members" description={t(members.error)} />
         ) : !members.data ? (
           <SettingsRow title={t("Loading members…")} role="status" />
         ) : (

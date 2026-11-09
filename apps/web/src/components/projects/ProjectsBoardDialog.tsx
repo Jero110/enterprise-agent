@@ -25,7 +25,8 @@ import {
   type ProjectTaskPriority,
   type ProjectTaskStatus,
 } from "~/projectBoardStore";
-import { useEnterpriseStatus } from "~/state/enterprise";
+import { enterpriseEnvironment, useEnterpriseStatus } from "~/state/enterprise";
+import { useEnvironmentQuery } from "~/state/query";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
@@ -38,9 +39,9 @@ const STATUS_STYLE: Record<ProjectTaskStatus, { pill: string; column: string }> 
     pill: "border border-border bg-background text-muted-foreground",
     column: "bg-muted/60",
   },
-  in_progress: { pill: "bg-fuchsia-600 text-white", column: "bg-fuchsia-500/8" },
+  in_progress: { pill: "bg-primary text-primary-foreground", column: "bg-primary/6" },
   blocked: { pill: "bg-red-500 text-white", column: "bg-red-500/8" },
-  complete: { pill: "bg-emerald-500 text-white", column: "bg-emerald-500/8" },
+  complete: { pill: "bg-emerald-700 text-white", column: "bg-emerald-500/8" },
 };
 
 const PRIORITY_COLOR: Record<ProjectTaskPriority, string> = {
@@ -50,7 +51,8 @@ const PRIORITY_COLOR: Record<ProjectTaskPriority, string> = {
   low: "text-muted-foreground",
 };
 
-const PALETTE = ["#f97316", "#0ea5e9", "#52525b", "#a855f7", "#16a34a", "#e11d48", "#ca8a04"];
+// sky-700 and yellow-700: white initials on the lighter shades were hard to read.
+const PALETTE = ["#f97316", "#0369a1", "#52525b", "#a855f7", "#16a34a", "#e11d48", "#a16207"];
 
 function paletteColor(key: string): string {
   let hash = 0;
@@ -65,9 +67,16 @@ function formatDue(dueDate: string): string {
   return DUE_FORMAT.format(new Date(year!, month! - 1, day!));
 }
 
+/** Today as YYYY-MM-DD in local time; toISOString is UTC, already tomorrow after 18:00 in CDMX. */
+function localToday(): string {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 function isOverdue(task: ProjectTask): boolean {
   if (task.dueDate === null || task.status === "complete") return false;
-  return task.dueDate < new Date().toISOString().slice(0, 10);
+  return task.dueDate < localToday();
 }
 
 function splitList(value: string): string[] {
@@ -87,7 +96,8 @@ function Avatars({ initials }: { readonly initials: ReadonlyArray<string> }) {
   }
   return (
     <span className="flex -space-x-1.5">
-      {initials.map((initial) => (
+      {/* The same initials twice ("AM, AM") would be one person twice and a duplicate key. */}
+      {[...new Set(initials)].map((initial) => (
         <span
           key={initial}
           className="flex size-6 items-center justify-center rounded-full text-3xs font-medium text-white ring-2 ring-background"
@@ -110,7 +120,9 @@ function TaskCard(props: { readonly task: ProjectTask; readonly onOpen: () => vo
       onClick={props.onOpen}
       className="w-full cursor-pointer rounded-lg border border-border/70 bg-card p-3 text-left shadow-xs transition-colors hover:border-border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
-      <p className="text-sm font-medium leading-snug text-foreground">{task.title}</p>
+      <p className="break-words text-sm font-medium leading-snug text-foreground [overflow-wrap:anywhere]">
+        {task.title}
+      </p>
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
         <Avatars initials={task.assignees} />
         {task.dueDate !== null ? (
@@ -130,13 +142,14 @@ function TaskCard(props: { readonly task: ProjectTask; readonly onOpen: () => vo
             {t(PROJECT_TASK_PRIORITY_LABELS[task.priority], undefined, "priority")}
           </span>
         ) : null}
-        {task.tags.map((tag) => (
+        {[...new Set(task.tags)].map((tag) => (
           <Badge
             key={tag}
             variant="label"
+            className="max-w-full"
             style={{ "--label": paletteColor(tag) } as CSSProperties}
           >
-            {tag}
+            <span className="min-w-0 truncate">{tag}</span>
           </Badge>
         ))}
       </div>
@@ -155,7 +168,13 @@ function BoardColumn(props: {
   const [dragOver, setDragOver] = useState(false);
   const style = STATUS_STYLE[props.status];
   const submit = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") setAdding(false);
+    if (event.key === "Escape") {
+      // Close only this input, not the whole dialog.
+      event.stopPropagation();
+      event.preventDefault();
+      setAdding(false);
+      return;
+    }
     if (event.key !== "Enter") return;
     const title = event.currentTarget.value.trim();
     if (title) props.onAddTask(title);
@@ -179,7 +198,11 @@ function BoardColumn(props: {
         event.preventDefault();
         setDragOver(true);
       }}
-      onDragLeave={() => setDragOver(false)}
+      onDragLeave={(event) => {
+        // Passing over a card inside the column is not leaving it; this keeps the outline steady.
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        setDragOver(false);
+      }}
       onDrop={drop}
     >
       <header className="flex items-center gap-2 px-1 pb-2 pt-1">
@@ -221,7 +244,7 @@ function BoardColumn(props: {
 
 const FIELD = "flex flex-col gap-1 text-xs font-medium text-muted-foreground";
 const NATIVE_SELECT =
-  "h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground dark:bg-input/32";
+  "h-7 rounded-lg border border-input bg-background px-2 text-sm text-foreground dark:bg-input/32";
 
 function TaskEditor(props: {
   readonly board: ProjectBoard;
@@ -303,6 +326,7 @@ function TaskEditor(props: {
             <label className={FIELD}>
               {t("Assignees (initials, comma separated)")}
               <Input
+                placeholder={t("e.g. AM, JR")}
                 defaultValue={task.assignees.join(", ")}
                 onBlur={(event) => update({ assignees: splitList(event.currentTarget.value) })}
               />
@@ -350,6 +374,8 @@ function BoardView() {
   const updateTask = useProjectBoards((state) => state.updateTask);
   const [query, setQuery] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const loading = useProjectBoards((state) => state.loading);
+  const unavailable = useProjectBoards((state) => state.unavailable);
   const [creatingBoard, setCreatingBoard] = useState(false);
   const board = boards.find((entry) => entry.id === activeBoardId) ?? boards[0];
   const editingTask = board?.tasks.find((task) => task.id === editingTaskId);
@@ -383,14 +409,20 @@ function BoardView() {
             aria-label={t("New board name")}
             onBlur={() => setCreatingBoard(false)}
             onKeyDown={(event) => {
-              if (event.key === "Escape") setCreatingBoard(false);
+              if (event.key === "Escape") {
+                // Close only this input, not the whole dialog.
+                event.stopPropagation();
+                event.preventDefault();
+                setCreatingBoard(false);
+                return;
+              }
               if (event.key !== "Enter") return;
               const name = event.currentTarget.value.trim();
               if (name) addBoard(name);
               setCreatingBoard(false);
             }}
           />
-        ) : (
+        ) : boards.length > 0 ? (
           <select
             aria-label={t("Board")}
             className={NATIVE_SELECT}
@@ -403,13 +435,13 @@ function BoardView() {
               </option>
             ))}
           </select>
-        )}
-        <Button size="xs" variant="ghost" onClick={() => setCreatingBoard(true)}>
+        ) : null}
+        <Button size="sm" variant="ghost" onClick={() => setCreatingBoard(true)}>
           <PlusIcon />
           {t("New board")}
         </Button>
         {board ? (
-          <Button size="xs" variant="ghost-destructive" onClick={() => void removeBoard(board)}>
+          <Button size="sm" variant="ghost-destructive" onClick={() => void removeBoard(board)}>
             <Trash2Icon />
             {t("Delete board")}
           </Button>
@@ -434,7 +466,12 @@ function BoardView() {
               status={status}
               tasks={visibleTasks.filter((task) => task.status === status)}
               onOpenTask={(task) => setEditingTaskId(task.id)}
-              onDropTask={(taskId) => updateTask(board.id, taskId, { status })}
+              onDropTask={(taskId) => {
+                // A card dropped back into its own column (or an unknown id) needs no save.
+                const dropped = board.tasks.find((task) => task.id === taskId);
+                if (dropped === undefined || dropped.status === status) return;
+                updateTask(board.id, taskId, { status });
+              }}
               onAddTask={(title) =>
                 addTask(board.id, {
                   title,
@@ -449,10 +486,18 @@ function BoardView() {
             />
           ))}
         </div>
-      ) : (
-        <p className="p-6 text-sm text-muted-foreground">
-          {t("No boards yet. Create one to start.")}
-        </p>
+      ) : loading ? (
+        <p className="p-6 text-sm text-muted-foreground">{t("Loading board…")}</p>
+      ) : unavailable ? null : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            {t("No boards yet. Create one to start.")}
+          </p>
+          <Button onClick={() => setCreatingBoard(true)}>
+            <PlusIcon />
+            {t("Create your first board")}
+          </Button>
+        </div>
       )}
       {board && editingTask ? (
         <TaskEditor
@@ -476,6 +521,13 @@ export function ProjectsBoardButton({
 }) {
   const [open, setOpen] = useState(false);
   const { identity } = useEnterpriseStatus();
+  // Keeps the board query mounted while a thread is open, so a message that mentions a task
+  // finds the board already loaded and attaches it on the first send.
+  useEnvironmentQuery(
+    identity !== null
+      ? enterpriseEnvironment.projectBoard({ environmentId, input: { projectId } })
+      : null,
+  );
   if (identity === null) return null;
   return (
     <>

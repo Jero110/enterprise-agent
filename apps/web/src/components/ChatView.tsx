@@ -717,7 +717,7 @@ export default function ChatView(props: ChatViewProps) {
   ] = useState<Record<string, boolean>>({});
   const legendListRef = useRef<LegendListRef | null>(null);
   const conversationArea = workspaceAreaProps("conversation", 1, "Conversation");
-  const composerArea = workspaceAreaProps("composer", 2, "Message input");
+  const composerArea = workspaceAreaProps("composer", 2, t("Message input"));
   const [composerOverlayElement, setComposerOverlayElement] = useState<HTMLDivElement | null>(null);
   const [composerTimelineInset, setComposerTimelineInset] = useState(0);
   const composerTimelineInsetRef = useRef(0);
@@ -3835,23 +3835,29 @@ export default function ChatView(props: ChatViewProps) {
                           )}
                         </div>
                       </div>
-                      {isDraftHeroState && composerBannerItems.length > 0 ? (
-                        // Out of flow, like the headline, so a notice never moves the centered composer.
-                        <div className="absolute inset-x-0 top-full flex flex-col gap-1 pt-4">
-                          <ComposerBannerStack items={composerBannerItems} detached />
-                        </div>
-                      ) : isDraftHeroState && !(isLocalDraftThread && activeProject === null) ? (
+                      {isDraftHeroState ? (
+                        // Out of flow, like the headline, so notices and home cards never move
+                        // the centered composer. Notices go first, above the home cards.
                         <div className="absolute inset-x-0 top-full flex flex-col gap-4 pt-4">
-                          <DraftStarterSuggestions
-                            draftTarget={composerDraftTarget}
-                            onPick={insertStarterSuggestionStable}
-                          />
-                          <TodayPanel />
-                          {activeProject ? (
-                            <TeamWorkCard
-                              environmentId={environmentId}
-                              projectId={activeProject.id}
-                            />
+                          {composerBannerItems.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              <ComposerBannerStack items={composerBannerItems} detached />
+                            </div>
+                          ) : null}
+                          {!(isLocalDraftThread && activeProject === null) ? (
+                            <>
+                              <DraftStarterSuggestions
+                                draftTarget={composerDraftTarget}
+                                onPick={insertStarterSuggestionStable}
+                              />
+                              <TodayPanel />
+                              {activeProject && !activeProjectIsScratch ? (
+                                <TeamWorkCard
+                                  environmentId={environmentId}
+                                  projectId={activeProject.id}
+                                />
+                              ) : null}
+                            </>
                           ) : null}
                         </div>
                       ) : null}

@@ -17,8 +17,11 @@ const PROJECT_BOARD_KIND = "project-board" as ComposerContextKind;
 const PROJECT_TASK_KIND = "project-task" as ComposerContextKind;
 const PROJECT_CONTEXT_KINDS: ReadonlySet<string> = new Set([PROJECT_BOARD_KIND, PROJECT_TASK_KIND]);
 
-/** Words that mean "the whole board" rather than one task. */
-const BOARD_KEYWORDS = ["tablero", "tableros", "kanban", "proyectos", "tarjetas", "tareas"];
+/**
+ * Words that mean "the whole board" rather than one task. Not "tareas" or "proyectos": they show
+ * up in everyday questions ("¿qué tareas tengo hoy?") and attached every board to them.
+ */
+const BOARD_KEYWORDS = ["tablero", "tableros", "kanban", "tarjetas"];
 const MAX_TASK_RECORDS = 20;
 
 function fold(text: string): string {

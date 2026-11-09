@@ -50,7 +50,7 @@ export function TodayPanel() {
   return (
     <section
       aria-label={t("Your day")}
-      className="hidden gap-2 sm:grid-cols-2 [@media(min-height:44rem)]:grid"
+      className="hidden gap-2 sm:grid-cols-2 [@media(min-height:40rem)]:grid"
       data-home-today-panel
     >
       <TimeSavedCard summary={summary} />
@@ -68,7 +68,7 @@ function TimeSavedCard({ summary }: { readonly summary: HomeDaySummary }) {
           {t("Your time saved will show up here")}
         </div>
         <p className="text-muted-foreground text-xs">
-          {t("Ask an agent for something and Sequoia will keep count.")}
+          {t("Ask an agent for something and Norai will keep count.")}
         </p>
       </div>
     );
@@ -79,7 +79,7 @@ function TimeSavedCard({ summary }: { readonly summary: HomeDaySummary }) {
         <div className="flex min-w-0 items-baseline gap-1.5 text-foreground text-sm">
           <HourglassIcon aria-hidden className="size-4 shrink-0 self-center text-primary" />
           <span>
-            {t("Sequoia saved you")}{" "}
+            {t("Norai saved you")}{" "}
             <strong className="font-semibold text-base text-primary tabular-nums">
               {formatSavedTime(summary.weekMinutes)}
             </strong>

@@ -653,7 +653,7 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
 
 const LINK_TARGET_LABELS: Readonly<Record<BrowserLinkTarget, string>> = {
   system: "Your default browser",
-  app: "Sequoia AI",
+  app: "Norai",
 };
 
 function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) {
@@ -793,12 +793,12 @@ export function PullRequestLinksOpenInAppSetting() {
     <SettingsRow
       {...searchableSetting("pull-request-links-open-in-app")}
       description={t(
-        "Clicking a pull request link opens it in Sequoia AI. Turn off to open pull request links like any other link, on your git host.",
+        "Clicking a pull request link opens it in Norai. Turn off to open pull request links like any other link, on your git host.",
       )}
       resetAction={
         openInApp ? null : (
           <SettingResetButton
-            label="open pull requests in Sequoia AI"
+            label="open pull requests in Norai"
             onClick={() => updateSettings({ pullRequestLinksOpenInApp: true })}
           />
         )
@@ -809,7 +809,7 @@ export function PullRequestLinksOpenInAppSetting() {
           onCheckedChange={(checked) =>
             updateSettings({ pullRequestLinksOpenInApp: Boolean(checked) })
           }
-          aria-label={t("Open pull requests in Sequoia AI")}
+          aria-label={t("Open pull requests in Norai")}
         />
       }
     />

@@ -17,7 +17,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   ", which is not available in this build. Its configuration is preserved.":
     ", que no está disponible en esta versión. Su configuración se conserva.",
   ". An alpha that may change or break. T3 Code never installs Simlock.":
-    ". Es una versión alfa que puede cambiar o fallar. Sequoia AI nunca instala Simlock.",
+    ". Es una versión alfa que puede cambiar o fallar. Norai nunca instala Simlock.",
   ". While it is off, every guest link stops working.":
     ". Mientras esté apagado, ningún enlace de invitado funciona.",
   ". While it is off, nothing new starts over a link; tasks already running finish.":
@@ -191,7 +191,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Accepted as {account}.": "Aceptado como {account}.",
   Access: "Acceso",
   "Access is still required. Quit and reopen T3 Code if you just allowed it, then retry the import.":
-    "Todavía falta el permiso. Si acabas de darlo, cierra y vuelve a abrir Sequoia AI, y reintenta la importación.",
+    "Todavía falta el permiso. Si acabas de darlo, cierra y vuelve a abrir Norai, y reintenta la importación.",
   Accessibility: "Accesibilidad",
   Account: "Cuenta",
   "Account {number}": "Cuenta {number}",
@@ -312,7 +312,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Allow GNOME extensions": "Permite las extensiones de GNOME",
   "Allow snapshots": "Permite las capturas",
   "Allow T3 Code to read your desktop settings. You'll review any changes here before saving.":
-    "Permite que Sequoia AI lea la configuración de tu escritorio. Verás aquí cualquier cambio antes de guardarlo.",
+    "Permite que Norai lea la configuración de tu escritorio. Verás aquí cualquier cambio antes de guardarlo.",
   Allowed: "Permitido",
   "Allows scoped background probes while any subscribed client remains connected.":
     "Permite revisiones en segundo plano mientras haya alguien conectado.",
@@ -338,7 +338,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Animate snapshots": "Animar capturas",
   "Another address…": "Otra dirección…",
   "Another t3 at {path} runs first in a new terminal. Remove it to use T3 Code's.":
-    "Otro t3 en {path} se ejecuta primero en una terminal nueva. Quítalo para usar el de Sequoia AI.",
+    "Otro t3 en {path} se ejecuta primero en una terminal nueva. Quítalo para usar el de Norai.",
   "Antigravity download": "Descarga de Antigravity",
   "Antigravity setup": "Configuración de Antigravity",
   "Any local files": "Cualquier archivo local",
@@ -503,7 +503,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
     "Busca versiones nuevas de los agentes de IA instalados y actualiza la lista de modelos. Apagado, quizá no veas modelos nuevos.",
   "Check provider versions": "Buscar versiones de agentes",
   "Check T3 Code SnapShots in GNOME Extensions, then try again.":
-    "Revisa Sequoia AI SnapShots en Extensiones de GNOME e inténtalo de nuevo.",
+    "Revisa Norai SnapShots en Extensiones de GNOME e inténtalo de nuevo.",
   "Check the Expo account before choosing a project.":
     "Revisa la cuenta de Expo antes de elegir un proyecto.",
   "Check versions": "Revisar versiones",
@@ -602,8 +602,8 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Click to hide email": "Haz clic para ocultar el correo",
   "Click to reveal account": "Haz clic para ver la cuenta",
   "Click to reveal email": "Haz clic para ver el correo",
-  "Clicking a pull request link opens it in Sequoia AI. Turn off to open pull request links like any other link, on your git host.":
-    "Al hacer clic en un enlace de pull request se abre en Sequoia AI. Apágalo para abrirlos como cualquier otro enlace, en tu servicio de git.",
+  "Clicking a pull request link opens it in Norai. Turn off to open pull request links like any other link, on your git host.":
+    "Al hacer clic en un enlace de pull request se abre en Norai. Apágalo para abrirlos como cualquier otro enlace, en tu servicio de git.",
   "Client label (optional)": "Nombre del dispositivo (opcional)",
   "Client not supported": "Esta versión de la app no es compatible",
   "Client scopes": "Permisos del dispositivo",
@@ -1011,7 +1011,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "device::Environment": "Computadora",
   "Devices at once": "Dispositivos a la vez",
   "Devices connected over your local network will disconnect. Existing tunnels, such as T3 Connect or Tailscale HTTPS, keep working. T3 Code will restart.":
-    "Los dispositivos conectados por tu red local se desconectarán. Los túneles que ya tienes, como T3 Connect o Tailscale HTTPS, siguen funcionando. Sequoia AI se reiniciará.",
+    "Los dispositivos conectados por tu red local se desconectarán. Los túneles que ya tienes, como T3 Connect o Tailscale HTTPS, siguen funcionando. Norai se reiniciará.",
   "Devices on the same network": "Dispositivos en la misma red",
   "Devices on your private network": "Dispositivos en tu red privada",
   "Diagnostics copied": "Diagnóstico copiado",
@@ -1045,7 +1045,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Downloading update": "Descargando actualización",
   "Downloading update {version}": "Descargando la actualización {version}",
   Driver: "Tipo de agente",
-  "Drop T3 Code or VS Code .json files": "Suelta aquí archivos .json de Sequoia AI o VS Code",
+  "Drop T3 Code or VS Code .json files": "Suelta aquí archivos .json de Norai o VS Code",
   Duplicate: "Duplicada",
   "Duplicate {name}": "Duplicar {name}",
   "Duplicate of an option above": "Repite una opción de arriba",
@@ -1093,7 +1093,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Electron main process": "Proceso principal de Electron",
   "Electron utility": "Utilidad de Electron",
   "Eligible usage in T3 Code uses your ChatGPT plan. Manage your shared usage and any credit settings in ChatGPT.":
-    "El uso permitido en Sequoia AI se cobra a tu plan de ChatGPT. Administra tu uso compartido y tus créditos en ChatGPT.",
+    "El uso permitido en Norai se cobra a tu plan de ChatGPT. Administra tu uso compartido y tus créditos en ChatGPT.",
   Emerald: "Esmeralda",
   Emoji: "Emoji",
   Empty: "Vacío",
@@ -1108,7 +1108,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Enable network access?": "¿Activar el acceso por red?",
   "Enable snapshots": "Activar capturas",
   "Enable T3 Code SnapShots to start capturing windows.":
-    "Activa Sequoia AI SnapShots para empezar a capturar ventanas.",
+    "Activa Norai SnapShots para empezar a capturar ventanas.",
   "Enable T3 Connect": "Activar T3 Connect",
   "Enable Tailscale HTTPS": "Activar Tailscale HTTPS",
   "Enable the extension": "Activa la extensión",
@@ -1249,7 +1249,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Flash captured window": "Destello en la ventana capturada",
   Folder: "Carpeta",
   "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the T3 home folder.":
-    "Carpeta donde se crean las nuevas copias de trabajo, en cualquier disco, como D:\\worktrees o ~/worktrees. Las que ya existen se quedan donde están. Déjala vacía para usar la carpeta principal de Sequoia AI.",
+    "Carpeta donde se crean las nuevas copias de trabajo, en cualquier disco, como D:\\worktrees o ~/worktrees. Las que ya existen se quedan donde están. Déjala vacía para usar la carpeta principal de Norai.",
   "Follow change request templates": "Seguir plantillas de pull request",
   "Follow system": "Seguir al sistema",
   "Follow the system appearance": "Seguir el modo del sistema",
@@ -1286,7 +1286,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
     "Genera un enlace de un solo uso para que otro dispositivo se vincule con esta computadora como dispositivo autorizado.",
   "Git fetch interval": "Cada cuánto revisar Git",
   "Give T3 Code Full Disk Access in System Settings → Privacy & Security, then retry.":
-    "Dale a Sequoia AI Acceso total al disco en Configuración del sistema → Privacidad y seguridad, y vuelve a intentarlo.",
+    "Dale a Norai Acceso total al disco en Configuración del sistema → Privacidad y seguridad, y vuelve a intentarlo.",
   "Give the host a label and limits within the ranges shown.":
     "Ponle un nombre al host y límites dentro de los rangos indicados.",
   "Give the host a label.": "Ponle un nombre al host.",
@@ -1369,11 +1369,11 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Idle minutes must be smaller than session minutes.":
     "Los minutos sin uso deben ser menos que los minutos de sesión.",
   "If access doesn't update after you allow it, quit and reopen T3 Code, then retry the import.":
-    "Si el permiso no se actualiza después de darlo, cierra y vuelve a abrir Sequoia AI, y reintenta la importación.",
+    "Si el permiso no se actualiza después de darlo, cierra y vuelve a abrir Norai, y reintenta la importación.",
   "If sign-in doesn't return to T3 Code, paste the URL from the final localhost page.":
-    "Si al iniciar sesión no regresas a Sequoia AI, pega la URL de la última página de localhost.",
+    "Si al iniciar sesión no regresas a Norai, pega la URL de la última página de localhost.",
   "If T3 Code does not reopen after it restarts, open it again.":
-    "Si Sequoia AI no se vuelve a abrir después de reiniciar, ábrelo de nuevo.",
+    "Si Norai no se vuelve a abrir después de reiniciar, ábrelo de nuevo.",
   "If the final localhost page does not load, paste its full URL here.":
     "Si la última página de localhost no carga, pega aquí su URL completa.",
   "Import from": "Importar de",
@@ -1408,7 +1408,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Include text and controls when the app makes them available.":
     "Incluye el texto y los controles cuando la app los ofrece.",
   "Included with T3 Code. No download needed.":
-    "Viene incluido con Sequoia AI. No hay que descargar nada.",
+    "Viene incluido con Norai. No hay que descargar nada.",
   "Includes ignored files, except node_modules.": "Incluye archivos ignorados, menos node_modules.",
   Incompatible: "Incompatible",
   Increase: "Aumentar",
@@ -1527,15 +1527,15 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Leases, drives, and streams devices. Create one with":
     "Sirve para pedir, usar y transmitir dispositivos. Créalo con",
   "Leave blank to let T3 Code spawn the server when needed.":
-    "Déjalo vacío para que Sequoia AI inicie el servidor cuando haga falta.",
+    "Déjalo vacío para que Norai inicie el servidor cuando haga falta.",
   "Less often": "Menos seguido",
   "Let agents here work on your other machines, and theirs here. Turn it on for each machine, then link them in":
     "Deja que los agentes de aquí trabajen en tus otras computadoras, y los de allá aquí. Actívalo en cada computadora y luego vincúlalas en",
-  "Let T3 Code read {name}’s cookies": "Deja que Sequoia AI lea las cookies de {name}",
+  "Let T3 Code read {name}’s cookies": "Deja que Norai lea las cookies de {name}",
   "Let the Device panel lease simulators and emulators from your own":
     "Deja que el panel de dispositivos use simuladores y emuladores de tu propio grupo de",
   "Let your other devices connect to T3 Code over the network. Pair devices to give them access. T3 Code will restart.":
-    "Deja que tus otros dispositivos se conecten a Sequoia AI por la red. Vincula cada uno para darle acceso. Sequoia AI se reiniciará.",
+    "Deja que tus otros dispositivos se conecten a Norai por la red. Vincula cada uno para darle acceso. Norai se reiniciará.",
   "Let's fix capture access": "Arreglemos el acceso de captura",
   "Let's try that again": "Intentemos otra vez",
   Letters: "Letras",
@@ -1550,7 +1550,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   Link: "Vincular",
   "Link an environment": "Vincular una computadora",
   "Link another machine running T3 Code, such as a VPS, so agents here can launch and drive threads there.":
-    "Vincula otra computadora con Sequoia AI, como un VPS, para que los agentes de aquí puedan abrir y manejar chats allá.",
+    "Vincula otra computadora con Norai, como un VPS, para que los agentes de aquí puedan abrir y manejar chats allá.",
   "Link created at {time}": "Enlace creado el {time}",
   "link target": "dónde abrir los enlaces",
   Linked: "Vinculada",
@@ -1622,7 +1622,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Manage relay": "Administrar relay",
   "Manage usage": "Administrar uso",
   "Managed binary cleanup failed.": "No se pudieron borrar los archivos instalados.",
-  "Managed by T3 Code": "Administrado por Sequoia AI",
+  "Managed by T3 Code": "Administrado por Norai",
   "Management key": "Clave de administración",
   "Manual capture only. You'll choose a window each time":
     "Solo captura manual. Elegirás una ventana cada vez",
@@ -1687,7 +1687,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Name your theme first.": "Primero ponle nombre a tu tema.",
   Native: "Nativo",
   "Native counters identify which process is reading or writing. These application-level counters identify known T3 operations so process spikes can be correlated with specific persistence and logging paths.":
-    "Los contadores nativos dicen qué proceso lee o escribe. Estos contadores de la app identifican operaciones conocidas de Sequoia AI, para relacionar los picos de un proceso con lo que se guarda o se registra.",
+    "Los contadores nativos dicen qué proceso lee o escribe. Estos contadores de la app identifican operaciones conocidas de Norai, para relacionar los picos de un proceso con lo que se guarda o se registra.",
   "Native process monitor": "Monitor de procesos nativo",
   "Native sessions": "Sesiones propias del agente",
   Navigation: "Navegación",
@@ -1855,8 +1855,8 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
     "Abre a mano Privacidad y seguridad → Acceso total al disco.",
   "Open pull requests and changes panels proactively":
     "Abrir solos los paneles de pull requests y de cambios",
-  "open pull requests in Sequoia AI": "abrir pull requests en Sequoia AI",
-  "Open pull requests in Sequoia AI": "Abrir pull requests en Sequoia AI",
+  "open pull requests in Norai": "abrir pull requests en Norai",
+  "Open pull requests in Norai": "Abrir pull requests en Norai",
   "Open sign-in page": "Abrir página para iniciar sesión",
   "Open simulators and emulators in the Device panel. Hub:":
     "Abre simuladores y emuladores en el panel de dispositivos. Hub:",
@@ -2235,7 +2235,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Restart and turn off": "Reiniciar y apagar",
   "Restart and turn on": "Reiniciar y encender",
   "Restart T3 Code to finish connecting your shortcut.":
-    "Reinicia Sequoia AI para terminar de conectar tu atajo.",
+    "Reinicia Norai para terminar de conectar tu atajo.",
   Restarting: "Reiniciando",
   "Restarting…": "Reiniciando…",
   Restarts: "Reinicios",
@@ -2243,7 +2243,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
     "Recupera Build/Plan, /plan, /default y Shift+Tab. Apagado, usa el modo build.",
   "Restore default settings?": "¿Restaurar la configuración predeterminada?",
   "Resume agent-owned conversations as T3 threads.":
-    "Retoma las conversaciones del agente como chats de Sequoia AI.",
+    "Retoma las conversaciones del agente como chats de Norai.",
   "Retry connection": "Reintentar conexión",
   "Retry installation": "Reintentar instalación",
   "Retry monitor": "Reintentar monitor",
@@ -2289,8 +2289,8 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Routes to {name}, preferred first": "Rutas a {name}, la preferida primero",
   "Run a prompt automatically on an interval, at a fixed time, once at a set date, or when a webhook is called.":
     "Ejecuta una instrucción automáticamente cada cierto tiempo, a una hora fija, una sola vez en una fecha, o cuando llega un webhook.",
-  "Run agents on this computer. Turn off to use Sequoia AI only with remote environments.":
-    "Usa agentes en esta computadora. Apágalo para usar Sequoia AI solo con computadoras remotas.",
+  "Run agents on this computer. Turn off to use Norai only with remote environments.":
+    "Usa agentes en esta computadora. Apágalo para usar Norai solo con computadoras remotas.",
   "Run an installed ACP executable on {name}.": "Usa un programa ACP instalado en {name}.",
   "Run at": "Ejecutar a las",
   "Run both backends": "Usar los dos",
@@ -2302,13 +2302,13 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Run now": "Ejecutar ahora",
   "Run only the WSL backend?": "¿Usar solo WSL?",
   "Run only the WSL backend. T3 Code restarts when this changes.":
-    "Usa solo WSL. Sequoia AI se reinicia al cambiar esto.",
+    "Usa solo WSL. Norai se reinicia al cambiar esto.",
   "Run only when every filter matches. Other requests are logged as filtered. Separate “is one of” values with commas; a value can't contain a comma.":
     "Se ejecuta solo si todos los filtros coinciden. Las demás solicitudes quedan registradas como filtradas. Separa con comas los valores de “es uno de”; un valor no puede llevar coma.",
   "Run scheduled when the window closes; no run started yet.":
     "Se ejecutará cuando cierre la ventana; todavía no empieza.",
   "Run T3 Code's CLI as `t3` from any terminal.":
-    "Usa la línea de comandos de Sequoia AI como `t3` desde cualquier terminal.",
+    "Usa la línea de comandos de Norai como `t3` desde cualquier terminal.",
   "Run the selected WSL distro alongside Windows. Projects remain on their current filesystem.":
     "Usa la distro de WSL elegida junto con Windows. Los proyectos se quedan donde están.",
   "Run the WSL backend alongside the Windows one, or stop the Windows backend and use only WSL? You can change this later from Settings.":
@@ -2397,7 +2397,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
     "Elige una sola computadora o un modelo en común para cambiar el esfuerzo.",
   "Select the variants you want to remove. You can restore them by importing the extension again.":
     "Elige las variantes que quieres quitar. Puedes recuperarlas importando la extensión otra vez.",
-  "Selected by T3 Code.": "Lo elige Sequoia AI.",
+  "Selected by T3 Code.": "Lo elige Norai.",
   "Semantic prefix": "Prefijo según el trabajo",
   "Send {signal}": "Enviar {signal}",
   "Send activity to mobile notifications and Live Activities without T3 Connect.":
@@ -2410,10 +2410,10 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Sensitive values are stored separately and never returned to the app.":
     "Los valores privados se guardan aparte y nunca regresan a la app.",
   "Sensitive, stored separately": "Privada, se guarda aparte",
-  "Sequoia AI will restart and start running a server on this computer again.":
-    "Sequoia AI se reiniciará y volverá a usar un servidor en esta computadora.",
-  "Sequoia AI will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected.":
-    "Sequoia AI se reiniciará sin un servidor en esta computadora. Los agentes y terminales que estén corriendo aquí se detendrán, y otros dispositivos ya no podrán conectarse a ella. Tus proyectos, tu historial y tus computadoras remotas no cambian.",
+  "Norai will restart and start running a server on this computer again.":
+    "Norai se reiniciará y volverá a usar un servidor en esta computadora.",
+  "Norai will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected.":
+    "Norai se reiniciará sin un servidor en esta computadora. Los agentes y terminales que estén corriendo aquí se detendrán, y otros dispositivos ya no podrán conectarse a ella. Tus proyectos, tu historial y tus computadoras remotas no cambian.",
   server: "servidor",
   Server: "Servidor",
   "Server environment": "Herramientas del servidor",
@@ -2632,26 +2632,26 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Switches this app and every connected machine whose database the target release supports.":
     "Cambia esta app y cada computadora conectada cuya base de datos sea compatible con la versión elegida.",
   "System monospace": "Ancho fijo del sistema",
-  'T3 Code already uses this for "{command}".': 'Sequoia AI ya usa esto para "{command}".',
+  'T3 Code already uses this for "{command}".': 'Norai ya usa esto para "{command}".',
   "T3 Code also reads any files included by this file.":
-    "Sequoia AI también lee los archivos que este incluya.",
+    "Norai también lee los archivos que este incluya.",
   "T3 Code does not recognize this condition yet. It can still be saved, but it may not match unless the runtime provides it.":
-    "Sequoia AI todavía no reconoce esta condición. Puedes guardarla, pero quizá no funcione si la app no la ofrece.",
-  "T3 Code downloads and manages Codex for you.": "Sequoia AI descarga y administra Codex por ti.",
+    "Norai todavía no reconoce esta condición. Puedes guardarla, pero quizá no funcione si la app no la ofrece.",
+  "T3 Code downloads and manages Codex for you.": "Norai descarga y administra Codex por ti.",
   "T3 Code will restart and bring the Windows backend back up alongside WSL.":
-    "Sequoia AI se reiniciará y volverá a activar Windows junto con WSL.",
+    "Norai se reiniciará y volverá a activar Windows junto con WSL.",
   "T3 Code will restart and start only the WSL backend. Your Windows-side projects won't be accessible until you turn this off again.":
-    "Sequoia AI se reiniciará y usará solo WSL. No podrás abrir tus proyectos de Windows hasta que lo vuelvas a apagar.",
+    "Norai se reiniciará y usará solo WSL. No podrás abrir tus proyectos de Windows hasta que lo vuelvas a apagar.",
   "T3 Code will restart on the Windows backend. Threads and projects opened against WSL stay safe inside the distro and become available again when you re-enable WSL.":
-    "Sequoia AI se reiniciará con Windows. Los chats y proyectos de WSL se quedan a salvo dentro de la distro y vuelven a aparecer cuando reactives WSL.",
+    "Norai se reiniciará con Windows. Los chats y proyectos de WSL se quedan a salvo dentro de la distro y vuelven a aparecer cuando reactives WSL.",
   "T3 Code will restart the local backend with Tailscale Serve enabled and ask Tailscale to proxy HTTPS traffic to this backend.":
-    "Sequoia AI reiniciará el servidor local con Tailscale Serve activado y le pedirá a Tailscale que envíe el tráfico HTTPS a este servidor.",
+    "Norai reiniciará el servidor local con Tailscale Serve activado y le pedirá a Tailscale que envíe el tráfico HTTPS a este servidor.",
   "T3 Code will restart the local backend without Tailscale Serve.":
-    "Sequoia AI reiniciará el servidor local sin Tailscale Serve.",
+    "Norai reiniciará el servidor local sin Tailscale Serve.",
   "T3 Code will restart the WSL backend on the new distro. Sessions still running on the current distro will be interrupted.":
-    "Sequoia AI reiniciará WSL con la nueva distro. Lo que siga corriendo en la distro actual se interrumpirá.",
+    "Norai reiniciará WSL con la nueva distro. Lo que siga corriendo en la distro actual se interrumpirá.",
   "T3 Code's capture helper lets you capture other apps and return to your draft. It's included with T3 Code.":
-    "El ayudante de captura de Sequoia AI te deja capturar otras apps y volver a tu mensaje. Viene incluido con Sequoia AI.",
+    "El ayudante de captura de Norai te deja capturar otras apps y volver a tu mensaje. Viene incluido con Norai.",
   "t3 command": "Comando t3",
   "T3 Connect": "T3 Connect",
   "T3 Connect is on, but other devices cannot reach this environment.":
@@ -2665,8 +2665,8 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "T3 Connect linked": "T3 Connect vinculado",
   "T3 Connect tunnel disabled": "Túnel de T3 Connect desactivado",
   "T3 Connect unlinked": "T3 Connect desvinculado",
-  "T3 process": "Proceso de Sequoia AI",
-  "T3 system footprint": "Consumo de Sequoia AI",
+  "T3 process": "Proceso de Norai",
+  "T3 system footprint": "Consumo de Norai",
   "t3.json is invalid": "t3.json no es válido",
   "Tab size for you and agents. Fill fits the panel; other sizes show the device toolbar.":
     'Tamaño de la pestaña para ti y los agentes. "Llenar" ocupa todo el panel; los otros tamaños muestran la barra de dispositivo.',
@@ -2747,7 +2747,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
     "El nombre necesita al menos una letra o un número.",
   "the primary environment": "la computadora principal",
   "The process is not a child of the T3 Server. It might already have exited.":
-    "El proceso no depende del servidor de Sequoia AI. Puede que ya haya terminado.",
+    "El proceso no depende del servidor de Norai. Puede que ya haya terminado.",
   "The provider failed its startup checks.": "El agente de IA no pasó sus revisiones de arranque.",
   "The provider is installed, but the server could not fully verify it.":
     "El agente de IA está instalado, pero el servidor no pudo revisarlo por completo.",
@@ -2768,12 +2768,12 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "The system keyring could not be accessed. Make sure your desktop keyring is running and unlocked, then retry.":
     "No se pudo acceder al llavero del sistema. Revisa que esté funcionando y desbloqueado, y vuelve a intentarlo.",
   "The T3 Code GNOME extension lets you capture other windows and bring them into your draft. Sign out once after installing.":
-    "La extensión de Sequoia AI para GNOME te deja capturar otras ventanas y agregarlas a tu mensaje. Cierra sesión una vez después de instalarla.",
+    "La extensión de Norai para GNOME te deja capturar otras ventanas y agregarlas a tu mensaje. Cierra sesión una vez después de instalarla.",
   "The target profile could not be opened.": "No se pudo abrir el perfil de destino.",
   "The update track did not change.": "El canal de actualizaciones no cambió.",
   "The URL appears after you save.": "La dirección aparece cuando guardes.",
   "The WSL backend will stop. Threads and projects opened against WSL stay safe inside the distro, but they'll be unavailable in T3 Code until you re-enable WSL.":
-    "WSL se detendrá. Los chats y proyectos de WSL se quedan a salvo dentro de la distro, pero no podrás usarlos en Sequoia AI hasta que reactives WSL.",
+    "WSL se detendrá. Los chats y proyectos de WSL se quedan a salvo dentro de la distro, pero no podrás usarlos en Norai hasta que reactives WSL.",
   Theme: "Tema",
   "Theme added, but it could not be selected. Try again.":
     "El tema se agregó, pero no se pudo seleccionar. Inténtalo de nuevo.",
@@ -2843,7 +2843,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "This environment did not accept your session. Reconnect to try again.":
     "Esta computadora no aceptó tu sesión. Vuelve a conectarte para intentarlo de nuevo.",
   "This environment does not support this setting. Update T3 Code on it.":
-    "Esta computadora no admite esta opción. Actualiza Sequoia AI en ella.",
+    "Esta computadora no admite esta opción. Actualiza Norai en ella.",
   "This environment is available through T3 Connect.":
     "Esta computadora está disponible por T3 Connect.",
   "This environment is available to your other devices through T3 Connect.":
@@ -2854,7 +2854,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "This environment publishes agent activity to your mobile clients.":
     "Esta computadora envía la actividad de los agentes a tu celular.",
   "This environment runs an older T3 Code. Update it to schedule a one-time task, or pick another schedule.":
-    "Esta computadora tiene una versión anterior de Sequoia AI. Actualízala para programar una tarea de una sola vez, o elige otro horario.",
+    "Esta computadora tiene una versión anterior de Norai. Actualízala para programar una tarea de una sola vez, o elige otro horario.",
   "This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again.":
     "Esta computadora se quitó de T3 Connect. Ejecuta `t3 connect link` en ella para vincularla otra vez.",
   "This environment was removed from T3 Connect. Turn it on to link it again.":
@@ -2876,7 +2876,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
     "Este proyecto no tiene una copia en esta computadora.",
   "This project is no longer available.": "Este proyecto ya no está disponible.",
   "This provider is installed but disabled for new sessions in T3 Code.":
-    "Este agente de IA está instalado, pero apagado para chats nuevos en Sequoia AI.",
+    "Este agente de IA está instalado, pero apagado para chats nuevos en Norai.",
   "This replaces its installed variants, including any local edits. Variants no longer in the extension will be removed.":
     "Esto reemplaza sus variantes instaladas, incluidos tus cambios. Las variantes que ya no vengan en la extensión se quitarán.",
   "This scheduled task no longer exists.": "Esta tarea programada ya no existe.",
@@ -2904,7 +2904,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "To edit these settings, pair this connection with both View relay and Manage relay permissions.":
     "Para cambiar estas opciones, vincula esta conexión con los permisos Ver relay y Administrar relay.",
   "To import cookies from {name}, T3 Code needs Full Disk Access. Turn it on in System Settings, then come back to finish the import. You can revoke it again once the import is done.":
-    "Para importar las cookies de {name}, Sequoia AI necesita Acceso total al disco. Actívalo en la Configuración del sistema y regresa para terminar. Puedes quitarlo cuando acabe la importación.",
+    "Para importar las cookies de {name}, Norai necesita Acceso total al disco. Actívalo en la Configuración del sistema y regresa para terminar. Puedes quitarlo cuando acabe la importación.",
   "Toggle {name} details": "Mostrar u ocultar detalles de {name}",
   "Toggle account email visibility": "Mostrar u ocultar el correo de la cuenta",
   "Toggle account visibility": "Mostrar u ocultar la cuenta",
@@ -2943,7 +2943,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Tune the shared power policy and the background intervals that feed it.":
     "Ajusta la política de energía compartida y cada cuánto corre el trabajo en segundo plano.",
   "Turn capture off in T3 Code to stop it. Remove the shortcut from {desktop} to free up the keys.":
-    "Para detenerla, apaga la captura en Sequoia AI. Quita el atajo de {desktop} para liberar las teclas.",
+    "Para detenerla, apaga la captura en Norai. Quita el atajo de {desktop} para liberar las teclas.",
   "Turn off local environment?": "¿Apagar esta computadora como servidor?",
   "Turn off WSL and switch back to Windows?": "¿Apagar WSL y volver a Windows?",
   "Turn on a cleanup rule to use this.": "Activa una regla de limpieza para usar esto.",
@@ -3010,7 +3010,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Update now": "Actualizar ahora",
   "Update required": "Hace falta actualizar",
   "Update T3 Code on {name} to manage its secret providers.":
-    "Actualiza Sequoia AI en {name} para administrar sus proveedores de claves.",
+    "Actualiza Norai en {name} para administrar sus proveedores de claves.",
   "Update text": "Texto de actualización",
   "Update the capture helper": "Actualiza el ayudante de captura",
   "Update the desktop app to use snapshots.": "Actualiza la app de escritorio para usar capturas.",
@@ -3136,7 +3136,7 @@ export const ES_SETTINGS_ADVANCED: Readonly<Record<string, string>> = {
   "Warning text": "Texto de advertencia",
   We: "Mi",
   "We do not recommend managing multiple {name} accounts in T3 Code.":
-    "No recomendamos manejar varias cuentas de {name} en Sequoia AI.",
+    "No recomendamos manejar varias cuentas de {name} en Norai.",
   Web: "Web",
   "Webhook URL": "Dirección del webhook",
   "webhook::Rotate": "Cambiar",

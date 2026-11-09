@@ -1,18 +1,19 @@
 import type { SVGProps } from "react";
 
+// The norai wordmark: lowercase, bold geometric sans with tight tracking (brand kit).
 export function T3Wordmark(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg {...props} viewBox="0 0 150 32" xmlns="http://www.w3.org/2000/svg">
+    <svg {...props} viewBox="0 0 70 32" overflow="visible" xmlns="http://www.w3.org/2000/svg">
       <text
         x="0"
         y="25"
         fill="currentColor"
-        fontFamily="Georgia, 'Times New Roman', serif"
-        fontSize="27"
-        fontWeight="400"
-        letterSpacing="-0.4"
+        fontFamily="'Inter Variable', Inter, Arial, Helvetica, sans-serif"
+        fontSize="28"
+        fontWeight="700"
+        letterSpacing="-1.1"
       >
-        sequoia ai
+        norai
       </text>
     </svg>
   );

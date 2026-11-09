@@ -20,6 +20,7 @@ import {
   SidebarStageBackdrop,
   useEnvironmentStageLabel,
 } from "../SidebarStageBackdrop";
+import { NoraiSymbol } from "../NoraiSymbol";
 import { EnterpriseHeaderButton } from "../enterprise/EnterpriseHeaderButton";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -33,6 +34,7 @@ import {
 } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+import { useShowAdvancedSettings } from "../settings/settingsAdvancedMode";
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
@@ -175,7 +177,7 @@ function HistoryNavigationButton({
 function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <Link
-      aria-label={t("Sequoia AI home")}
+      aria-label={t("Norai home")}
       className={cn(
         "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
         onBackdrop ? "text-white" : "text-foreground",
@@ -191,12 +193,12 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 items-center gap-1.5 truncate font-serif text-sm tracking-tight",
+        "inline-flex min-w-0 items-center gap-1.5 truncate font-sans text-sm font-bold tracking-tight",
         onBackdrop ? "text-white" : "text-foreground",
       )}
     >
-      <img src="/enterprise-agent.svg" alt="" aria-hidden className="size-5 shrink-0" />
-      sequoia ai
+      <NoraiSymbol aria-hidden className="size-5 shrink-0" />
+      norai
     </span>
   );
 }
@@ -234,6 +236,8 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
   const pullRequestsSupported = usePullRequestsSupported();
+  // Pull requests and token usage are developer pages; the simple menu shows only Settings.
+  const [showAdvanced] = useShowAdvancedSettings();
   const closeMobileSidebar = () => {
     if (isMobile) {
       setOpenMobile(false);
@@ -279,18 +283,20 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             label={t("Settings")}
             onClick={handleSettingsClick}
           />
-          {pullRequestsSupported ? (
+          {showAdvanced && pullRequestsSupported ? (
             <SidebarUtilityItem
               icon={<PullRequestGlyph.pullRequest />}
               label={t("Pull requests")}
               onClick={handlePullRequestsClick}
             />
           ) : null}
-          <SidebarUtilityItem
-            icon={<ChartNoAxesColumnIcon />}
-            label={t("Usage")}
-            onClick={handleUsageClick}
-          />
+          {showAdvanced ? (
+            <SidebarUtilityItem
+              icon={<ChartNoAxesColumnIcon />}
+              label={t("Usage")}
+              onClick={handleUsageClick}
+            />
+          ) : null}
         </>
       )}
       <SidebarThreadUndoNotice />

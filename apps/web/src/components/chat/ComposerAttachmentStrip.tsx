@@ -25,6 +25,7 @@ import {
   shouldAnimateSnapShotArrival,
 } from "../../lib/snapShotAnimation";
 import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import { getRestingComposerImagePreviewCounts } from "../composerFooterLayout";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { AttachmentFilePreview } from "../files/AttachmentFilePreview";
@@ -703,14 +704,14 @@ export function ComposerAttachButton({
               size="icon-sm"
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => inputRef.current?.click()}
-              aria-label="Attach files"
+              aria-label={t("Attach files")}
             />
           }
         >
           {/* The clip's weight sits in its upper loop; 1px down reads as centered on the row. */}
           <PaperclipIcon className="translate-y-px" />
         </TooltipTrigger>
-        <TooltipPopup>Attach files</TooltipPopup>
+        <TooltipPopup>{t("Attach files")}</TooltipPopup>
       </Tooltip>
     </>
   );

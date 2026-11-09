@@ -11,6 +11,7 @@ import {
   type ProviderUpdateSidebarPillView,
 } from "../ProviderUpdateLaunchNotification.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { t } from "~/i18n";
 
 // Matches the pill's `duration-180` class.
 const PROVIDER_UPDATE_PILL_EXIT_MS = 180;
@@ -168,7 +169,7 @@ export function SidebarProviderUpdatePill() {
           render={
             <button
               type="button"
-              aria-label={displayedView.description}
+              aria-label={t(displayedView.description)}
               data-provider-update-main
               className="relative z-[1] flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
               onClick={openProviderSettings}
@@ -182,11 +183,11 @@ export function SidebarProviderUpdatePill() {
               ) : (
                 <DownloadIcon className="size-3.5 shrink-0" />
               )}
-              <span className="min-w-0 wrap-break-word">{displayedView.title}</span>
+              <span className="min-w-0 wrap-break-word">{t(displayedView.title)}</span>
             </button>
           }
         />
-        <TooltipPopup side="top">{displayedView.description}</TooltipPopup>
+        <TooltipPopup side="top">{t(displayedView.description)}</TooltipPopup>
       </Tooltip>
       {displayedView.dismissible && (
         <Tooltip>
@@ -194,7 +195,7 @@ export function SidebarProviderUpdatePill() {
             render={
               <button
                 type="button"
-                aria-label="Dismiss provider update notice"
+                aria-label={t("Dismiss provider update notice")}
                 className="relative z-[1] mr-1 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md opacity-70 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 onClick={() => startExit(displayedView.key, null, displayedView.key)}
               >
@@ -202,7 +203,7 @@ export function SidebarProviderUpdatePill() {
               </button>
             }
           />
-          <TooltipPopup side="top">Dismiss until provider status changes</TooltipPopup>
+          <TooltipPopup side="top">{t("Dismiss until provider status changes")}</TooltipPopup>
         </Tooltip>
       )}
     </div>
