@@ -580,4 +580,75 @@ describe("AreaKnowledge", () => {
         }).pipe(Effect.provide(layerAreaKnowledge())),
     );
   });
+
+  describe("wiki versions", () => {
+    const writeWiki = (dir: string, version: string, claim: string) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const file = path.join(dir, version, "empresa", "areas", "ledger", "negocio", "promo.md");
+        yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+        yield* fs.writeFileString(
+          file,
+          `---\nid: "areas/ledger/negocio/promo"\ntitulo: "Promo de fin de semana"\ndescripcion: "Estado de la promo."\ndominio: "negocio"\narea: "ledger"\nalcance: "company"\n---\n\n# Promo de fin de semana\n\n${claim}\n`,
+        );
+      });
+
+    it.effect("an admin switches versions and every reader sees the new content at once", () =>
+      Effect.gen(function* () {
+        const dir = (yield* ServerConfig.ServerConfig).enterpriseWikisDir!;
+        yield* writeWiki(dir, "v0", "La promo esta vigente.");
+        yield* writeWiki(dir, "v1", "La promo ya termino.");
+        const knowledge = yield* AreaKnowledge.AreaKnowledge;
+        const admin = (yield* knowledge.getMemberPrincipal(PREAUTHORIZED_ADMIN_EMAIL))!;
+        const body = Effect.gen(function* () {
+          const node = (yield* knowledge.graph(admin)).nodes.find(
+            (n) => n.id === "areas/ledger/negocio/promo.md",
+          );
+          return node?.content ?? null;
+        });
+        yield* knowledge.activateWikiVersion(admin, "v0");
+        expect(yield* body).toContain("vigente");
+        expect((yield* knowledge.wikiVersion).active).toBe("v0");
+        const state = yield* knowledge.activateWikiVersion(admin, "v1");
+        expect(state).toEqual({ active: "v1", available: ["v0", "v1"] });
+        expect(yield* body).toContain("ya termino");
+        yield* knowledge.activateWikiVersion(admin, "v0");
+        expect(yield* body).toContain("vigente");
+      }).pipe(
+        Effect.provide(
+          Layer.unwrap(
+            Effect.gen(function* () {
+              const fs = yield* FileSystem.FileSystem;
+              const dir = yield* fs.makeTempDirectory({ prefix: "t3-wikis-cfg-" });
+              return layerAreaKnowledge({ enterpriseWikisDir: dir });
+            }),
+          ).pipe(Layer.provide(baseLayer)),
+        ),
+      ),
+    );
+
+    it.effect("plain members cannot switch, and unknown versions are refused", () =>
+      Effect.gen(function* () {
+        const knowledge = yield* AreaKnowledge.AreaKnowledge;
+        const admin = (yield* knowledge.getMemberPrincipal(PREAUTHORIZED_ADMIN_EMAIL))!;
+        const bruno = (yield* knowledge.getMemberPrincipal("ent.test.bruno@gmail.com"))!;
+        const ana = (yield* knowledge.getMemberPrincipal("ent.test.ana@gmail.com"))!;
+        const codeOf = (principal: typeof bruno) =>
+          knowledge.activateWikiVersion(principal, "v0").pipe(
+            Effect.flip,
+            Effect.map((error) => error.code),
+          );
+        expect(yield* codeOf(bruno)).toBe("admin_required");
+        // A lead passes the permission check; this hub simply has no wiki folder.
+        expect(yield* codeOf(ana)).toBe("wiki_version_unavailable");
+        expect(
+          Exit.isFailure(yield* knowledge.activateWikiVersion(admin, "v9").pipe(Effect.exit)),
+        ).toBe(true);
+        expect(
+          Exit.isFailure(yield* knowledge.activateWikiVersion(admin, "../x").pipe(Effect.exit)),
+        ).toBe(true);
+      }).pipe(Effect.provide(layerAreaKnowledge())),
+    );
+  });
 });

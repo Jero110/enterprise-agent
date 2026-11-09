@@ -65,6 +65,12 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     staleTimeMs: 0,
     refreshIntervalMs: 10_000,
   });
+  const knowledgeWikiVersion = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:knowledge-wiki-version",
+    tag: WS_METHODS.enterpriseKnowledgeWikiVersion,
+    staleTimeMs: 0,
+    refreshIntervalMs: 10_000,
+  });
   const knowledgeGet = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:enterprise:knowledge-get",
     tag: WS_METHODS.enterpriseKnowledgeGet,
@@ -146,6 +152,7 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     }),
     knowledgeList,
     knowledgeGraph,
+    knowledgeWikiVersion,
     knowledgeSharing,
     knowledgePublishPersonal: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:knowledge-publish-personal",
@@ -160,6 +167,15 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
         Effect.sync(() => {
           refreshAll(registry, environmentId);
           registry.refresh(knowledgeGet({ environmentId, input: { path: input.path } }));
+        }),
+    }),
+    knowledgeWikiActivate: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:knowledge-wiki-activate",
+      tag: WS_METHODS.enterpriseKnowledgeWikiActivate,
+      onSuccess: ({ environmentId }, registry) =>
+        Effect.sync(() => {
+          refreshAll(registry, environmentId);
+          registry.refresh(knowledgeWikiVersion({ environmentId, input: {} }));
         }),
     }),
     knowledgeShareRevoke: createEnvironmentRpcCommand(runtime, {

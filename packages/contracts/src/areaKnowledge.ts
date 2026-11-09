@@ -31,6 +31,14 @@ export const KnowledgeGraphNode = Schema.Struct({
   content: Schema.optionalKey(Schema.String),
 });
 export const KnowledgeGraph = Schema.Struct({ nodes: Schema.Array(KnowledgeGraphNode) });
+
+export const WikiVersionState = Schema.Struct({
+  active: Schema.NullOr(TrimmedNonEmptyString),
+  available: Schema.Array(TrimmedNonEmptyString),
+});
+export type WikiVersionState = typeof WikiVersionState.Type;
+export const WikiVersionActivateInput = Schema.Struct({ version: TrimmedNonEmptyString });
+export type WikiVersionActivateInput = typeof WikiVersionActivateInput.Type;
 export type KnowledgeGraph = typeof KnowledgeGraph.Type;
 
 export const KnowledgeDocument = Schema.Struct({

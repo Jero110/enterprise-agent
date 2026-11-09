@@ -81,6 +81,8 @@ const RPC_AGGREGATES = {
   [WS_METHODS.enterpriseKnowledgeUnpublish]: "enterprise",
   [WS_METHODS.enterpriseKnowledgeSharing]: "enterprise",
   [WS_METHODS.enterpriseKnowledgeGraph]: "enterprise",
+  [WS_METHODS.enterpriseKnowledgeWikiVersion]: "enterprise",
+  [WS_METHODS.enterpriseKnowledgeWikiActivate]: "enterprise",
   [WS_METHODS.enterpriseKnowledgeRequestAccess]: "enterprise",
   [WS_METHODS.enterpriseKnowledgeList]: "enterprise",
   [WS_METHODS.enterpriseKnowledgeGet]: "enterprise",

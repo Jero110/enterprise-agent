@@ -31,6 +31,7 @@ import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { KnowledgeMap } from "../enterprise/KnowledgeMap";
 import { ContextChanges } from "../enterprise/ContextChanges";
+import { WikiVersionSelect } from "../enterprise/WikiVersionSelect";
 import { useDemoState } from "../enterprise/noraiDemo";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Radio, RadioGroup } from "../ui/radio-group";
@@ -180,6 +181,11 @@ function EnterpriseContextDialog(props: {
           <p className="mt-1 text-xs text-muted-foreground">
             {t("Knowledge for this conversation, pending proposals and review history.")}
           </p>
+          {open && (
+            <div className="mt-3">
+              <WikiVersionSelect environmentId={props.environmentId} />
+            </div>
+          )}
         </div>
         <Tabs.Root
           value={tab}
@@ -345,6 +351,7 @@ export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(p
   if (environmentId === null || identity === null) return null;
   return (
     <>
+      <WikiVersionSelect environmentId={environmentId} />
       <HeaderPopover icon={UsersRoundIcon} label={t("Organization")}>
         <OrganizationView environmentId={environmentId} />
       </HeaderPopover>

@@ -14,6 +14,8 @@ import {
   KnowledgeShareInput,
   KnowledgePublishPersonalInput,
   KnowledgeShareRevokeInput,
+  WikiVersionActivateInput,
+  WikiVersionState,
   KnowledgeSharing,
   KnowledgeGetInput,
   KnowledgeSearchInput,
@@ -51,6 +53,20 @@ const GraphTool = Tool.make("knowledge_graph", {
   parameters: Tool.EmptyParams,
   success: hubResult(KnowledgeGraph),
 }).annotate(Tool.Readonly, true);
+const WikiVersionTool = Tool.make("knowledge_wiki_version", {
+  ...shared,
+  description:
+    "Show which version of the company wiki is active and which versions can be activated.",
+  parameters: Tool.EmptyParams,
+  success: hubResult(WikiVersionState),
+}).annotate(Tool.Readonly, true);
+const WikiActivateTool = Tool.make("knowledge_wiki_activate", {
+  ...shared,
+  description:
+    "Admin only: replace the company wiki with another version (for example v0 or v1). Everyone reads the new version immediately. Personal items are untouched.",
+  parameters: WikiVersionActivateInput,
+  success: hubResult(WikiVersionState),
+}).annotate(Tool.Destructive, true);
 const RequestAccessTool = Tool.make("knowledge_request_access", {
   ...shared,
   description:
@@ -149,6 +165,8 @@ export const KnowledgeToolkit = Toolkit.make(
   AttachmentTool,
   ListTool,
   GraphTool,
+  WikiVersionTool,
+  WikiActivateTool,
   RequestAccessTool,
   PublishPersonalTool,
   ShareTool,
@@ -162,8 +180,21 @@ export const KnowledgeToolkit = Toolkit.make(
   DecideTool,
 );
 
+/** The calling thread's id when it is an ingestion run; an ordinary chat on the hub reads as its member. */
+const ingestionThreadId = (hub: EnterpriseHub["Service"]) =>
+  McpInvocationContext.McpInvocationContext.pipe(
+    Effect.flatMap((scope) =>
+      scope.client === undefined && scope.thread !== undefined
+        ? hub.assertOrdinaryAgent(scope.thread.threadId).pipe(
+            Effect.as(undefined),
+            Effect.orElseSucceed(() => scope.thread?.threadId),
+          )
+        : Effect.succeed(undefined),
+    ),
+  );
+
 /** On the hub, scope comes from the member the caller's session is enrolled as. */
-const layerHub = McpToolAccess.toLayer(
+export const layerHub = McpToolAccess.toLayer(
   KnowledgeToolkit,
   Effect.gen(function* () {
     const hub = yield* EnterpriseHub;
@@ -184,11 +215,17 @@ const layerHub = McpToolAccess.toLayer(
       knowledge_sharing: McpToolAccess.reads(() =>
         asResult(Effect.flatMap(sessionId, hub.knowledgeSharing)),
       ),
+      knowledge_wiki_version: McpToolAccess.reads(() =>
+        asResult(Effect.flatMap(sessionId, hub.knowledgeWikiVersion)),
+      ),
+      knowledge_wiki_activate: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.knowledgeWikiActivate(id, input))),
+      ),
       knowledge_graph: McpToolAccess.reads(() =>
         asResult(
-          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
-            scope.client === undefined && scope.thread !== undefined
-              ? hub.ingestionGraph(scope.thread.threadId)
+          Effect.flatMap(ingestionThreadId(hub), (ingestionId) =>
+            ingestionId !== undefined
+              ? hub.ingestionGraph(ingestionId)
               : Effect.flatMap(sessionId, hub.knowledgeGraph),
           ),
         ),
@@ -215,9 +252,9 @@ const layerHub = McpToolAccess.toLayer(
       ),
       knowledge_proposals: McpToolAccess.reads((input) =>
         asResult(
-          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
-            scope.client === undefined && scope.thread !== undefined
-              ? hub.ingestionInbox(scope.thread.threadId, input)
+          Effect.flatMap(ingestionThreadId(hub), (ingestionId) =>
+            ingestionId !== undefined
+              ? hub.ingestionInbox(ingestionId, input)
               : Effect.flatMap(sessionId, (id) => hub.proposalInbox(id, input)),
           ),
         ),
@@ -227,27 +264,27 @@ const layerHub = McpToolAccess.toLayer(
       ),
       knowledge_list: McpToolAccess.reads(() =>
         asResult(
-          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
-            scope.client === undefined && scope.thread !== undefined
-              ? hub.ingestionList(scope.thread.threadId)
+          Effect.flatMap(ingestionThreadId(hub), (ingestionId) =>
+            ingestionId !== undefined
+              ? hub.ingestionList(ingestionId)
               : Effect.flatMap(sessionId, hub.knowledgeList),
           ),
         ),
       ),
       knowledge_search: McpToolAccess.reads((input) =>
         asResult(
-          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
-            scope.client === undefined && scope.thread !== undefined
-              ? hub.ingestionSearch(scope.thread.threadId, input)
+          Effect.flatMap(ingestionThreadId(hub), (ingestionId) =>
+            ingestionId !== undefined
+              ? hub.ingestionSearch(ingestionId, input)
               : Effect.flatMap(sessionId, (id) => hub.knowledgeSearch(id, input)),
           ),
         ),
       ),
       knowledge_get: McpToolAccess.reads((input) =>
         asResult(
-          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
-            scope.client === undefined && scope.thread !== undefined
-              ? hub.ingestionGet(scope.thread.threadId, input)
+          Effect.flatMap(ingestionThreadId(hub), (ingestionId) =>
+            ingestionId !== undefined
+              ? hub.ingestionGet(ingestionId, input)
               : Effect.flatMap(sessionId, (id) => hub.knowledgeGet(id, input)),
           ),
         ),
@@ -285,6 +322,10 @@ export const layerMember = McpToolAccess.toLayer(
         asResult(client.knowledgeUnpublish(input)),
       ),
       knowledge_sharing: McpToolAccess.reads(() => asResult(client.knowledgeSharing)),
+      knowledge_wiki_version: McpToolAccess.reads(() => asResult(client.knowledgeWikiVersion)),
+      knowledge_wiki_activate: McpToolAccess.reads((input) =>
+        asResult(client.knowledgeWikiActivate(input)),
+      ),
       knowledge_graph: McpToolAccess.reads(() =>
         asResult(
           Effect.gen(function* () {

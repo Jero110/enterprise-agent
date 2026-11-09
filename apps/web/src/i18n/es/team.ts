@@ -119,6 +119,10 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "Interactive context changes graph": "Mapa de propuestas",
   "Pending proposals by scope": "Propuestas pendientes por área",
   "No pending changes": "No hay propuestas pendientes",
+  "Wiki {version} is active": "La wiki {version} está activa",
+  "Could not switch the wiki": "No se pudo cambiar la wiki",
+  "Knowledge version": "Versión del conocimiento",
+  "Active: {version}": "Activa: {version}",
   "Loading proposals…": "Cargando propuestas…",
   "Ingest files": "Subir archivos",
   "Stage files from this device for review. Approved files await future processing and are not added to current context.":

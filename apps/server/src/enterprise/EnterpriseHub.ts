@@ -23,6 +23,8 @@ import {
   type KnowledgeShareInput,
   type KnowledgePublishPersonalInput,
   type KnowledgeShareRevokeInput,
+  type WikiVersionActivateInput,
+  type WikiVersionState,
   type KnowledgeSharing,
   type KnowledgeGetInput,
   type KnowledgeSearchInput,
@@ -141,6 +143,13 @@ export class EnterpriseHub extends Context.Service<
       sessionId: string,
     ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
     readonly knowledgeGraph: (sessionId: string) => Effect.Effect<KnowledgeGraph, EnterpriseError>;
+    readonly knowledgeWikiVersion: (
+      sessionId: string,
+    ) => Effect.Effect<WikiVersionState, EnterpriseError>;
+    readonly knowledgeWikiActivate: (
+      sessionId: string,
+      input: WikiVersionActivateInput,
+    ) => Effect.Effect<WikiVersionState, EnterpriseError>;
     readonly knowledgeRequestAccess: (
       sessionId: string,
       input: KnowledgeGetInput,
@@ -540,6 +549,15 @@ const make = Effect.gen(function* () {
     knowledgeSharing: Effect.fn("EnterpriseHub.knowledgeSharing")(function* (sessionId) {
       return yield* knowledge.sharing(yield* principalOf(sessionId));
     }),
+    knowledgeWikiVersion: Effect.fn("EnterpriseHub.knowledgeWikiVersion")(function* (sessionId) {
+      yield* principalOf(sessionId);
+      return yield* knowledge.wikiVersion;
+    }),
+    knowledgeWikiActivate: Effect.fn("EnterpriseHub.knowledgeWikiActivate")(
+      function* (sessionId, input) {
+        return yield* knowledge.activateWikiVersion(yield* principalOf(sessionId), input.version);
+      },
+    ),
     knowledgeGraph: Effect.fn("EnterpriseHub.knowledgeGraph")(function* (sessionId) {
       return yield* knowledge.graph(yield* principalOf(sessionId));
     }),

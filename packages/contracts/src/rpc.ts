@@ -58,6 +58,8 @@ import {
   KnowledgeShareInput,
   KnowledgePublishPersonalInput,
   KnowledgeShareRevokeInput,
+  WikiVersionActivateInput,
+  WikiVersionState,
   KnowledgeSharing,
   KnowledgeGraph,
   KnowledgeDocument,
@@ -585,6 +587,8 @@ export const WS_METHODS = {
   enterpriseKnowledgeUnpublish: "enterprise.knowledge.unpublish",
   enterpriseKnowledgeSharing: "enterprise.knowledge.sharing",
   enterpriseKnowledgeGraph: "enterprise.knowledge.graph",
+  enterpriseKnowledgeWikiVersion: "enterprise.knowledge.wikiVersion",
+  enterpriseKnowledgeWikiActivate: "enterprise.knowledge.wikiActivate",
   enterpriseKnowledgeRequestAccess: "enterprise.knowledge.requestAccess",
   enterpriseKnowledgeList: "enterprise.knowledge.list",
   enterpriseKnowledgeGet: "enterprise.knowledge.get",
@@ -1069,6 +1073,16 @@ const WsEnterpriseKnowledgeSharingRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeS
 const WsEnterpriseKnowledgeGraphRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeGraph, {
   payload: Schema.Struct({}),
   success: KnowledgeGraph,
+  error: enterpriseError,
+});
+const WsEnterpriseKnowledgeWikiVersionRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeWikiVersion, {
+  payload: Schema.Struct({}),
+  success: WikiVersionState,
+  error: enterpriseError,
+});
+const WsEnterpriseKnowledgeWikiActivateRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeWikiActivate, {
+  payload: WikiVersionActivateInput,
+  success: WikiVersionState,
   error: enterpriseError,
 });
 const WsEnterpriseKnowledgeRequestAccessRpc = Rpc.make(
@@ -2311,6 +2325,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseKnowledgeUnpublishRpc,
   WsEnterpriseKnowledgeSharingRpc,
   WsEnterpriseKnowledgeGraphRpc,
+  WsEnterpriseKnowledgeWikiVersionRpc,
+  WsEnterpriseKnowledgeWikiActivateRpc,
   WsEnterpriseKnowledgeRequestAccessRpc,
   WsEnterpriseKnowledgeListRpc,
   WsEnterpriseKnowledgeGetRpc,

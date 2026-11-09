@@ -261,6 +261,7 @@ export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("Ente
     "proposal_not_found",
     "conflict",
     "knowledge_write_failed",
+    "wiki_version_unavailable",
     "thread_not_found",
     "snapshot_unavailable",
     "connector_invalid",

@@ -14,6 +14,7 @@ import {
   KnowledgePublishPersonalInput,
   type KnowledgeShareRevokeInput,
   type KnowledgeSharing,
+  type WikiVersionState,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -92,6 +93,14 @@ export interface AreaKnowledgeService {
     email: string,
     areaId: AreaId,
   ) => Effect.Effect<void, AreaKnowledgeError>;
+
+  readonly wikiVersion: Effect.Effect<WikiVersionState>;
+
+  /** Replaces the company wiki with another version. Admins and area leads; everyone reads the new one at once. */
+  readonly activateWikiVersion: (
+    adminPrincipal: TeamPrincipal,
+    version: string,
+  ) => Effect.Effect<WikiVersionState, EnterpriseError>;
 }
 
 export class AreaKnowledge extends Context.Service<AreaKnowledge, AreaKnowledgeService>()(
@@ -610,9 +619,25 @@ export const layer = Layer.effect(
       yield* store.revokeArea(email, areaId);
     });
 
+    const activateWikiVersion: AreaKnowledgeService["activateWikiVersion"] = Effect.fn(
+      "AreaKnowledge.activateWikiVersion",
+    )(function* (adminPrincipal, version) {
+      const role = (yield* store.getMember(adminPrincipal.email))?.role;
+      if (!adminPrincipal.isAdmin && role !== "lead") {
+        return yield* new EnterpriseError({
+          code: "admin_required",
+          message: "Only administrators and area leads can switch the wiki version.",
+        });
+      }
+      yield* repo.activateWikiVersion(version);
+      return yield* repo.wikiVersion;
+    });
+
     return {
       getPrincipal,
       getMemberPrincipal,
+      wikiVersion: repo.wikiVersion,
+      activateWikiVersion,
       graph,
       sharing,
       publishPersonal,

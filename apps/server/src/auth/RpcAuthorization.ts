@@ -96,6 +96,7 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.enterpriseThreadContext]: AuthOrchestrationReadScope,
   [WS_METHODS.enterpriseKnowledgeSharing]: AuthAccessReadScope,
   [WS_METHODS.enterpriseKnowledgeGraph]: AuthAccessReadScope,
+  [WS_METHODS.enterpriseKnowledgeWikiVersion]: AuthAccessReadScope,
   [WS_METHODS.enterpriseKnowledgeList]: AuthAccessReadScope,
   [WS_METHODS.enterpriseKnowledgeGet]: AuthAccessReadScope,
   [WS_METHODS.enterpriseProposalInbox]: AuthAccessReadScope,

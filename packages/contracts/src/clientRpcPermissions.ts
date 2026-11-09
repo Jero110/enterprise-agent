@@ -82,6 +82,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.enterpriseKnowledgePublishPersonal]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseKnowledgeShare]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseKnowledgeShareRevoke]: AuthAccessWriteScope,
+  [WS_METHODS.enterpriseKnowledgeWikiActivate]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseKnowledgeUnpublish]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseKnowledgeRequestAccess]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseKnowledgePropose]: AuthAccessWriteScope,

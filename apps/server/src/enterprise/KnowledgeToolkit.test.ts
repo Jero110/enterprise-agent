@@ -9,7 +9,9 @@ import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import { liveThreadShell } from "../mcp/McpToolAccess.testkit.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import { EnterpriseClient } from "./EnterpriseClient.ts";
-import { KnowledgeToolkit, layerMember } from "./KnowledgeToolkit.ts";
+import { KnowledgeToolkit, layerHub, layerMember } from "./KnowledgeToolkit.ts";
+import { EnterpriseHub } from "./EnterpriseHub.ts";
+import { HOST_AGENT_SESSION } from "./EnterpriseSession.ts";
 import { ThreadKnowledge } from "./ThreadKnowledge.ts";
 
 it.effect(
@@ -110,6 +112,45 @@ it.effect(
         client: undefined,
         thread: {
           threadId: ThreadId.make("caller"),
+          providerInstanceId: ProviderInstanceId.make("codex"),
+          providerSessionId: "session",
+        },
+      }),
+    ),
+);
+
+it.effect(
+  "an ordinary chat on the hub searches as its member, not through the ingestion path",
+  () =>
+    Effect.gen(function* () {
+      const toolkit = yield* KnowledgeToolkit;
+      const result = yield* toolkit
+        .handle("knowledge_search", { query: "fin de verano" })
+        .pipe(Stream.unwrap, Stream.runCollect);
+      expect(result.at(-1)?.result).toEqual({ ok: true, value: { hits: [] } });
+    }).pipe(
+      Effect.provide(
+        McpToolAccess.HandlersLayer.layer(layerHub).pipe(
+          Layer.provide(
+            Layer.mock(EnterpriseHub)({
+              assertOrdinaryAgent: () => Effect.void,
+              ingestionSearch: () => Effect.die("ordinary chats never use the ingestion path"),
+              knowledgeSearch: (sessionId) =>
+                sessionId === HOST_AGENT_SESSION
+                  ? Effect.succeed({ hits: [] })
+                  : Effect.die("wrong session"),
+            }),
+          ),
+        ),
+      ),
+      Effect.provideService(McpInvocationContext.McpInvocationContext, {
+        environmentId: EnvironmentId.make("hub"),
+        capabilities: new Set<"orchestration">(),
+        issuedAt: 0,
+        requestNamespace: "knowledge-hub-test",
+        client: undefined,
+        thread: {
+          threadId: ThreadId.make("chat"),
           providerInstanceId: ProviderInstanceId.make("codex"),
           providerSessionId: "session",
         },

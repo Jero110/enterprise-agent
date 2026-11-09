@@ -4,6 +4,8 @@ import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
 import * as Stream from "effect/Stream";
 
+import * as Option from "effect/Option";
+import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as TeamPublication from "../team/TeamPublication.ts";
 import * as EnterpriseClient from "./EnterpriseClient.ts";
@@ -20,6 +22,11 @@ const make = Effect.gen(function* () {
   const environment = yield* ServerEnvironment.ServerEnvironment;
   const environmentId = yield* environment.getEnvironmentId;
   const changes = yield* PubSub.unbounded<void>();
+  // In dev, hub-local agents may act as any member signed in here, so a lead can be tested end to end.
+  const devHub = (yield* Effect.serviceOption(ServerConfig.ServerConfig)).pipe(
+    Option.exists((config) => config.devUrl !== undefined),
+  );
+  const speaksForHub = (role: string) => role === "admin" || devHub;
   const session = EnterpriseSession.pipe(
     Effect.filterOrFail(
       (id) => id !== null,
@@ -40,7 +47,7 @@ const make = Effect.gen(function* () {
   return EnterpriseClient.EnterpriseClient.of({
     status: identity().pipe(
       Effect.tap((member) =>
-        member.role !== "admin"
+        !speaksForHub(member.role)
           ? Effect.void
           : hub.whoami(HOST_AGENT_SESSION).pipe(
               Effect.filterOrFail(
@@ -63,8 +70,8 @@ const make = Effect.gen(function* () {
     connect: Effect.fn("EnterpriseHubClient.connect")(function* (input) {
       const id = yield* session;
       const member = yield* hub.enroll(id, input);
-      // Only an admin speaks for this hub's own agents; paired members must not become them.
-      if (member.role === "admin") yield* hub.enroll(HOST_AGENT_SESSION, { email: member.email });
+      // Only an admin speaks for this hub's own agents (any member in dev); paired members must not become them.
+      if (speaksForHub(member.role)) yield* hub.enroll(HOST_AGENT_SESSION, { email: member.email });
       yield* PubSub.publish(changes, undefined);
       return { ...member, hubEnvironmentId: environmentId };
     }),
@@ -105,6 +112,12 @@ const make = Effect.gen(function* () {
     }),
     knowledgeSharing: Effect.flatMap(session, hub.knowledgeSharing),
     knowledgeGraph: Effect.flatMap(session, hub.knowledgeGraph),
+    knowledgeWikiVersion: Effect.flatMap(session, hub.knowledgeWikiVersion),
+    knowledgeWikiActivate: Effect.fn("EnterpriseHubClient.knowledgeWikiActivate")(
+      function* (input) {
+        return yield* hub.knowledgeWikiActivate(yield* session, input);
+      },
+    ),
     knowledgeRequestAccess: Effect.fn("EnterpriseHubClient.knowledgeRequestAccess")(
       function* (input) {
         return yield* hub.knowledgeRequestAccess(yield* session, input);

@@ -110,6 +110,8 @@ export class ServerConfig extends Context.Service<
     readonly enterpriseHub?: boolean | undefined;
     /** Seed file the hub loads into the store at startup (`T3CODE_ENTERPRISE_SEED`). */
     readonly enterpriseSeedPath?: string | undefined;
+    /** Folder with `v0/`, `v1/`... wiki versions the hub can activate (`T3CODE_WIKIS_DIR`). */
+    readonly enterpriseWikisDir?: string | undefined;
   }
 >()("t3/config/ServerConfig") {
   static readonly layerTest = (

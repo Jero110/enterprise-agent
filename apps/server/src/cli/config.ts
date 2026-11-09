@@ -171,6 +171,10 @@ const EnvServerConfig = Config.all({
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
+  enterpriseWikisDir: Config.String("T3CODE_WIKIS_DIR").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
   tailscaleServeEnabled: Config.Boolean("T3CODE_TAILSCALE_SERVE").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
@@ -533,6 +537,7 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     tailscaleServePort,
     ...(env.enterpriseHub === true ? { enterpriseHub: true } : {}),
     ...(env.enterpriseSeedPath === undefined ? {} : { enterpriseSeedPath: env.enterpriseSeedPath }),
+    ...(env.enterpriseWikisDir === undefined ? {} : { enterpriseWikisDir: env.enterpriseWikisDir }),
   };
 
   return config;

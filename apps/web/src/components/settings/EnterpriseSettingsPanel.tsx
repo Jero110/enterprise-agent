@@ -386,29 +386,6 @@ function MemberRow({
             disabled={busy || !member.active}
             onChange={(next) => void save(next)}
           />
-          <fieldset
-            disabled={busy || !canAuthorize || !member.active || member.areaIds === undefined}
-            className="flex flex-wrap gap-2"
-          >
-            <legend className="text-xs text-muted-foreground">{t("Additional areas")}</legend>
-            {teams.map((team) => (
-              <label key={team.id} className="flex items-center gap-1 text-xs">
-                <Checkbox
-                  checked={member.areaIds?.includes(team.id) ?? false}
-                  onCheckedChange={(checked) =>
-                    void save({
-                      teamId: member.teamId,
-                      role: member.role,
-                      areaIds: checked
-                        ? [...(member.areaIds ?? []), team.id]
-                        : (member.areaIds ?? []).filter((id) => id !== team.id),
-                    })
-                  }
-                />
-                {team.name}
-              </label>
-            ))}
-          </fieldset>
           {member.active ? (
             <Button
               size="xs"
@@ -430,7 +407,31 @@ function MemberRow({
           )}
         </div>
       }
-    />
+    >
+      <fieldset
+        disabled={busy || !canAuthorize || !member.active || member.areaIds === undefined}
+        className="flex flex-wrap gap-x-4 gap-y-2 pb-3"
+      >
+        <legend className="text-xs text-muted-foreground">{t("Additional areas")}</legend>
+        {teams.map((team) => (
+          <label key={team.id} className="flex items-center gap-1 text-xs">
+            <Checkbox
+              checked={member.areaIds?.includes(team.id) ?? false}
+              onCheckedChange={(checked) =>
+                void save({
+                  teamId: member.teamId,
+                  role: member.role,
+                  areaIds: checked
+                    ? [...(member.areaIds ?? []), team.id]
+                    : (member.areaIds ?? []).filter((id) => id !== team.id),
+                })
+              }
+            />
+            {team.name}
+          </label>
+        ))}
+      </fieldset>
+    </SettingsRow>
   );
 }
 

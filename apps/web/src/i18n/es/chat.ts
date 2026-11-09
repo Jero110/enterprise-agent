@@ -18,6 +18,9 @@ export const ES_CHAT: Readonly<Record<string, string>> = {
   "What was the discount on our last promo?":
     "¿De cuánto fue el descuento de nuestra última promo?",
   "Summarize today's meeting and tell me what's mine": "Resume la junta de hoy y dime qué me toca",
+  "Is Fin de Verano still active?": "¿Sigue vigente Fin de Verano?",
+  "Is the Fin de Verano promotion still active?": "¿Sigue vigente la promoción Fin de Verano?",
+  "How much is the Fin de Verano discount?": "¿Cuánto es el descuento de Fin de Verano?",
   "Request access to the Sales area": "Pide acceso al área de Ventas",
   "What does my team's wiki know about…?": "¿Qué sabe la wiki de mi equipo sobre…?",
   "What does my team's wiki know about ": "¿Qué sabe la wiki de mi equipo sobre ",

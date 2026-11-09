@@ -2693,6 +2693,9 @@ export const layerWsRpc = (
         [WS_METHODS.enterpriseKnowledgeUnpublish]: (input) => enterprise.knowledgeUnpublish(input),
         [WS_METHODS.enterpriseKnowledgeSharing]: () => enterprise.knowledgeSharing,
         [WS_METHODS.enterpriseKnowledgeGraph]: () => enterprise.knowledgeGraph,
+        [WS_METHODS.enterpriseKnowledgeWikiVersion]: () => enterprise.knowledgeWikiVersion,
+        [WS_METHODS.enterpriseKnowledgeWikiActivate]: (input) =>
+          enterprise.knowledgeWikiActivate(input),
         [WS_METHODS.enterpriseKnowledgeRequestAccess]: (input) =>
           enterprise.knowledgeRequestAccess(input),
         [WS_METHODS.enterpriseKnowledgeList]: () => enterprise.knowledgeList,

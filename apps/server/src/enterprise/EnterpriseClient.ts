@@ -34,6 +34,8 @@ import {
   type KnowledgeShareInput,
   type KnowledgePublishPersonalInput,
   type KnowledgeShareRevokeInput,
+  type WikiVersionActivateInput,
+  WikiVersionState,
   type KnowledgeGetInput,
   type KnowledgeSearchInput,
   KnowledgeSearchResult,
@@ -152,6 +154,10 @@ export class EnterpriseClient extends Context.Service<
     ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
     readonly knowledgeSharing: Effect.Effect<KnowledgeSharing, EnterpriseError>;
     readonly knowledgeGraph: Effect.Effect<KnowledgeGraph, EnterpriseError>;
+    readonly knowledgeWikiVersion: Effect.Effect<WikiVersionState, EnterpriseError>;
+    readonly knowledgeWikiActivate: (
+      input: WikiVersionActivateInput,
+    ) => Effect.Effect<WikiVersionState, EnterpriseError>;
     readonly knowledgeRequestAccess: (
       input: KnowledgeGetInput,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
@@ -496,6 +502,12 @@ const make = Effect.gen(function* () {
       callResult(hub, "knowledge_sharing", {}, KnowledgeSharing),
     ),
     knowledgeGraph: withConnection((hub) => callResult(hub, "knowledge_graph", {}, KnowledgeGraph)),
+    knowledgeWikiVersion: withConnection((hub) =>
+      callResult(hub, "knowledge_wiki_version", {}, WikiVersionState),
+    ),
+    knowledgeWikiActivate: Effect.fn("EnterpriseClient.knowledgeWikiActivate")((input) =>
+      withConnection((hub) => callResult(hub, "knowledge_wiki_activate", input, WikiVersionState)),
+    ),
     knowledgeRequestAccess: Effect.fn("EnterpriseClient.knowledgeRequestAccess")((input) =>
       withConnection((hub) =>
         callResult(hub, "knowledge_request_access", input, KnowledgeProposal),
