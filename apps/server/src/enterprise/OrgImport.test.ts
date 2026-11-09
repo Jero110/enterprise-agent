@@ -105,6 +105,80 @@ describe("OrgImport", () => {
     }).pipe(Effect.provide(layer)),
   );
 
+  it.effect("the fictional Kavak directory preserves area IDs, leads and emails", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const plan = yield* OrgImport.parse({
+        organization: yield* fs.readFileString(fixturePath("kavak-kb.organization.yaml")),
+        areas: yield* fs.readFileString(fixturePath("kavak-kb.areas.yaml")),
+      });
+      expect(plan.areas.map(({ id }) => id)).toEqual([
+        "direccion",
+        "ventas",
+        "cx",
+        "ingenieria",
+        "data",
+        "operaciones",
+        "financiamiento",
+        "marketing",
+        "people",
+        "legal",
+      ]);
+      expect(plan.people.map(({ email }) => email)).toEqual([
+        "ernesto.villalobos@kavak-demo.mx",
+        "magdalena.ruvalcaba@kavak-demo.mx",
+        "rodrigo.esquivel@kavak-demo.mx",
+        "emiliano.cardenas@kavak-demo.mx",
+        "paola.villasenor@kavak-demo.mx",
+        "adriana.montemayor@kavak-demo.mx",
+        "julian.ochoa@kavak-demo.mx",
+        "maria.trevino@kavak-demo.mx",
+        "iker.salcedo@kavak-demo.mx",
+        "brenda.saucedo@kavak-demo.mx",
+        "oscar.peralta@kavak-demo.mx",
+        "tomas.arreola@kavak-demo.mx",
+        "renata.olvera@kavak-demo.mx",
+        "francisco.lozano@kavak-demo.mx",
+        "valeria.quintanilla@kavak-demo.mx",
+        "diego.barragan@kavak-demo.mx",
+        "sofia.elizondo@kavak-demo.mx",
+        "mateo.zubiria@kavak-demo.mx",
+        "camila.robles@kavak-demo.mx",
+        "hernan.bustamante@kavak-demo.mx",
+        "ximena.galindo@kavak-demo.mx",
+        "lucia.arriaga@kavak-demo.mx",
+        "andres.toscano@kavak-demo.mx",
+        "daniela.cervera@kavak-demo.mx",
+        "santiago.medina@kavak-demo.mx",
+        "natalia.pineda@kavak-demo.mx",
+        "gabriel.ugalde@kavak-demo.mx",
+      ]);
+      expect(
+        plan.people
+          .filter(({ role }) => role === "lead")
+          .map(({ areaId, email }) => [areaId, email]),
+      ).toEqual([
+        ["ventas", "magdalena.ruvalcaba@kavak-demo.mx"],
+        ["cx", "adriana.montemayor@kavak-demo.mx"],
+        ["ingenieria", "tomas.arreola@kavak-demo.mx"],
+        ["data", "sofia.elizondo@kavak-demo.mx"],
+        ["operaciones", "hernan.bustamante@kavak-demo.mx"],
+        ["financiamiento", "lucia.arriaga@kavak-demo.mx"],
+        ["marketing", "daniela.cervera@kavak-demo.mx"],
+        ["people", "natalia.pineda@kavak-demo.mx"],
+        ["legal", "gabriel.ugalde@kavak-demo.mx"],
+      ]);
+      expect(plan.people[0]).toMatchObject({
+        areaId: "direccion",
+        role: "admin",
+        reportsTo: null,
+      });
+      expect(
+        plan.people.find(({ email }) => email === "paola.villasenor@kavak-demo.mx")?.reportsTo,
+      ).toBe("rodrigo.esquivel@kavak-demo.mx");
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
   it.effect("invalid files return typed errors and change nothing", () =>
     Effect.gen(function* () {
       const hub = yield* hubAsAdmin;
