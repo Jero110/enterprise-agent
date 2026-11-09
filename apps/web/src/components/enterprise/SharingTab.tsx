@@ -2,9 +2,24 @@ import { useState } from "react";
 import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
+import { personalPublicationPath } from "./sharingPublication";
 
 // The hub sharing commands are integrated through this boundary when available.
 export interface PersonalSharing {
+  readonly ownerMemberKey?: string;
+  readonly members?: ReadonlyArray<{ memberKey: string; displayName: string }>;
+  readonly publish?: (input: {
+    path: string;
+    item: {
+      kind: "skill" | "node";
+      title: string;
+      description: string;
+      layer: "metrics" | "business" | "ai" | "data";
+      content: string;
+    };
+    grantee: { kind: "member" | "area"; target: string };
+  }) => Promise<void>;
   readonly items: ReadonlyArray<{ id: string; title: string }>;
   readonly areas: ReadonlyArray<{ id: string; name: string }>;
   readonly listShared: {
@@ -88,11 +103,25 @@ export function SharingTab({ sharing }: { sharing?: PersonalSharing }) {
                 <option value="area">{t("Area")}</option>
               </select>
             </label>
-            {kind === "member" ? (
+            {kind === "member" && sharing.members ? (
+              <select
+                aria-label={t("Recipient member")}
+                className="rounded border bg-background p-1"
+                value={recipient}
+                onChange={(event) => setRecipient(event.target.value)}
+              >
+                <option value="">{t("Choose a person")}</option>
+                {sharing.members.map((member) => (
+                  <option key={member.memberKey} value={member.memberKey}>
+                    {member.displayName}
+                  </option>
+                ))}
+              </select>
+            ) : kind === "member" ? (
               <Input
                 nativeInput
-                aria-label={t("Recipient email")}
-                type="email"
+                aria-label={t("Recipient member key")}
+                placeholder={t("Member key")}
                 value={recipient}
                 onChange={(event) => setRecipient(event.target.value)}
               />
@@ -121,6 +150,12 @@ export function SharingTab({ sharing }: { sharing?: PersonalSharing }) {
               {t("Share")}
             </Button>
           </fieldset>
+          <PersonalPublication
+            sharing={sharing}
+            grantee={{ kind, target: recipient.trim() }}
+            busy={busy}
+            run={run}
+          />
           <Button
             size="sm"
             variant="outline"
@@ -175,5 +210,170 @@ export function SharingTab({ sharing }: { sharing?: PersonalSharing }) {
         </p>
       )}
     </div>
+  );
+}
+
+function PersonalPublication({
+  sharing,
+  grantee,
+  busy,
+  run,
+}: {
+  sharing: PersonalSharing;
+  grantee: { kind: "member" | "area"; target: string };
+  busy: boolean;
+  run: (action: () => Promise<void>) => Promise<void>;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [itemKind, setItemKind] = useState<"skill" | "node">("skill");
+  const [layer, setLayer] = useState<"metrics" | "business" | "ai" | "data">("ai");
+  const [content, setContent] = useState("");
+  const [reading, setReading] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [published, setPublished] = useState(false);
+  const path = personalPublicationPath(sharing.ownerMemberKey ?? "", title);
+  return (
+    <section className="space-y-3">
+      <fieldset
+        className="space-y-3 rounded-xl border p-4"
+        disabled={
+          busy || reading || !sharing.canShare || !sharing.publish || !sharing.ownerMemberKey
+        }
+      >
+        <legend>{t("Publish and share a personal copy")}</legend>
+        <p className="text-sm text-muted-foreground">
+          {t(
+            "Choose a recipient above, then paste a skill or node, or select its file. Only this copy is published; your local original is not changed or automatically synced.",
+          )}
+        </p>
+        <Input
+          nativeInput
+          aria-label={t("Publication title")}
+          placeholder={t("Title, for example RAG practices")}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+        <Input
+          nativeInput
+          aria-label={t("Publication description")}
+          placeholder={t("Description")}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+        <label className="block text-sm">
+          {t("Item kind")}
+          <select
+            className="ml-2 rounded border bg-background p-1"
+            value={itemKind}
+            onChange={(event) => setItemKind(event.target.value === "node" ? "node" : "skill")}
+          >
+            <option value="skill">{t("Skill")}</option>
+            <option value="node">{t("Node")}</option>
+          </select>
+        </label>
+        <label className="block text-sm">
+          {t("Layer")}
+          <select
+            className="ml-2 rounded border bg-background p-1"
+            value={layer}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (next === "metrics" || next === "business" || next === "ai" || next === "data")
+                setLayer(next);
+            }}
+          >
+            <option value="metrics">{t("Metrics")}</option>
+            <option value="business">{t("Business")}</option>
+            <option value="ai">AI</option>
+            <option value="data">{t("Data")}</option>
+          </select>
+        </label>
+        <label className="block text-sm">
+          {t("Select a Markdown or text file (optional)")}
+          <input
+            type="file"
+            accept=".md,.txt,text/plain,text/markdown"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              setFileError(null);
+              if (file.size > 200_000) {
+                setFileError(t("File exceeds 200 KB"));
+                return;
+              }
+              setReading(true);
+              try {
+                setContent(await file.text());
+                setPublished(false);
+              } catch {
+                setFileError(t("Could not read file"));
+              } finally {
+                setReading(false);
+              }
+            }}
+          />
+        </label>
+        <Textarea
+          aria-label={t("Personal copy content")}
+          placeholder={t("Paste the content to publish")}
+          maxLength={200_000}
+          value={content}
+          onChange={(event) => {
+            setContent(event.target.value);
+            setPublished(false);
+          }}
+        />
+        {fileError && (
+          <p role="alert" className="text-sm text-destructive">
+            {fileError}
+          </p>
+        )}
+        <Button
+          size="sm"
+          disabled={
+            !path || !content.trim() || !grantee.target || content.length > 200_000 || !!fileError
+          }
+          onClick={() =>
+            void run(async () => {
+              const publish = sharing.publish;
+              if (!publish || !path) return;
+              if (sharing.items.some((item) => item.id === path))
+                throw new Error(
+                  t(
+                    "An item with this title is already published. Choose a different title to avoid replacing it.",
+                  ),
+                );
+              setPublished(false);
+              await publish({
+                path,
+                item: {
+                  kind: itemKind,
+                  title: title.trim(),
+                  description: description.trim(),
+                  layer,
+                  content,
+                },
+                grantee,
+              });
+              setPublished(true);
+            })
+          }
+        >
+          {t("Publish copy and share")}
+        </Button>
+      </fieldset>
+      {!sharing.publish && (
+        <p className="text-sm text-muted-foreground">
+          {t("Publishing personal copies is not available on this hub yet.")}
+        </p>
+      )}
+      {published && (
+        <p role="status" className="text-sm">
+          {t("Personal copy published and shared. Your local original is unchanged.")}
+        </p>
+      )}
+    </section>
   );
 }

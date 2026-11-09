@@ -46,7 +46,7 @@ Connection URLs stay in the hub's secret store. Use **Refresh schema** to propos
 
 ## Share personal knowledge
 
-Open **Conversation context → Sharing** to share one of your explicitly published personal skills or nodes with a specific member or area. These are copies you choose to publish, not an automatic upload of your private local wiki, personal transcripts or files. For example, Francisco can share his published RAG skill with María without sharing the rest of his personal knowledge.
+Open **Conversation context → Sharing** and choose a specific member or area. To share a local skill or node for the first time, enter its title and description, choose its kind and layer, then paste its content or select a Markdown/text file and choose **Publish copy and share**. You can also grant access to an already published personal item. These are copies you choose to publish, not an automatic upload of your private local wiki, personal transcripts or files. For example, Francisco can share his published RAG skill with María without sharing the rest of his personal knowledge.
 
 Use **Shared by me** to review recipients and revoke an individual grant. Stop sharing an item with everyone to unpublish it. **Shared with me** lists items others have shared with you. Area documents are not shared through this tab; their access is managed through area membership and requests. Personal knowledge sharing is separate from publishing a conversation with **Share with team**.
 
