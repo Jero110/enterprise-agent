@@ -69,17 +69,11 @@ export function ConnectedSharingTab({ environmentId }: { environmentId: Environm
   const canRevoke = useAtomValue(
     enterpriseEnvironment.knowledgeShareRevoke.permissionAtom(environmentId),
   );
-  const canUnpublish = useAtomValue(
-    enterpriseEnvironment.knowledgeUnpublish.permissionAtom(environmentId),
-  );
   const share = useAtomCommand(enterpriseEnvironment.knowledgeShare, {
     label: "share personal knowledge",
   });
   const revoke = useAtomCommand(enterpriseEnvironment.knowledgeShareRevoke, {
     label: "revoke personal knowledge grant",
-  });
-  const unpublish = useAtomCommand(enterpriseEnvironment.knowledgeUnpublish, {
-    label: "unpublish personal knowledge",
   });
   const roster = [
     ...new Map(
@@ -105,9 +99,7 @@ export function ConnectedSharingTab({ environmentId }: { environmentId: Environm
           : (org.data?.teams.find((team) => team.id === grantee.target)?.name ?? grantee.target),
     })),
   );
-  const ownerMemberKey = roster.find((member) => member.isMe)?.memberKey;
   const adapter: PersonalSharing = {
-    ...(ownerMemberKey ? { ownerMemberKey } : {}),
     members,
     items: sharing.data?.sharedByMe ?? [],
     areas: org.data?.teams ?? [],
@@ -122,12 +114,6 @@ export function ConnectedSharingTab({ environmentId }: { environmentId: Environm
     },
     canShare,
     canRevoke,
-    canUnpublish,
-    publish: async (input) => {
-      const result = await share({ environmentId, input });
-      if (result._tag === "Failure")
-        throw new Error(enterpriseFailureMessage(squashAtomCommandFailure(result)));
-    },
     share: async ({ itemId, grantee }) => {
       const result = await share({
         environmentId,
@@ -143,11 +129,6 @@ export function ConnectedSharingTab({ environmentId }: { environmentId: Environm
         environmentId,
         input: { path: grant.path, grantee: grant.grantee },
       });
-      if (result._tag === "Failure")
-        throw new Error(enterpriseFailureMessage(squashAtomCommandFailure(result)));
-    },
-    unpublish: async (path) => {
-      const result = await unpublish({ environmentId, input: { path } });
       if (result._tag === "Failure")
         throw new Error(enterpriseFailureMessage(squashAtomCommandFailure(result)));
     },

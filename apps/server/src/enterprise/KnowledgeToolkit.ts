@@ -12,6 +12,7 @@ import {
   KnowledgeDocumentList,
   KnowledgeGraph,
   KnowledgeShareInput,
+  KnowledgePublishPersonalInput,
   KnowledgeShareRevokeInput,
   KnowledgeSharing,
   KnowledgeGetInput,
@@ -57,10 +58,17 @@ const RequestAccessTool = Tool.make("knowledge_request_access", {
   parameters: KnowledgeGetInput,
   success: hubResult(KnowledgeProposal),
 }).annotate(Tool.Destructive, false);
+const PublishPersonalTool = Tool.make("knowledge_publish_personal", {
+  ...shared,
+  description:
+    "Save a private personal skill or node for the authenticated owner. This creates only when missing and never grants access or overwrites an existing item. Path: personal/<your member key>/<slug>.md. Skills use layer ai.",
+  parameters: KnowledgePublishPersonalInput,
+  success: hubResult(KnowledgeSharing),
+}).annotate(Tool.Destructive, false);
 const ShareTool = Tool.make("knowledge_share", {
   ...shared,
   description:
-    "Publish a copy of your own personal skill or node and share it with a member key or area. Path: personal/<your member key>/<slug>.md. Send item content to publish; omit item to grant an existing copy. Skills use layer ai. Only an owner or admin may grant access.",
+    "Share one of your existing personal files or skills by path with an active member key or area. Only the owner may grant access; this does not install the skill on a recipient's device.",
   parameters: KnowledgeShareInput,
   success: hubResult(KnowledgeSharing),
 }).annotate(Tool.Destructive, false);
@@ -80,7 +88,7 @@ const UnpublishTool = Tool.make("knowledge_unpublish", {
 const SharingTool = Tool.make("knowledge_sharing", {
   ...shared,
   description:
-    "List personal items shared by you and with you. Shared skills can be read with knowledge_get; they are not installed on your device.",
+    "List your own personal inventory (including private items with no grants) and items shared with you. Read permitted content with knowledge_get; shared skills are not installed on your device.",
   parameters: Tool.EmptyParams,
   success: hubResult(KnowledgeSharing),
 }).annotate(Tool.Readonly, true);
@@ -142,6 +150,7 @@ export const KnowledgeToolkit = Toolkit.make(
   ListTool,
   GraphTool,
   RequestAccessTool,
+  PublishPersonalTool,
   ShareTool,
   ShareRevokeTool,
   UnpublishTool,
@@ -160,6 +169,9 @@ const layerHub = McpToolAccess.toLayer(
     const hub = yield* EnterpriseHub;
     const sessionId = hubSessionId(hub);
     return {
+      knowledge_publish_personal: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.knowledgePublishPersonal(id, input))),
+      ),
       knowledge_share: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => hub.knowledgeShare(id, input))),
       ),
@@ -262,6 +274,9 @@ export const layerMember = McpToolAccess.toLayer(
           : Effect.filter(items, (item) => threadKnowledge.allows(threadId, item.areaId)),
       );
     return {
+      knowledge_publish_personal: McpToolAccess.reads((input) =>
+        asResult(client.knowledgePublishPersonal(input)),
+      ),
       knowledge_share: McpToolAccess.reads((input) => asResult(client.knowledgeShare(input))),
       knowledge_share_revoke: McpToolAccess.reads((input) =>
         asResult(client.knowledgeShareRevoke(input)),

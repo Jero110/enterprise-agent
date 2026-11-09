@@ -89,6 +89,11 @@ const make = Effect.gen(function* () {
     revoke: Effect.fn("EnterpriseHubClient.revoke")(function* (input) {
       return yield* hub.revoke(yield* session, input);
     }),
+    knowledgePublishPersonal: Effect.fn("EnterpriseHubClient.knowledgePublishPersonal")(
+      function* (input) {
+        return yield* hub.knowledgePublishPersonal(yield* session, input);
+      },
+    ),
     knowledgeShare: Effect.fn("EnterpriseHubClient.knowledgeShare")(function* (input) {
       return yield* hub.knowledgeShare(yield* session, input);
     }),

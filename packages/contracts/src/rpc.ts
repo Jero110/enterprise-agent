@@ -54,6 +54,7 @@ import {
 } from "./enterprise.ts";
 import {
   KnowledgeShareInput,
+  KnowledgePublishPersonalInput,
   KnowledgeShareRevokeInput,
   KnowledgeSharing,
   KnowledgeGraph,
@@ -576,6 +577,7 @@ export const WS_METHODS = {
   enterpriseMembersList: "enterprise.members.list",
   enterpriseMembersAuthorize: "enterprise.members.authorize",
   enterpriseMembersRevoke: "enterprise.members.revoke",
+  enterpriseKnowledgePublishPersonal: "enterprise.knowledge.publishPersonal",
   enterpriseKnowledgeShare: "enterprise.knowledge.share",
   enterpriseKnowledgeShareRevoke: "enterprise.knowledge.shareRevoke",
   enterpriseKnowledgeUnpublish: "enterprise.knowledge.unpublish",
@@ -1027,6 +1029,14 @@ const WsEnterpriseMembersRevokeRpc = Rpc.make(WS_METHODS.enterpriseMembersRevoke
   error: enterpriseError,
 });
 
+const WsEnterpriseKnowledgePublishPersonalRpc = Rpc.make(
+  WS_METHODS.enterpriseKnowledgePublishPersonal,
+  {
+    payload: KnowledgePublishPersonalInput,
+    success: KnowledgeSharing,
+    error: enterpriseError,
+  },
+);
 const WsEnterpriseKnowledgeShareRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeShare, {
   payload: KnowledgeShareInput,
   success: KnowledgeSharing,
@@ -2287,6 +2297,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseMembersListRpc,
   WsEnterpriseMembersAuthorizeRpc,
   WsEnterpriseMembersRevokeRpc,
+  WsEnterpriseKnowledgePublishPersonalRpc,
   WsEnterpriseKnowledgeShareRpc,
   WsEnterpriseKnowledgeShareRevokeRpc,
   WsEnterpriseKnowledgeUnpublishRpc,

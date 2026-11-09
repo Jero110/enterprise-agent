@@ -1,4 +1,5 @@
 import {
+  PREAUTHORIZED_ADMIN_EMAIL,
   type VerifiedIdentity,
   type KnowledgeDocument,
   type KnowledgeGraph,
@@ -10,6 +11,7 @@ import {
   AreaKnowledgeError,
   EnterpriseError,
   KnowledgeShareInput,
+  KnowledgePublishPersonalInput,
   type KnowledgeShareRevokeInput,
   type KnowledgeSharing,
 } from "@t3tools/contracts";
@@ -17,11 +19,15 @@ import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
+import * as Ref from "effect/Ref";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
-import { stringify as stringifyYaml } from "yaml";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import * as ServerConfig from "../config.ts";
 import * as KnowledgeProposals from "../enterprise/KnowledgeProposals.ts";
 
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
@@ -33,8 +39,15 @@ export interface AreaKnowledgeService {
   /** The principal of an enrolled member's email, or null when the email cannot enter. */
   readonly getMemberPrincipal: (email: string) => Effect.Effect<TeamPrincipal | null>;
 
+  readonly initializeLocalPersonalSkills: (
+    principal: TeamPrincipal,
+  ) => Effect.Effect<void, EnterpriseError>;
   readonly graph: (principal: TeamPrincipal) => Effect.Effect<KnowledgeGraph>;
   readonly sharing: (principal: TeamPrincipal) => Effect.Effect<KnowledgeSharing>;
+  readonly publishPersonal: (
+    principal: TeamPrincipal,
+    input: KnowledgePublishPersonalInput,
+  ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
   readonly share: (
     principal: TeamPrincipal,
     input: KnowledgeShareInput,
@@ -89,6 +102,7 @@ const MAX_HITS = 20;
 const SNIPPET_CHARS = 160;
 const PERSONAL_PATH = /^personal\/([a-f0-9]{64})\/[a-z0-9][a-z0-9-]{0,79}\.md$/;
 const decodeShare = Schema.decodeUnknownEffect(KnowledgeShareInput);
+const decodePublish = Schema.decodeUnknownEffect(KnowledgePublishPersonalInput);
 
 /** Path matches outrank headings, which outrank body text. */
 const scoreDocument = (doc: KnowledgeDocument, terms: ReadonlyArray<string>) => {
@@ -121,6 +135,10 @@ export const layer = Layer.effect(
     const repo = yield* KnowledgeRepo;
     const random = yield* SecureRandom.SecureRandom;
     const sharingMutex = yield* Semaphore.make(1);
+    const fs = yield* FileSystem.FileSystem;
+    const pathService = yield* Path.Path;
+    const config = yield* ServerConfig.ServerConfig;
+    const skillsInitialized = yield* Ref.make(false);
 
     const principalOf = Effect.fn("AreaKnowledge.principalOf")(function* (
       email: string,
@@ -174,7 +192,6 @@ export const layer = Layer.effect(
         if (current === null) return false;
         const owner = PERSONAL_PATH.exec(doc.id)?.[1];
         if (owner === undefined) return false;
-        if (current.isAdmin) return true;
         if (!activeKeys.has(owner)) return false;
         const key = teamMemberKey(current.email);
         return (
@@ -280,6 +297,89 @@ export const layer = Layer.effect(
       );
     });
 
+    const publishPersonal = Effect.fn("AreaKnowledge.publishPersonal")(function* (
+      principal: TeamPrincipal,
+      raw: KnowledgePublishPersonalInput,
+    ) {
+      const { path, item } = yield* decodePublish(raw).pipe(
+        Effect.mapError(
+          () =>
+            new EnterpriseError({
+              code: "invalid_proposal",
+              message: "Invalid personal item.",
+            }),
+        ),
+      );
+      const { current, owner, existing } = yield* ownedPersonal(principal, path);
+      if (teamMemberKey(current.email) !== owner)
+        return yield* new EnterpriseError({
+          code: "access_denied",
+          message: "Only the owner can publish a personal item.",
+        });
+      if ((item.kind === "skill" && item.layer !== "ai") || !item.content.trim())
+        return yield* new EnterpriseError({
+          code: "invalid_proposal",
+          message: "Choose nonempty personal content; skills belong to the AI layer.",
+        });
+      // A repeated initialization never replaces the owner's changes or alters grants.
+      if (!existing) {
+        const content = `---\n${stringifyYaml({ title: item.title, description: item.description, area: "personal", layer: item.layer, private: true, links: [], itemKind: item.kind })}---\n${item.content}`;
+        yield* writePersonal(current, path, content, false);
+      }
+      return yield* sharing(current);
+    }, sharingMutex.withPermits(1));
+
+    const initializeLocalPersonalSkills = Effect.fn("AreaKnowledge.initializeLocalPersonalSkills")(
+      function* (principal: TeamPrincipal) {
+        if (
+          config.devUrl === undefined ||
+          principal.email !== PREAUTHORIZED_ADMIN_EMAIL ||
+          (yield* Ref.get(skillsInitialized))
+        )
+          return;
+        const current = yield* getMemberPrincipal(principal.email);
+        if (current === null) return;
+        const root = pathService.join(config.cwd, ".agents", "skills");
+        if (!(yield* fs.exists(root))) return;
+        const realRoot = yield* fs.realPath(root);
+        if (realRoot !== pathService.join(yield* fs.realPath(config.cwd), ".agents", "skills"))
+          return;
+        const names = yield* fs.readDirectory(root);
+        for (const name of names.slice(0, 100)) {
+          if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(name)) continue;
+          const source = pathService.join(root, name, "SKILL.md");
+          if (!(yield* fs.exists(source))) continue;
+          const realSource = yield* fs.realPath(source);
+          if (!realSource.startsWith(realRoot + pathService.sep)) continue;
+          const size = (yield* fs.stat(realSource)).size;
+          if (size > 200_000) continue;
+          const content = yield* fs.readFileString(realSource);
+          const metadata = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
+          if (!metadata) continue;
+          const parsed: unknown = yield* Effect.try(() => parseYaml(metadata[1]!)).pipe(
+            Effect.orElseSucceed(() => null),
+          );
+          if (
+            typeof parsed !== "object" ||
+            parsed === null ||
+            !("name" in parsed) ||
+            parsed.name !== name
+          )
+            continue;
+          const description =
+            "description" in parsed && typeof parsed.description === "string"
+              ? parsed.description
+              : "";
+          yield* publishPersonal(current, {
+            path: `personal/${teamMemberKey(current.email)}/${name}.md`,
+            item: { kind: "skill", title: name, description, layer: "ai", content },
+          });
+        }
+        yield* Ref.set(skillsInitialized, true);
+      },
+      Effect.catch(() => Effect.logWarning("Could not initialize local personal skills.")),
+    );
+
     const share = Effect.fn("AreaKnowledge.share")(function* (
       principal: TeamPrincipal,
       raw: KnowledgeShareInput,
@@ -294,7 +394,12 @@ export const layer = Layer.effect(
         ),
       );
       const { current, owner, existing } = yield* ownedPersonal(principal, input.path);
-      const { grantee, item } = input;
+      const { grantee } = input;
+      if (teamMemberKey(current.email) !== owner)
+        return yield* new EnterpriseError({
+          code: "access_denied",
+          message: "Only the owner can share a personal item.",
+        });
       const recipientExists =
         grantee.kind === "area"
           ? (yield* store.getTeam(grantee.target)) !== null
@@ -304,38 +409,16 @@ export const layer = Layer.effect(
                 !member.revoked &&
                 teamMemberKey(member.email) === grantee.target,
             );
-      if (
-        !recipientExists ||
-        (item?.kind === "skill" && item.layer !== "ai") ||
-        (item !== undefined && !item.content.trim())
-      )
+      if (!recipientExists)
         return yield* new EnterpriseError({
           code: "invalid_proposal",
-          message:
-            "Choose an active member or area and a nonempty personal item; skills belong to the AI layer.",
+          message: "Choose an active member or area.",
         });
-      if (item !== undefined && teamMemberKey(current.email) !== owner)
-        return yield* new EnterpriseError({
-          code: "access_denied",
-          message: "Only the owner can publish or replace their personal item.",
-        });
-      if (!existing && item === undefined)
+      if (!existing)
         return yield* new EnterpriseError({
           code: "document_not_found",
-          message: "Publish a personal item before sharing it.",
+          message: "Choose an existing personal item before sharing it.",
         });
-      if (
-        item !== undefined &&
-        (!existing ||
-          existing.content !== item.content ||
-          existing.title !== item.title ||
-          existing.description !== item.description ||
-          existing.layer !== item.layer ||
-          existing.itemKind !== item.kind)
-      ) {
-        const content = `---\n${stringifyYaml({ title: item.title, description: item.description, area: "personal", layer: item.layer, private: true, links: [], itemKind: item.kind })}---\n${item.content}`;
-        yield* writePersonal(current, input.path, content, existing !== undefined);
-      }
       yield* store.grantKnowledgeShare(input.path, grantee, current.email);
       return yield* sharing(current);
     }, sharingMutex.withPermits(1));
@@ -527,6 +610,8 @@ export const layer = Layer.effect(
       getMemberPrincipal,
       graph,
       sharing,
+      publishPersonal,
+      initializeLocalPersonalSkills,
       share,
       revokeShare,
       unpublish,

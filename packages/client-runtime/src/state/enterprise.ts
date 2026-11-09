@@ -143,6 +143,12 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     knowledgeList,
     knowledgeGraph,
     knowledgeSharing,
+    knowledgePublishPersonal: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:knowledge-publish-personal",
+      tag: WS_METHODS.enterpriseKnowledgePublishPersonal,
+      onSuccess: ({ environmentId }, registry) =>
+        Effect.sync(() => refreshAll(registry, environmentId)),
+    }),
     knowledgeShare: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:knowledge-share",
       tag: WS_METHODS.enterpriseKnowledgeShare,
