@@ -25,6 +25,7 @@ import {
   type ProjectTaskPriority,
   type ProjectTaskStatus,
 } from "~/projectBoardStore";
+import { useEnterpriseStatus } from "~/state/enterprise";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
@@ -465,7 +466,7 @@ function BoardView() {
   );
 }
 
-/** Project boards the user keeps here; mentioning a board, task or tag in a message gives the agent that context. */
+/** Company project boards, only while signed in to an enterprise; mentioning a board, task or tag gives the agent that context. */
 export function ProjectsBoardButton({
   environmentId,
   projectId,
@@ -474,6 +475,8 @@ export function ProjectsBoardButton({
   readonly projectId: ProjectId;
 }) {
   const [open, setOpen] = useState(false);
+  const { identity } = useEnterpriseStatus();
+  if (identity === null) return null;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Tooltip>
@@ -500,7 +503,7 @@ export function ProjectsBoardButton({
           <DialogTitle>{t("Projects")}</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
             {t(
-              "Boards belong to this project on the connected server. Ask your agent to read the cards. Browser boards can be imported; the original browser copy is kept.",
+              "Boards belong to this project on the connected server. Ask your agent to read the cards.",
             )}
           </p>
         </div>

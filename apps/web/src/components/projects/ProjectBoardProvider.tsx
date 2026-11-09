@@ -4,7 +4,6 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 
 import { t } from "~/i18n";
 import { randomUUID } from "~/lib/utils";
-import { useProjectBoardStore } from "~/projectBoardStore";
 import { enterpriseEnvironment } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -47,8 +46,6 @@ export function ProjectBoardProvider({
   const [activeBoardId, selectBoard] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const legacy = useProjectBoardStore((state) => state.boards);
-  const [imported, setImported] = useState(false);
   const boards = query.data?.boards ?? [];
   const replace = async (next: ReadonlyArray<ProjectBoard>) => {
     if (query.data === null || !allowed || saving) return;
@@ -64,7 +61,7 @@ export function ProjectBoardProvider({
         saved = true;
       } else {
         setError(
-          t("Could not save the board. Refresh and try again; your browser copy is preserved."),
+          t("Could not save the board. Refresh and try again."),
         );
       }
     } catch {
@@ -119,25 +116,6 @@ export function ProjectBoardProvider({
         <Button variant="ghost" size="xs" onClick={query.refresh}>
           {t("Refresh")}
         </Button>
-        {!imported && legacy.length > 0 && allowed && query.data !== null ? (
-          <Button
-            variant="ghost"
-            size="xs"
-            disabled={saving}
-            onClick={() => {
-              const copies = legacy.map((board) => ({
-                ...board,
-                id: randomUUID(),
-                tasks: board.tasks.map((task) => ({ ...task, id: randomUUID() })),
-              }));
-              void replace([...boards, ...copies]).then((ok) => {
-                if (ok) setImported(true);
-              });
-            }}
-          >
-            {t("Import browser boards into this project")}
-          </Button>
-        ) : null}
       </div>
       <fieldset
         // Not query.isPending: the board polls every 10 s, and disabling on each refresh dimmed it
