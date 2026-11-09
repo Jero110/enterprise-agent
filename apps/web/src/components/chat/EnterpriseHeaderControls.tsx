@@ -26,6 +26,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { cn } from "~/lib/utils";
 import { Badge } from "../ui/badge";
+import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { KnowledgeMap } from "../enterprise/KnowledgeMap";
@@ -335,15 +336,35 @@ function SharePanel(props: {
       thread.parentThreadId === null &&
       thread.ownerEmail === props.ownerEmail,
   );
+  const org = useEnvironmentQuery(
+    enterpriseEnvironment.org({ environmentId: props.queryEnvironmentId, input: {} }),
+  );
+  const colleagues = (org.data?.teams ?? []).flatMap((team) =>
+    team.members.flatMap((member) =>
+      member.isMe || member.memberKey === undefined
+        ? []
+        : [{ key: member.memberKey, label: `${member.displayName} · ${team.name}` }],
+    ),
+  );
   // Shows the choice right away; falls back to the server value once the save settles.
   const [pendingStatus, setPendingStatus] = useState<PublicationStatus | null>(null);
-  const change = async (status: PublicationStatus) => {
+  // "people" with nobody ticked yet stays local: an empty list would mean the whole team.
+  const [choosingPeople, setChoosingPeople] = useState(false);
+  const status = pendingStatus ?? summary?.publicationStatus ?? "unpublished";
+  const audienceKeys = summary?.audienceKeys ?? [];
+  const forPeople = choosingPeople || audienceKeys.length > 0;
+  const change = async (next: PublicationStatus, keys: ReadonlyArray<string> = audienceKeys) => {
     if (pendingStatus !== null) return;
-    setPendingStatus(status);
+    setPendingStatus(next);
     const result = await publish({
       environmentId: props.environmentId,
-      input: { threadId: props.threadId, status },
+      input: {
+        threadId: props.threadId,
+        status: next,
+        ...(next !== "unpublished" && keys.length > 0 ? { audienceKeys: [...keys] } : {}),
+      },
     });
+    if (result._tag === "Success" && keys.length > 0) setChoosingPeople(false);
     setPendingStatus(null);
     if (result._tag === "Success") threads.refresh();
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
@@ -360,7 +381,7 @@ function SharePanel(props: {
       <RadioGroup
         aria-label={t("Team sharing")}
         disabled={!canPublish || pendingStatus !== null}
-        value={pendingStatus ?? summary?.publicationStatus ?? "unpublished"}
+        value={status}
         onValueChange={(value) => void change(value as PublicationStatus)}
       >
         <label className="flex items-start gap-2 text-sm">
@@ -377,7 +398,7 @@ function SharePanel(props: {
           <span>
             {t("Team readable")}
             <span className="block text-xs text-muted-foreground">
-              {t("Your team can read this conversation and its subagents. Stop sharing any time.")}
+              {t("They can read this conversation and its subagents. Stop sharing any time.")}
             </span>
           </span>
         </label>
@@ -387,12 +408,66 @@ function SharePanel(props: {
             {t("Summary only")}
             <span className="block text-xs text-muted-foreground">
               {t(
-                "Your team and their agents see only what you asked and the result. The chat itself stays on your computer.",
+                "They and their agents see only what you asked and the result. The chat itself stays on your computer.",
               )}
             </span>
           </span>
         </label>
       </RadioGroup>
+      {status !== "unpublished" ? (
+        <div className="space-y-2 border-t border-border/60 pt-3">
+          <h3 className="text-xs font-medium">{t("Who can read it")}</h3>
+          <RadioGroup
+            aria-label={t("Who can read it")}
+            disabled={!canPublish || pendingStatus !== null}
+            value={forPeople ? "people" : "team"}
+            onValueChange={(value) => {
+              if (value === "people") setChoosingPeople(true);
+              else {
+                setChoosingPeople(false);
+                void change(status, []);
+              }
+            }}
+          >
+            <label className="flex items-center gap-2 text-sm">
+              <Radio value="team" />
+              {t("My whole team")}
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Radio value="people" />
+              {t("Only people I choose")}
+            </label>
+          </RadioGroup>
+          {forPeople ? (
+            <ul className="max-h-48 space-y-1 overflow-y-auto">
+              {colleagues.map((colleague) => (
+                <li key={colleague.key}>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={audienceKeys.includes(colleague.key)}
+                      disabled={!canPublish || pendingStatus !== null}
+                      onCheckedChange={(checked) => {
+                        const next = checked
+                          ? [...audienceKeys, colleague.key]
+                          : audienceKeys.filter((key) => key !== colleague.key);
+                        // Unticking the last person falls back to the whole team, so say so first.
+                        if (next.length === 0) setChoosingPeople(true);
+                        void change(status, next);
+                      }}
+                    />
+                    <span className="min-w-0 truncate">{colleague.label}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            {forPeople && audienceKeys.length === 0
+              ? t("Tick who can read it. Until then your whole team can.")
+              : t("Your bosses (admins and your area's lead) can always read what you share.")}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

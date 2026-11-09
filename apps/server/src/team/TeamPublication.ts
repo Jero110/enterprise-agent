@@ -1,5 +1,6 @@
 import {
   EnterpriseError,
+  TEAM_THREAD_AUDIENCE_MAX,
   TeamThreadMessage,
   type EnterpriseHubIdentity,
   type TeamThreadPublishInput,
@@ -13,6 +14,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
+
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
 
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 import { summarizeSharedThread } from "./sharedThreadSummary.ts";
@@ -48,11 +51,43 @@ interface ThreadRow {
   readonly publication_status: "unpublished" | "read-only";
   readonly publication_view: "full" | "summary";
   readonly publication_team_id: string | null;
+  readonly publication_audience: string | null;
 }
 const denied = new EnterpriseError({ code: "access_denied", message: "Thread access denied." });
 const MessagesJson = Schema.fromJsonString(Schema.Array(TeamThreadMessage));
 const decodeMessages = Schema.decodeUnknownEffect(MessagesJson);
 const encodeMessages = Schema.encodeEffect(MessagesJson);
+const AudienceJson = Schema.fromJsonString(Schema.Array(Schema.String));
+const decodeAudience = Schema.decodeUnknownSync(AudienceJson);
+const encodeAudience = Schema.encodeSync(AudienceJson);
+const audienceOf = (row: ThreadRow): ReadonlyArray<string> | null =>
+  row.publication_audience === null ? null : decodeAudience(row.publication_audience);
+
+type Viewer = Pick<EnterpriseHubIdentity, "email" | "teamId" | "role">;
+/**
+ * Who may read a shared thread: its owner, the owner's bosses (any admin, the lead of the
+ * owner's area) and whoever the share names, or the owner's whole team when it names nobody.
+ * An unshared thread is never readable by anyone but its owner.
+ */
+const canRead = (
+  rows: ReadonlyMap<string, ThreadRow>,
+  row: ThreadRow,
+  owner: EnterpriseStore.EnterpriseMember,
+  viewer: Viewer,
+) => {
+  if (viewer.email === owner.email) return true;
+  const sharing = sharingAncestors(rows, row, owner.teamId);
+  if (sharing.length === 0) return false;
+  if (viewer.role === "admin") return true;
+  if (viewer.role === "lead" && viewer.teamId !== null && viewer.teamId === owner.teamId)
+    return true;
+  return sharing.some((ancestor) => {
+    const audience = audienceOf(ancestor);
+    return audience === null
+      ? viewer.teamId !== null && viewer.teamId === owner.teamId
+      : audience.includes(viewer.email);
+  });
+};
 
 const ancestors = (rows: ReadonlyMap<string, ThreadRow>, row: ThreadRow) => {
   const chain: ThreadRow[] = [];
@@ -96,16 +131,21 @@ const toSummary = (
   rows: ReadonlyMap<string, ThreadRow>,
   row: ThreadRow,
   owner: { readonly displayName: string; readonly teamId: string | null },
-): TeamThreadSummary => ({
-  threadId: row.thread_id,
-  parentThreadId: row.parent_thread_id,
-  title: row.title,
-  status: row.status,
-  updatedAt: row.updated_at,
-  ownerEmail: row.owner_email,
-  ownerDisplayName: owner.displayName,
-  publicationStatus: publicationOf(rows, row, owner.teamId),
-});
+  forOwner = false,
+): TeamThreadSummary => {
+  const audience = audienceOf(row);
+  return {
+    threadId: row.thread_id,
+    parentThreadId: row.parent_thread_id,
+    title: row.title,
+    status: row.status,
+    updatedAt: row.updated_at,
+    ownerEmail: row.owner_email,
+    ownerDisplayName: owner.displayName,
+    publicationStatus: publicationOf(rows, row, owner.teamId),
+    ...(forOwner && audience !== null ? { audienceKeys: audience.map(teamMemberKey) } : {}),
+  };
+};
 
 export const layer = Layer.effect(
   TeamPublication,
@@ -124,7 +164,7 @@ export const layer = Layer.effect(
       return member;
     });
     const ownerRows = (email: string) =>
-      sql<ThreadRow>`SELECT owner_email, thread_id, parent_thread_id, title, status, updated_at, publication_status, publication_view, publication_team_id FROM enterprise_team_threads WHERE owner_email = ${email}`.pipe(
+      sql<ThreadRow>`SELECT owner_email, thread_id, parent_thread_id, title, status, updated_at, publication_status, publication_view, publication_team_id, publication_audience FROM enterprise_team_threads WHERE owner_email = ${email}`.pipe(
         Effect.map((rows) => new Map(rows.map((row) => [row.thread_id, row]))),
         Effect.orDie,
       );
@@ -164,6 +204,23 @@ export const layer = Layer.effect(
       function* (sessionId, input) {
         const owner = yield* identity(sessionId);
         if (owner.teamId === null && input.status !== "unpublished") return yield* denied;
+        const keys = input.audienceKeys ?? [];
+        if (keys.length > TEAM_THREAD_AUDIENCE_MAX)
+          return yield* new EnterpriseError({
+            code: "access_denied",
+            message: "Share with fewer people, or with your whole team.",
+          });
+        const members = keys.length === 0 ? [] : yield* store.listMembers;
+        const audience: string[] = [];
+        for (const key of new Set(keys)) {
+          const member = members.find((entry) => teamMemberKey(entry.email) === key);
+          if (member === undefined || !member.authorized || member.revoked)
+            return yield* new EnterpriseError({
+              code: "access_denied",
+              message: "You can only share with people in your company.",
+            });
+          if (member.email !== owner.email) audience.push(member.email);
+        }
         return yield* sql
           .withTransaction(
             Effect.gen(function* () {
@@ -185,13 +242,14 @@ export const layer = Layer.effect(
                   if (
                     ancestors(rows, row)?.some((ancestor) => ancestor.thread_id === input.threadId)
                   ) {
-                    yield* sql`UPDATE enterprise_team_threads SET publication_status = 'unpublished', publication_view = 'full', publication_team_id = NULL, snapshot_json = NULL
+                    yield* sql`UPDATE enterprise_team_threads SET publication_status = 'unpublished', publication_view = 'full', publication_team_id = NULL, publication_audience = NULL, snapshot_json = NULL
               WHERE owner_email = ${owner.email} AND thread_id = ${row.thread_id}`;
                   }
                 }
               } else {
                 const view = input.status === "summary" ? "summary" : "full";
-                yield* sql`UPDATE enterprise_team_threads SET publication_status = 'read-only', publication_view = ${view}, publication_team_id = ${owner.teamId}
+                const audienceJson = keys.length === 0 ? null : encodeAudience(audience);
+                yield* sql`UPDATE enterprise_team_threads SET publication_status = 'read-only', publication_view = ${view}, publication_team_id = ${owner.teamId}, publication_audience = ${audienceJson}
           WHERE owner_email = ${owner.email} AND thread_id = ${input.threadId}`;
                 // Drop stored snapshots under this thread so a switch never leaves the other view behind.
                 for (const row of rows.values()) {
@@ -209,27 +267,18 @@ export const layer = Layer.effect(
           .pipe(Effect.catchIf((error) => error._tag !== "EnterpriseError", Effect.die));
       },
     );
-    const visibleOwner = (
-      viewer: Pick<EnterpriseHubIdentity, "email" | "teamId" | "role">,
-      owner: EnterpriseStore.EnterpriseMember,
-    ) =>
-      owner.authorized &&
-      !owner.revoked &&
-      (viewer.role === "admin" ||
-        viewer.email === owner.email ||
-        (viewer.teamId !== null && viewer.teamId === owner.teamId));
     const list: TeamPublication["Service"]["list"] = Effect.fn("TeamPublication.list")(
       function* (sessionId) {
         const viewer = yield* identity(sessionId);
-        const owners = (yield* store.listMembers).filter((member) => visibleOwner(viewer, member));
+        const owners = (yield* store.listMembers).filter(
+          (member) => member.authorized && !member.revoked,
+        );
         const summaries: TeamThreadSummary[] = [];
         for (const owner of owners) {
           const rows = yield* ownerRows(owner.email);
           for (const row of rows.values()) {
-            const summary = toSummary(rows, row, owner);
-            if (owner.email === viewer.email || summary.publicationStatus !== "unpublished") {
-              summaries.push(summary);
-            }
+            if (canRead(rows, row, owner, viewer))
+              summaries.push(toSummary(rows, row, owner, owner.email === viewer.email));
           }
         }
         return summaries.sort(
@@ -244,10 +293,15 @@ export const layer = Layer.effect(
       function* (sessionId, input) {
         const viewer = yield* identity(sessionId);
         const owner = yield* store.getMember(input.ownerEmail);
-        if (owner === null || !visibleOwner(viewer, owner)) return yield* denied;
+        if (owner === null || !owner.authorized || owner.revoked) return yield* denied;
         const rows = yield* ownerRows(owner.email);
         const row = rows.get(input.threadId);
-        if (row === undefined || !isPublished(rows, row, owner.teamId)) return yield* denied;
+        if (
+          row === undefined ||
+          !isPublished(rows, row, owner.teamId) ||
+          !canRead(rows, row, owner, viewer)
+        )
+          return yield* denied;
         const snapshot = yield* sql<{
           readonly snapshot_json: string | null;
         }>`SELECT snapshot_json FROM enterprise_team_threads WHERE owner_email = ${owner.email} AND thread_id = ${row.thread_id}`.pipe(
@@ -259,7 +313,7 @@ export const layer = Layer.effect(
             code: "snapshot_unavailable",
             message: "The owner's IDE has not uploaded this snapshot yet.",
           });
-        const summary = toSummary(rows, row, owner);
+        const summary = toSummary(rows, row, owner, owner.email === viewer.email);
         const messages = yield* decodeMessages(json).pipe(Effect.orDie);
         return {
           summary,
