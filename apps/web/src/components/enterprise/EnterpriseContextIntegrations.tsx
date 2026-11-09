@@ -1,5 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentId, ModelSelection } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  EnterpriseIngestStartResult,
+  ModelSelection,
+} from "@t3tools/contracts";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import {
   enterpriseEnvironment,
@@ -16,9 +20,11 @@ import { SharingTab, type PersonalSharing } from "./SharingTab";
 export function ConnectedIngestTab({
   environmentId,
   modelSelection,
+  onReview,
 }: {
   environmentId: EnvironmentId;
   modelSelection: ModelSelection;
+  onReview: () => void;
 }) {
   const canStart = useAtomValue(enterpriseEnvironment.ingestStart.permissionAtom(environmentId));
   const { identity } = useEnterpriseStatus();
@@ -29,6 +35,7 @@ export function ConnectedIngestTab({
   return (
     <IngestTab
       environmentId={environmentId}
+      onReview={onReview}
       connectors={<ConnectorsSection environmentId={environmentId} />}
       ingestion={{
         canStart,
@@ -40,6 +47,7 @@ export function ConnectedIngestTab({
           });
           if (result._tag === "Failure")
             throw new Error(enterpriseFailureMessage(squashAtomCommandFailure(result)));
+          return result.value satisfies EnterpriseIngestStartResult;
         },
         stageUpload: async (files, destination) => {
           const result = await upload({
