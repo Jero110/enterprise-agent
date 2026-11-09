@@ -111,6 +111,11 @@ describe("embedded knowledge graph", () => {
     expect(graph.inspect("nodes.filter(n => n.hub).length")).toBe(0);
     expect(graph.inspect("nodes.every(n => Math.hypot(n.x, n.z) <= RAD)")).toBe(true);
     expect(
+      graph.inspect(
+        "LAYERS.every(layer => nodes.filter(n => n.layer === layer.id).some(n => Math.hypot(n.x, n.z) > 140))",
+      ),
+    ).toBe(true);
+    expect(
       graph.inspect("nodes.every(n => n.x === n.fx && n.z === n.fz && n.fy === LAYERS[n.li].y)"),
     ).toBe(true);
     expect(graph.inspect("nodes.every(n => !('content' in n))")).toBe(true);
@@ -123,6 +128,37 @@ describe("embedded knowledge graph", () => {
     graph.send({ type: "knowledge-nodes", nodes: [] });
     expect(graph.inspect("nodes.length + links.length")).toBe(0);
     expect(graph.inspect('document.getElementById("empty-stage").hidden')).toBe(false);
+    graph.send({
+      type: "knowledge-nodes",
+      nodes: Array.from({ length: 187 }, (_, index) => ({
+        id: `general/ai/${index}.md`,
+        title: `Accepted ${index}`,
+        areaId: "general",
+        layer: "ai",
+        links: [],
+      })),
+    });
+    expect(graph.inspect("Math.max(...nodes.map(n => Math.hypot(n.x, n.z)))")).toBeGreaterThan(140);
+    expect(graph.inspect("Math.min(...nodes.map(n => Math.hypot(n.x, n.z)))")).toBeLessThan(15);
+    expect(graph.inspect("nodes.every(n => Math.hypot(n.x, n.z) < RAD)")).toBe(true);
+    graph.send({
+      type: "knowledge-nodes",
+      nodes: ["cx", "ventas"].flatMap((areaId) =>
+        Array.from({ length: 100 }, (_, index) => ({
+          id: `${areaId}/business/${index}.md`,
+          title: `${areaId} ${index}`,
+          areaId,
+          layer: "business",
+          links: [],
+        })),
+      ),
+    });
+    expect(
+      graph.inspect(
+        'Math.hypot(nodes.find(n => n.areaId === "cx").x - nodes.find(n => n.areaId === "ventas").x, nodes.find(n => n.areaId === "cx").z - nodes.find(n => n.areaId === "ventas").z)',
+      ),
+    ).toBeGreaterThan(150);
+    expect(graph.inspect("nodes.every(n => Math.hypot(n.x, n.z) < RAD)")).toBe(true);
   });
 
   it("keeps accepted CX Business and private Ventas Data Markdown as real linked documents", () => {
@@ -154,6 +190,7 @@ describe("embedded knowledge graph", () => {
       ["areas/cx/experience.md", "areas/ventas/sales.md"],
     ]);
     expect(graph.inspect("nodes.every(n => !('content' in n))")).toBe(true);
+    expect(graph.inspect("nodes.every(n => n.x === 0 && n.z === 0)")).toBe(true);
     expect(graph.inspect('activeArea = "cx"; nodes.filter(vis).map(n => n.id)')).toEqual([
       "areas/cx/experience.md",
     ]);
