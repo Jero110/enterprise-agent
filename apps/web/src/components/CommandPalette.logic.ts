@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   foldSearchQuery,
   PALETTE_SECONDARY_LIMIT,
@@ -766,7 +767,11 @@ export function buildRootGroups(input: {
 }): CommandPaletteGroup[] {
   const groups: CommandPaletteGroup[] = [];
   if (input.actionItems.length > 0) {
-    groups.push({ value: "actions", label: "Actions", items: input.actionItems });
+    groups.push({
+      value: "actions",
+      label: t("Actions", undefined, "palette"),
+      items: input.actionItems,
+    });
   }
   if (input.recentThreadItems.length > 0) {
     groups.push({
