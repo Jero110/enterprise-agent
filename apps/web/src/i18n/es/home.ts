@@ -33,4 +33,19 @@ export const ES_HOME: Readonly<Record<string, string>> = {
   "home::Working": "Trabajando",
   "home::Done": "Listo",
   "home::Stopped": "Se detuvo",
+  // Projects and team
+  "Projects and team": "Proyectos y equipo",
+  "Join your company's team to see its projects.":
+    "Únete al equipo de tu empresa para ver sus proyectos.",
+  "Open board": "Ver tablero",
+  "No tasks yet": "Sin tareas",
+  "1 in progress": "1 en curso",
+  "{count} in progress": "{count} en curso",
+  "1 blocked": "1 atorada",
+  "{count} blocked": "{count} atoradas",
+  "nothing shared yet": "nada compartido aún",
+  "1 shared chat": "1 chat compartido",
+  "{count} shared chats": "{count} chats compartidos",
+  "1 new message": "1 mensaje nuevo",
+  "{count} new messages": "{count} mensajes nuevos",
 };

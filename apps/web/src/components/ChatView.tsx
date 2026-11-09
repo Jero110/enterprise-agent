@@ -262,6 +262,7 @@ import { useEnvironmentShellHasSnapshot } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { DraftStarterSuggestions } from "./chat/DraftStarterSuggestions";
+import { TeamWorkCard } from "./home/TeamWorkCard";
 import { TodayPanel } from "./home/TodayPanel";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import {
@@ -3842,6 +3843,12 @@ export default function ChatView(props: ChatViewProps) {
                             onPick={insertStarterSuggestionStable}
                           />
                           <TodayPanel />
+                          {activeProject ? (
+                            <TeamWorkCard
+                              environmentId={environmentId}
+                              projectId={activeProject.id}
+                            />
+                          ) : null}
                         </div>
                       ) : null}
                     </ComposerSurface.Shell>

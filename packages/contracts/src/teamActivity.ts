@@ -50,7 +50,8 @@ export const TeamActivity = Schema.Struct({
 });
 export type TeamActivity = typeof TeamActivity.Type;
 
-export const PublicationStatus = Schema.Literals(["unpublished", "read-only"]);
+/** `summary`: teammates and their agents get only the request and the result, never the transcript. */
+export const PublicationStatus = Schema.Literals(["unpublished", "read-only", "summary"]);
 export type PublicationStatus = typeof PublicationStatus.Type;
 
 export const ThreadPublication = Schema.Struct({

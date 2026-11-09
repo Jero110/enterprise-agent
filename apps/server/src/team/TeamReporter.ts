@@ -18,6 +18,7 @@ import * as EnterpriseClient from "../enterprise/EnterpriseClient.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ApplicationEvents from "../persistence/OrchestrationEventStore.ts";
 import { forkParked } from "../serverActivation.ts";
+import { summarizeSharedThread } from "./sharedThreadSummary.ts";
 
 export class TeamReporter extends Context.Service<
   TeamReporter,
@@ -75,7 +76,7 @@ export const layer = Layer.effect(
       const published = summaries.filter(
         (summary) =>
           summary.ownerEmail === local.identity.email &&
-          summary.publicationStatus === "read-only" &&
+          summary.publicationStatus !== "unpublished" &&
           local.ids.has(ThreadId.make(summary.threadId)) &&
           (threadIds === undefined || threadIds.has(summary.threadId)),
       );
@@ -92,7 +93,16 @@ export const layer = Layer.effect(
           }));
         yield* client.teamReport({
           summaries: [],
-          snapshots: [{ threadId: summary.threadId, messages }],
+          snapshots: [
+            {
+              threadId: summary.threadId,
+              // The transcript of a summary share never leaves this machine.
+              messages:
+                summary.publicationStatus === "summary"
+                  ? summarizeSharedThread(messages)
+                  : messages,
+            },
+          ],
         });
       }
     });
@@ -110,7 +120,7 @@ export const layer = Layer.effect(
             message: "Only this Enterprise identity can share its conversations.",
           });
         const result = yield* client.teamPublish(input);
-        if (input.status === "read-only") yield* upload(local);
+        if (input.status !== "unpublished") yield* upload(local);
         return result;
       },
       lock.withPermits(1),

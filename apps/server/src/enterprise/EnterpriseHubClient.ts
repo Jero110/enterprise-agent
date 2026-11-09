@@ -5,6 +5,7 @@ import * as PubSub from "effect/PubSub";
 import * as Stream from "effect/Stream";
 
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as TeamMessages from "../team/TeamMessages.ts";
 import * as TeamPublication from "../team/TeamPublication.ts";
 import * as EnterpriseClient from "./EnterpriseClient.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
@@ -15,6 +16,7 @@ import * as RunRecords from "./RunRecords.ts";
 const make = Effect.gen(function* () {
   const hub = yield* EnterpriseHub.EnterpriseHub;
   const publication = yield* TeamPublication.TeamPublication;
+  const messages = yield* TeamMessages.TeamMessages;
   const ingestion = yield* EnterpriseIngestion.EnterpriseIngestion;
   const runs = yield* RunRecords.RunRecords;
   const environment = yield* ServerEnvironment.ServerEnvironment;
@@ -114,6 +116,16 @@ const make = Effect.gen(function* () {
     }),
     teamPublish: Effect.fn("EnterpriseHubClient.teamPublish")(function* (input) {
       return yield* publication.publish(yield* session, input);
+    }),
+    messagesList: Effect.flatMap(session, messages.list),
+    messageSend: Effect.fn("EnterpriseHubClient.messageSend")(function* (input) {
+      return yield* messages.send(yield* session, input);
+    }),
+    messageRead: Effect.fn("EnterpriseHubClient.messageRead")(function* (input) {
+      return yield* messages.read(yield* session, input);
+    }),
+    messageDecide: Effect.fn("EnterpriseHubClient.messageDecide")(function* (input) {
+      return yield* messages.decide(yield* session, input);
     }),
     teamReport: Effect.fn("EnterpriseHubClient.teamReport")(function* (input) {
       return yield* publication.report(yield* session, input);

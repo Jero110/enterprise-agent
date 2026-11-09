@@ -74,6 +74,10 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   // Connecting links this environment to the hub and replaces its enterprise identity.
   [WS_METHODS.teamThreadContinue]: AuthOrchestrationOperateScope,
   [WS_METHODS.teamThreadPublish]: AuthOrchestrationOperateScope,
+  [WS_METHODS.teamMessageSend]: AuthOrchestrationOperateScope,
+  [WS_METHODS.teamMessageRead]: AuthOrchestrationOperateScope,
+  // Installing writes a skill into this machine's agent folders.
+  [WS_METHODS.teamMessageDecide]: AuthOrchestrationOperateScope,
   [WS_METHODS.enterpriseConnect]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseDisconnect]: AuthAccessWriteScope,
   // The hub decides on the member's role; this scope only lets the client ask.

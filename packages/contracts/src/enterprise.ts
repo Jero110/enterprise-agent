@@ -183,6 +183,10 @@ export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("Ente
     "knowledge_write_failed",
     "thread_not_found",
     "snapshot_unavailable",
+    "invalid_message",
+    "message_not_found",
+    "too_many_messages",
+    "skill_exists",
   ]),
   message: Schema.String,
 }) {}

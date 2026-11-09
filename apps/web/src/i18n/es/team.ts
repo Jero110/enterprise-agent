@@ -36,10 +36,13 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "Share with team": "Compartir con el equipo",
   "Could not update sharing": "No se pudo cambiar cómo se comparte",
   "Share with your team": "Comparte con tu equipo",
+  "Summary only": "Solo resumen",
+  "Your team and their agents see only what you asked and the result. The chat itself stays on your computer.":
+    "Tu equipo y sus agentes solo ven lo que pediste y el resultado. El chat se queda en tu computadora.",
   "Team sharing": "Compartir con el equipo",
-  "Not shared": "Solo yo",
+  "Not shared": "No compartida",
   "Only you can see this conversation.": "Solo tú puedes ver este chat.",
-  "Team readable": "Mi equipo puede leerlo",
+  "Team readable": "Toda la conversación",
   "Your team can read this conversation and its subagents. Stop sharing any time.":
     "Tu equipo puede leer este chat. Puedes dejar de compartirlo cuando quieras.",
   "AI architecture": "Arquitectura de IA",
@@ -140,7 +143,7 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   History: "Historial",
   "File upload": "Archivo subido",
   Projects: "Proyectos",
-  "Boards belong to this project on the connected server. Ask your agent to read the cards. Browser boards can be imported; the original browser copy is kept.":
+  "Boards belong to this project on the connected server. Ask your agent to read the cards.":
     "Tus tableros de tareas para este proyecto. Menciona una tarea en el chat y tu asistente la toma en cuenta.",
   Backlog: "Por hacer",
   "In progress": "En curso",
@@ -174,13 +177,12 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "Delete board": "Borrar tablero",
   "Search tasks": "Buscar tareas",
   "No boards yet. Create one to start.": "Aún no tienes tableros. Crea uno para empezar.",
-  "Could not save the board. Refresh and try again; your browser copy is preserved.":
-    "No se pudo guardar el tablero. Actualiza e intenta otra vez; no se perdió nada.",
+  "Could not save the board. Refresh and try again.":
+    "No se pudo guardar el tablero. Actualiza e intenta otra vez.",
   "Could not reach the server. Refresh and try again.":
     "No hay conexión con el servidor. Actualiza e intenta otra vez.",
   "Saving…": "Guardando…",
   "Saved on this environment · Current project": "Guardado · Proyecto actual",
-  "Import browser boards into this project": "Traer tableros guardados en este navegador",
   "Could not read settings": "No se pudo leer tu configuración",
   "Still connecting": "Conectando…",
   "Your saved settings could not be loaded.": "No se pudo cargar tu configuración guardada.",

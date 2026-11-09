@@ -53,4 +53,4 @@ The CLI creates a read-only local MCP session and revokes it on normal exit. Thi
 
 In a new thread, ask “Lee las tarjetas del proyecto” or “¿Qué está haciendo Alex en Cowork?”. The agent can list and read cards for its current project, and published Cowork conversations available to this environment’s signed-in member. Unpublished conversations remain unavailable.
 
-Project boards are saved on the connected server, so browsers connected to that server use the same project data. In Proyectos, import existing browser boards into the selected project; the original browser copy is kept. Boards do not sync between separate environments or through the Enterprise hub. The native mobile app has no board editor yet.
+Proyectos appears only while you are signed in to an enterprise. Project boards are saved on the connected server, so browsers connected to that server use the same project data. Boards do not sync between separate environments or through the Enterprise hub. The native mobile app has no board editor yet.

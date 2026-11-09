@@ -118,6 +118,59 @@ describe("TeamPublication hub", () => {
     }).pipe(Effect.provide(layer)),
   );
 
+  it.effect("summary shares store and serve only the request and the result", () =>
+    Effect.gen(function* () {
+      yield* enroll;
+      const pub = yield* TeamPublication.TeamPublication;
+      const sql = yield* SqlClient.SqlClient;
+      const transcript = [
+        { role: "user" as const, text: "Find last promo's %", createdAt: "2026-11-09T10:00:00Z" },
+        { role: "assistant" as const, text: "Searching Ventas", createdAt: "2026-11-09T10:01:00Z" },
+        { role: "user" as const, text: "private follow-up", createdAt: "2026-11-09T10:05:00Z" },
+        {
+          role: "assistant" as const,
+          text: "The promo was 15%.\nWorked for 7 min",
+          createdAt: "2026-11-09T10:09:00Z",
+        },
+      ];
+      yield* pub.report(hugo, {
+        summaries: [summary("parent"), summary("child", "parent")],
+        snapshots: [],
+      });
+      yield* pub.publish(hugo, { threadId: "parent", status: "summary" });
+      yield* pub.report(hugo, {
+        summaries: [],
+        snapshots: ["parent", "child"].map((threadId) => ({ threadId, messages: transcript })),
+      });
+      expect((yield* pub.list(juan)).map((thread) => thread.publicationStatus)).toEqual([
+        "summary",
+        "summary",
+      ]);
+      const expected = [
+        { role: "user", text: "Find last promo's %", createdAt: "2026-11-09T10:09:00Z" },
+        { role: "assistant", text: "The promo was 15%.", createdAt: "2026-11-09T10:09:00Z" },
+      ];
+      for (const threadId of ["parent", "child"]) {
+        expect((yield* pub.get(juan, { ownerEmail: hugo, threadId })).messages).toEqual(expected);
+      }
+      const stored = yield* sql<{
+        readonly snapshot_json: string;
+      }>`SELECT snapshot_json FROM enterprise_team_threads WHERE snapshot_json IS NOT NULL`;
+      expect(stored).toHaveLength(2);
+      for (const row of stored) expect(row.snapshot_json).not.toContain("private follow-up");
+      // Switching views drops the stored snapshot instead of serving it under the new view.
+      yield* pub.publish(hugo, { threadId: "parent", status: "read-only" });
+      expect(yield* denied(pub.get(juan, { ownerEmail: hugo, threadId: "parent" }))).toBe(true);
+      yield* pub.report(hugo, {
+        summaries: [],
+        snapshots: [{ threadId: "parent", messages: transcript }],
+      });
+      expect((yield* pub.get(juan, { ownerEmail: hugo, threadId: "parent" })).messages).toEqual(
+        transcript,
+      );
+    }).pipe(Effect.provide(layer)),
+  );
+
   it.effect("rechecks current membership and rejects cyclic lineage", () =>
     Effect.gen(function* () {
       yield* enroll;

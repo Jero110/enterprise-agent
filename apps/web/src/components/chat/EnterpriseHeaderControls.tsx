@@ -7,6 +7,7 @@ import {
 import type {
   EnterpriseOrgTeam,
   EnvironmentId,
+  PublicationStatus,
   ServerProviderSkill,
   ThreadId,
   ThreadKnowledgeScope,
@@ -28,6 +29,11 @@ import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { KnowledgeMap } from "../enterprise/KnowledgeMap";
 import { ContextChanges } from "../enterprise/ContextChanges";
+import {
+  SharingPanel,
+  TeamMessagesButton,
+  usePendingSharedCount,
+} from "../enterprise/TeamMessages";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Radio, RadioGroup } from "../ui/radio-group";
 import { toastManager } from "../ui/toast";
@@ -188,13 +194,16 @@ function EnterpriseContextDialog(props: {
     }),
   );
   const pendingCount = inbox.error ? 0 : (inbox.data?.pendingCount ?? 0);
+  const pendingShared = usePendingSharedCount(props.environmentId);
+  // Shared skills wait on this user's answer just like proposals do.
+  const toAnswer = pendingCount + pendingShared;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
-              size={pendingCount > 0 ? "sm" : "icon"}
+              size={toAnswer > 0 ? "sm" : "icon"}
               variant="ghost"
               aria-label={t("Conversation context and changes")}
               aria-haspopup="dialog"
@@ -202,16 +211,16 @@ function EnterpriseContextDialog(props: {
               data-pressed={open ? "" : undefined}
               className="shrink-0 [-webkit-app-region:no-drag]"
               onClick={() => {
-                setTab(pendingCount > 0 ? "changes" : "context");
+                setTab(pendingShared > 0 ? "sharing" : pendingCount > 0 ? "changes" : "context");
                 setOpen(true);
               }}
             />
           }
         >
           <BrainCircuitIcon className="size-4" />
-          {pendingCount > 0 ? (
+          {toAnswer > 0 ? (
             <span className="whitespace-nowrap rounded-full bg-primary px-1.5 text-2xs font-medium text-primary-foreground">
-              {t("To approve · {count}", { count: pendingCount })}
+              {t("To approve · {count}", { count: toAnswer })}
             </span>
           ) : null}
         </TooltipTrigger>
@@ -237,6 +246,12 @@ function EnterpriseContextDialog(props: {
             className="flex shrink-0 gap-2 px-8 py-3"
           >
             <Tabs.Tab
+              value="sharing"
+              render={<Button size="sm" variant={tab === "sharing" ? "secondary" : "ghost"} />}
+            >
+              {pendingShared > 0 ? t("Sharing ({count})", { count: pendingShared }) : t("Sharing")}
+            </Tabs.Tab>
+            <Tabs.Tab
               value="context"
               render={<Button size="sm" variant={tab === "context" ? "secondary" : "ghost"} />}
             >
@@ -251,6 +266,9 @@ function EnterpriseContextDialog(props: {
                 : t("Changes", undefined, "knowledge")}
             </Tabs.Tab>
           </Tabs.List>
+          <Tabs.Panel value="sharing" className="flex min-h-0 flex-1 flex-col">
+            {open && <SharingPanel environmentId={props.environmentId} />}
+          </Tabs.Panel>
           <Tabs.Panel value="context" className="flex min-h-0 flex-1 flex-col">
             {open && <ContextPanel {...props} />}
           </Tabs.Panel>
@@ -306,7 +324,7 @@ function SharePanel(props: {
       thread.parentThreadId === null &&
       thread.ownerEmail === props.ownerEmail,
   );
-  const change = async (status: "unpublished" | "read-only") => {
+  const change = async (status: PublicationStatus) => {
     const result = await publish({
       environmentId: props.environmentId,
       input: { threadId: props.threadId, status },
@@ -327,7 +345,7 @@ function SharePanel(props: {
         aria-label={t("Team sharing")}
         disabled={!canPublish}
         value={summary?.publicationStatus ?? "unpublished"}
-        onValueChange={(value) => void change(value as "unpublished" | "read-only")}
+        onValueChange={(value) => void change(value as PublicationStatus)}
       >
         <label className="flex items-start gap-2 text-sm">
           <Radio value="unpublished" />
@@ -347,6 +365,17 @@ function SharePanel(props: {
             </span>
           </span>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <Radio value="summary" />
+          <span>
+            {t("Summary only")}
+            <span className="block text-xs text-muted-foreground">
+              {t(
+                "Your team and their agents see only what you asked and the result. The chat itself stays on your computer.",
+              )}
+            </span>
+          </span>
+        </label>
       </RadioGroup>
     </div>
   );
@@ -361,6 +390,7 @@ export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(p
   if (environmentId === null || identity === null) return null;
   return (
     <>
+      <TeamMessagesButton environmentId={environmentId} skills={props.skills} />
       <HeaderPopover icon={UsersRoundIcon} label={t("Organization")}>
         <OrgPanel environmentId={environmentId} />
       </HeaderPopover>
