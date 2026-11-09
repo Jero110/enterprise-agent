@@ -21,6 +21,8 @@ import { hubSessionId } from "./EnterpriseToolkit.ts";
 import * as Result from "effect/Result";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as ServerConfig from "../config.ts";
+import { stringify } from "yaml";
+import { documentOf } from "../knowledge/KnowledgeRepo.ts";
 import { layerKnowledge } from "../knowledge/KnowledgeRepo.testkit.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
@@ -177,6 +179,150 @@ describe("EnterpriseIngestion", () => {
       }).pipe(Effect.provide(layerFor(commands)));
     },
   );
+  it.effect(
+    "stages the Kavak Meet transcript and accepts CX Business nodes with Iker as percentage owner, without applying them",
+    () => {
+      const commands: OrchestrationV2ServerCommand[] = [];
+      return Effect.gen(function* () {
+        const hub = yield* EnterpriseHub.EnterpriseHub;
+        const ingestion = yield* EnterpriseIngestion.EnterpriseIngestion;
+        const fs = yield* FileSystem.FileSystem;
+        yield* hub.enroll("admin", { email: "jeronimo.deli@gmail.com", token });
+        yield* hub.orgImport(
+          "admin",
+          {
+            areas: stringify({
+              areas: [
+                { id: "ai-eng", name: "AI Engineering" },
+                { id: "cx", name: "CX" },
+                { id: "sales", name: "Sales" },
+              ],
+            }),
+            organization: stringify({
+              people: [
+                {
+                  email: "jeronimo.deli@gmail.com",
+                  name: "Demo admin",
+                  area: "ai-eng",
+                  role: "admin",
+                },
+                {
+                  email: "francisco@example.com",
+                  name: "Francisco",
+                  area: "ai-eng",
+                  role: "member",
+                },
+                { email: "maria@example.com", name: "María", area: "cx", role: "lead" },
+                {
+                  email: "iker@example.com",
+                  name: "Iker",
+                  area: "cx",
+                  role: "member",
+                  reportsTo: "maria@example.com",
+                },
+                { email: "magdalena@example.com", name: "Magdalena", area: "sales", role: "lead" },
+              ],
+            }),
+          },
+          true,
+        );
+        const transcript = yield* fs.readFile(
+          new URL("./fixtures/kavak-planning.meet.txt", import.meta.url).pathname,
+        );
+        const upload = yield* hub.proposalUpload("admin", {
+          scope: "global",
+          reason: "Planning call bucket",
+          files: [
+            {
+              name: "kavak-planning.meet.txt",
+              mimeType: "text/plain",
+              base64: Buffer.from(transcript).toString("base64"),
+            },
+          ],
+        });
+        const run = yield* ingestion.start("admin", {
+          uploadProposalIds: [upload.id],
+          modelSelection,
+        });
+        const message = commands.find((command) => command.type === "message.dispatch")!;
+        for (const value of [
+          "Francisco",
+          "María",
+          "Iker",
+          "Magdalena",
+          '"cx"',
+          '"sales"',
+          "speaker attribution",
+          "decisions",
+          "owners",
+        ])
+          expect(message.text).toContain(value);
+        const stagedPath = (
+          JSON.parse(/Selected sources \(data\): (.+)/.exec(message.text)![1]!) as string[]
+        )[0]!;
+        expect(Array.from(yield* fs.readFile(stagedPath))).toEqual(Array.from(transcript));
+        const plan = "areas/cx/kavak-promo-plan.md";
+        const action = "areas/cx/kavak-find-percentage.md";
+        const proposed = [];
+        for (const node of [
+          {
+            path: plan,
+            title: "Plan de promoción Kavak",
+            links: [action],
+            body: "Decisión (02:05): preparar el diseño, sin autorizar ni lanzar la campaña. María es responsable del plan. Francisco revisa la solicitud por Sequoia esta tarde (00:52).",
+          },
+          {
+            path: action,
+            title: "Encontrar el porcentaje histórico Kavak",
+            links: [plan],
+            body: "Responsable: Iker (01:15–01:40). Buscar el porcentaje y su fuente en Sales, liderada por Magdalena, y compartirlo con María. El porcentaje todavía es desconocido; no inferir un valor de la transcripción.",
+          },
+        ]) {
+          proposed.push(
+            yield* hub.ingestionPropose(run.threadId, {
+              kind: "create",
+              scope: "cx",
+              path: node.path,
+              content: `---\n${stringify({ title: node.title, description: node.title, area: "cx", layer: "business", private: true, links: node.links })}---\n${node.body}\n`,
+              reason:
+                "Extract the planning decision and its separately owned follow-up from the Meet call.",
+              evidence: [`${stagedPath}:3-8`],
+            }),
+          );
+        }
+        expect(
+          proposed.map((proposal) => ({
+            ...documentOf(proposal.path, proposal.content!),
+            status: proposal.status,
+          })),
+        ).toEqual([
+          expect.objectContaining({
+            id: plan,
+            areaId: "cx",
+            layer: "business",
+            private: true,
+            links: [action],
+            status: "pending",
+            content: expect.stringContaining("María"),
+          }),
+          expect.objectContaining({
+            id: action,
+            areaId: "cx",
+            layer: "business",
+            private: true,
+            links: [plan],
+            status: "pending",
+            content: expect.stringContaining("Responsable: Iker"),
+          }),
+        ]);
+        expect(
+          (yield* hub.knowledgeGraph("admin")).nodes.some(
+            (node) => node.id === plan || node.id === action,
+          ),
+        ).toBe(false);
+      }).pipe(Effect.provide(layerFor(commands)));
+    },
+  );
   it.effect("starts an ordinary thread attributed to the authenticated admin", () => {
     const commands: OrchestrationV2ServerCommand[] = [];
     return Effect.gen(function* () {
@@ -212,7 +358,7 @@ describe("EnterpriseIngestion", () => {
         hubSessionId(hub).pipe(
           Effect.provideService(McpInvocationContext.McpInvocationContext, {
             environmentId: EnvironmentId.make("hub"),
-            capabilities: new Set<never>(),
+            capabilities: new Set<McpInvocationContext.McpCapability>(),
             issuedAt: 0,
             requestNamespace: "ingestion",
             client: undefined,
