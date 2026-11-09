@@ -2686,6 +2686,7 @@ export const layerWsRpc = (
         [WS_METHODS.enterpriseIngestStart]: (input) => enterprise.ingestStart(input),
         [WS_METHODS.enterpriseOrg]: () => enterprise.org,
         [WS_METHODS.enterpriseOrgTemplate]: () => Effect.succeed(OrgImport.template),
+        [WS_METHODS.enterpriseConnector]: (input) => enterprise.connector(input),
         [WS_METHODS.enterpriseOrgImportPreview]: (input) => enterprise.orgImport(input, false),
         [WS_METHODS.enterpriseOrgImportApply]: (input) => enterprise.orgImport(input, true),
         [WS_METHODS.enterpriseThreadContext]: (input) => threadKnowledge.get(input),

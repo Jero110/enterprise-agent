@@ -99,6 +99,12 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     status,
     members,
     org,
+    connector: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:connector",
+      tag: WS_METHODS.enterpriseConnector,
+      onSuccess: ({ environmentId }, registry) =>
+        Effect.sync(() => refreshAll(registry, environmentId)),
+    }),
     orgTemplate,
     // A preview writes nothing, so it refreshes nothing.
     orgImportPreview: createEnvironmentRpcCommand(runtime, {

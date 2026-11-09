@@ -82,6 +82,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.enterpriseProposalDecide]: "enterprise",
   [WS_METHODS.enterpriseIngestStart]: "enterprise",
   [WS_METHODS.enterpriseOrg]: "enterprise",
+  [WS_METHODS.enterpriseConnector]: "enterprise",
   [WS_METHODS.enterpriseOrgTemplate]: "enterprise",
   [WS_METHODS.enterpriseOrgImportPreview]: "enterprise",
   [WS_METHODS.enterpriseOrgImportApply]: "enterprise",

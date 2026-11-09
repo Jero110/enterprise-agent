@@ -4,6 +4,8 @@ import {
   RunsQuery,
   EnterpriseAuthorizeMemberInput,
   EnterpriseError,
+  EnterpriseConnectorInput,
+  EnterpriseConnectorResult,
   EnterpriseHubIdentity,
   EnterpriseIngestStartInput,
   EnterpriseIngestStartResult,
@@ -80,6 +82,13 @@ const MembersTool = Tool.make("enterprise_members", {
   parameters: emptyParameters,
   success: hubResult(EnterpriseMembers),
 }).annotate(Tool.Readonly, true);
+const ConnectorTool = Tool.make("enterprise_connector", {
+  ...shared,
+  description:
+    "Admin only: list connector status, connect Postgres or Supabase, introspect schema into Data-layer proposals, or disconnect. Never reads rows. Disconnect preserves accepted knowledge. Connection URLs are secrets; prefer entering them in the admin UI, never include them in chat or reports.",
+  parameters: Schema.Struct({ input: EnterpriseConnectorInput }),
+  success: hubResult(EnterpriseConnectorResult),
+}).annotate(Tool.Destructive, true);
 const OrgTool = Tool.make("enterprise_org", {
   ...shared,
   description: "The organization: teams with their members' names and roles, and your own access.",
@@ -188,6 +197,7 @@ export const EnterpriseToolkit = Toolkit.make(
   DisconnectTool,
   MembersTool,
   OrgTool,
+  ConnectorTool,
   TemplateTool,
   OrgImportTool,
   AuthorizeTool,
@@ -227,6 +237,9 @@ export const layer = McpToolAccess.toLayer(
     const ingestion = yield* EnterpriseIngestion;
     const team = yield* TeamPublication;
     return {
+      enterprise_connector: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (session) => hub.connector(session, input.input))),
+      ),
       enterprise_run_report: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => runs.report(id, input))),
       ),

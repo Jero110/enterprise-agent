@@ -1,5 +1,7 @@
 import {
   EnterpriseError,
+  type EnterpriseConnectorInput,
+  EnterpriseConnectorResult,
   type EnterpriseIngestStartInput,
   EnterpriseIngestStartResult,
   type KnowledgeProposeInput,
@@ -70,6 +72,9 @@ const decodeBootstrapError = Schema.decodeUnknownEffect(
 export class EnterpriseClient extends Context.Service<
   EnterpriseClient,
   {
+    readonly connector: (
+      input: EnterpriseConnectorInput,
+    ) => Effect.Effect<EnterpriseConnectorResult, EnterpriseError>;
     readonly ingestStart: (
       input: EnterpriseIngestStartInput,
     ) => Effect.Effect<EnterpriseIngestStartResult, EnterpriseError>;
@@ -414,6 +419,11 @@ const make = Effect.gen(function* () {
     disconnect,
     listMembers: withConnection((hub) =>
       callResult(hub, "enterprise_members", {}, EnterpriseMembers),
+    ),
+    connector: Effect.fn("EnterpriseClient.connector")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "enterprise_connector", { input }, EnterpriseConnectorResult),
+      ),
     ),
     org: withConnection((hub) => callResult(hub, "enterprise_org", {}, EnterpriseOrg)),
     orgImport: Effect.fn("EnterpriseClient.orgImport")((files, apply) =>

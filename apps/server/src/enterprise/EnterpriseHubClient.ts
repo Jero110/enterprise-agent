@@ -76,6 +76,9 @@ const make = Effect.gen(function* () {
       return { disconnected };
     }),
     listMembers: Effect.flatMap(session, hub.listMembers),
+    connector: Effect.fn("EnterpriseHubClient.connector")(function* (input) {
+      return yield* hub.connector(yield* session, input);
+    }),
     org: Effect.flatMap(session, hub.org),
     orgImport: Effect.fn("EnterpriseHubClient.orgImport")(function* (files, apply) {
       return yield* hub.orgImport(yield* session, files, apply);
