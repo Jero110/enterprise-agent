@@ -5,13 +5,19 @@ import type {
   ModelSelection,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
-import { useState, type ReactNode } from "react";
-import { enterpriseEnvironment, useEnterpriseStatus } from "~/state/enterprise";
+import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { useRef, useState, type ReactNode } from "react";
+import {
+  enterpriseEnvironment,
+  enterpriseFailureMessage,
+  useEnterpriseStatus,
+} from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { areaDestinations, ingestStartError } from "./ingestDestinations";
 
 const MAX_FILES = 20;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -78,7 +84,6 @@ function IngestionRun({
   ingestion: IncrementalIngestion | undefined;
 }) {
   const org = useEnvironmentQuery(enterpriseEnvironment.org({ environmentId, input: {} }));
-  const { identity } = useEnterpriseStatus();
   const [destination, setDestination] = useState("personal");
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState("");
@@ -125,9 +130,12 @@ function IngestionRun({
       setFiles([]);
       setUrls("");
       setNote("");
-      setStatus(t("Ingestion started. Review proposed nodes in Changes."));
+      setStatus(
+        t("Run started. Check Changes after processing; nothing is approved automatically."),
+      );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("Could not start ingestion"));
+      const message = cause instanceof Error ? cause.message : t("Could not start ingestion");
+      setError(t(ingestStartError(message, sourceUrls)));
     }
     setBusy(false);
   };
@@ -152,16 +160,21 @@ function IngestionRun({
           disabled={busy}
         >
           <option value="personal">{t("Personal")}</option>
-          {(org.data?.teams ?? [])
-            .filter((team) => identity?.role === "admin" || team.access !== "none")
-            .map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
+          {areaDestinations(org.data?.teams ?? []).map((team) => (
+            <option key={team.id} value={team.id}>
+              {team.name}
+            </option>
+          ))}
           <option value="global">{t("General")}</option>
         </select>
       </label>
+      <p className="text-xs text-muted-foreground">
+        {destination === "personal"
+          ? t("Only you review Personal proposals; they are filed under your account.")
+          : destination === "global"
+            ? t("A company admin reviews General proposals.")
+            : t("Your area's lead or a company admin reviews Area proposals.")}
+      </p>
       <label
         className="block rounded border border-dashed p-4 text-sm"
         onDragOver={(event) => event.preventDefault()}
@@ -235,8 +248,31 @@ function OrgImport({ environmentId }: { environmentId: EnvironmentId }) {
     label: "apply organization import",
   });
   const [files, setFiles] = useState<EnterpriseOrgFiles>({ organization: "", areas: "" });
+  const [fileNames, setFileNames] = useState<Partial<Record<keyof EnterpriseOrgFiles, string>>>({});
   const [preview, setPreview] = useState<EnterpriseOrgImportResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const selections = useRef({ organization: 0, areas: 0 });
+  const selectFile = async (name: keyof EnterpriseOrgFiles, file: File | undefined) => {
+    if (!file || busy) return;
+    const selection = ++selections.current[name];
+    setPreview(null);
+    setFiles((current) => ({ ...current, [name]: "" }));
+    setFileNames((current) => ({ ...current, [name]: undefined }));
+    if (!/\.ya?ml$/i.test(file.name) || file.size === 0 || file.size > 1_000_000) {
+      setError(t("Choose a nonempty YAML file under 1 MB."));
+      return;
+    }
+    try {
+      const content = await file.text();
+      if (selections.current[name] !== selection) return;
+      setFiles((current) => ({ ...current, [name]: content }));
+      setFileNames((current) => ({ ...current, [name]: file.name }));
+      setError(null);
+    } catch {
+      if (selections.current[name] === selection) setError(t("Could not read YAML file."));
+    }
+  };
   const download = (name: keyof EnterpriseOrgFiles) => {
     if (!template.data) return;
     const url = URL.createObjectURL(new Blob([template.data[name]], { type: "text/yaml" }));
@@ -247,14 +283,28 @@ function OrgImport({ environmentId }: { environmentId: EnvironmentId }) {
     URL.revokeObjectURL(url);
   };
   const run = async (apply: boolean) => {
+    if (busy || (apply && (!preview || preview.applied))) return;
     setBusy(true);
-    const result = await (apply ? applyImport : previewImport)({ environmentId, input: files });
-    if (result._tag === "Success") setPreview(result.value);
+    setError(null);
+    try {
+      const result = await (apply ? applyImport : previewImport)({ environmentId, input: files });
+      if (result._tag === "Success") setPreview(result.value);
+      else setError(enterpriseFailureMessage(squashAtomCommandFailure(result)));
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : t("Could not preview organization import."),
+      );
+    }
     setBusy(false);
   };
   return (
     <section aria-label={t("Organization import")} className="space-y-3 rounded-xl border p-4">
-      <h2 className="font-medium">{t("Organization and areas")}</h2>
+      <h2 className="font-medium">{t("Organization and areas (admins)")}</h2>
+      <p className="text-sm text-muted-foreground">
+        {t(
+          "Upload both matching YAML files. Preview all changes before confirming; missing people may be removed. To add one member or change an area, use Organization settings instead.",
+        )}
+      </p>
       {(["organization", "areas"] as const).map((name) => (
         <div key={name} className="space-y-2">
           <Button
@@ -265,21 +315,35 @@ function OrgImport({ environmentId }: { environmentId: EnvironmentId }) {
           >
             {t("Download template")} · {name}.yaml
           </Button>
-          <label className="block text-sm">
-            {name}.yaml
-            <textarea
+          <label
+            className="block rounded border border-dashed p-3 text-sm"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              if (!busy && canPreview) void selectFile(name, event.dataTransfer.files[0]);
+            }}
+          >
+            {name}.yaml · {fileNames[name] ?? t("Drop or choose a YAML file")}
+            <input
+              className="block text-xs"
+              type="file"
+              accept=".yaml,.yml"
               aria-label={name + ".yaml"}
-              className="block min-h-28 w-full rounded border bg-background p-2 font-mono text-xs"
-              value={files[name]}
               disabled={busy || !canPreview}
               onChange={(event) => {
-                setPreview(null);
-                setFiles((current) => ({ ...current, [name]: event.target.value }));
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                void selectFile(name, file);
               }}
             />
           </label>
         </div>
       ))}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
       <Button
         size="sm"
         disabled={busy || !canPreview || !files.organization || !files.areas}
@@ -289,6 +353,14 @@ function OrgImport({ environmentId }: { environmentId: EnvironmentId }) {
       </Button>
       {preview && (
         <div className="space-y-3">
+          <p role="status" className="text-sm">
+            {preview.applied
+              ? t("Organization imported")
+              : t("Preview: {count} changes; {removed} removals. Nothing has been applied.", {
+                  count: preview.changes.length,
+                  removed: preview.changes.filter((change) => change.change === "removed").length,
+                })}
+          </p>
           <ul className="max-h-52 overflow-auto text-sm">
             {preview.changes.map((change) => (
               <li key={change.kind + ":" + change.id}>

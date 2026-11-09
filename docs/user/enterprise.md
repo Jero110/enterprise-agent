@@ -32,7 +32,7 @@ Select a locked node and choose **Request access**. The area's lead or an admin 
 
 Enrolled members use **Conversation context → Ingest** on web or desktop. Choose **Personal** for knowledge only you own, an accessible **Area** for proposals reviewed by its lead or an admin, or **General** for proposals reviewed by an admin. Drop or choose files from your device, or paste public HTTPS links to plain text or Markdown. Authenticated websites are not supported. You can also enter a note about missing knowledge without files; a note is guidance, not evidence. Ingestion uses your selected agent model and subscription. Review proposals in **Changes**; starting a run does not approve or apply them.
 
-Admins can also download the `organization.yaml` and `areas.yaml` templates. Paste the completed YAML into the two inputs, preview the added, changed and removed people and areas, then confirm the import. Give each area at most one lead; that lead reviews access requests. Check removals carefully: removing a person revokes their access. Open **Organization** to see area leads and reporting relationships.
+Admins can also download the `organization.yaml` and `areas.yaml` templates. Upload the two completed YAML files, preview the added, changed and removed people and areas, then confirm the import. To add one member or change an area without replacing the organization, use Organization settings. Give each area at most one lead; that lead reviews access requests. Check removals carefully: removing a person revokes their access. Open **Organization** to see area leads and reporting relationships.
 
 ### Import database schemas
 
