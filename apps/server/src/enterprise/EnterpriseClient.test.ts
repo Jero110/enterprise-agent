@@ -48,7 +48,10 @@ const serveHub = Effect.gen(function* () {
     KnowledgeToolkit.layerHubRegistration,
   ).pipe(
     Layer.provide(
-      Layer.succeed(EnterpriseIngestion.EnterpriseIngestion, { start: () => Effect.die("unused") }),
+      Layer.succeed(EnterpriseIngestion.EnterpriseIngestion, {
+        start: () => Effect.die("unused"),
+        finish: () => Effect.die("unused"),
+      }),
     ),
     Layer.provide(services),
   );

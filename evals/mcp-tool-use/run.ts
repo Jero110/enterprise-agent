@@ -58,6 +58,9 @@ import { PreviewToolkit } from "../../apps/server/src/mcp/toolkits/preview/tools
 import { PreviewControlsToolkit } from "../../apps/server/src/mcp/toolkits/previewControls/tools.ts";
 import { ProjectBoardToolkit } from "../../apps/server/src/project/ProjectBoardToolkit.ts";
 import { EnterpriseTeamToolkit } from "../../apps/server/src/enterprise/EnterpriseTeamToolkit.ts";
+import { EnterpriseToolkit } from "../../apps/server/src/enterprise/EnterpriseToolkit.ts";
+import { KnowledgeToolkit } from "../../apps/server/src/enterprise/KnowledgeToolkit.ts";
+import { ingestionPrompt } from "../../apps/server/src/enterprise/EnterpriseIngestion.ts";
 import { ProjectToolkit } from "../../apps/server/src/mcp/toolkits/project/tools.ts";
 import {
   CHILD_PULL_REQUEST_REPORT_NEXT,
@@ -280,6 +283,15 @@ export const McpToolUseCase = Schema.Struct({
     /** delegate_task `role` for a delegated child. T3 builds the child's first message from it. */
     delegateRole: Schema.optional(OrchestratorMcpTaskRole),
     context: Schema.optional(Schema.String),
+    ingestion: Schema.optional(
+      Schema.Struct({
+        organization: Schema.Unknown,
+        index: Schema.Unknown,
+        pending: Schema.Unknown,
+        sources: Schema.Array(Schema.String),
+        note: Schema.String,
+      }),
+    ),
     priorTurns: Schema.optional(
       Schema.Array(
         Schema.Struct({
@@ -419,6 +431,8 @@ const t3SourceTools: ReadonlyArray<Tool.Any> = [
   ProjectToolkit,
   ProjectBoardToolkit,
   EnterpriseTeamToolkit,
+  EnterpriseToolkit,
+  KnowledgeToolkit,
   EnvironmentToolkit,
   PreviewControlsToolkit,
   WorktreeToolkit,
@@ -2325,6 +2339,10 @@ const main = Effect.gen(function* () {
       );
       return {
         ...testCase,
+        prompt:
+          testCase.setup.ingestion === undefined
+            ? testCase.prompt
+            : ingestionPrompt(testCase.setup.ingestion),
         setup: {
           ...testCase.setup,
           priorTurns,

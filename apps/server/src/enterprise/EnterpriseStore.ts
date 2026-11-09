@@ -21,6 +21,7 @@ export interface IngestionRun {
   readonly adminEmail: string;
   readonly folder: string;
   readonly status: "running" | "completed" | "failed";
+  readonly sources?: ReadonlyArray<{ readonly path: string; readonly hash: string }>;
 }
 
 export interface EnterpriseTeam {
@@ -95,6 +96,8 @@ export class EnterpriseStore extends Context.Service<
     /** Inserts what is missing; never overwrites what an admin changed. */
     readonly saveIngestionRun: (run: IngestionRun) => Effect.Effect<void>;
     readonly getIngestionRun: (threadId: string) => Effect.Effect<IngestionRun | null>;
+    readonly ingestedHashes: Effect.Effect<ReadonlySet<string>>;
+    readonly runningIngestions: Effect.Effect<ReadonlyArray<{ readonly threadId: string }>>;
     readonly listProposals: Effect.Effect<ReadonlyArray<KnowledgeProposal>>;
     readonly saveProposal: (proposal: KnowledgeProposal) => Effect.Effect<void>;
     readonly seed: (seed: EnterpriseSeed) => Effect.Effect<void>;
@@ -507,10 +510,30 @@ const make = Effect.gen(function* () {
     Effect.orDie,
   );
 
-  const saveIngestionRun: EnterpriseStore["Service"]["saveIngestionRun"] = (run) =>
-    sql`INSERT INTO enterprise_ingestion_runs (id, thread_id, admin_email, folder, status)
+  const saveIngestionRun = Effect.fn("EnterpriseStore.saveIngestionRun")(
+    function* (run: IngestionRun) {
+      yield* sql`INSERT INTO enterprise_ingestion_runs (id, thread_id, admin_email, folder, status)
       VALUES (${run.id}, ${run.threadId}, ${normalizeEmail(run.adminEmail)}, ${run.folder}, ${run.status})
-      ON CONFLICT (id) DO UPDATE SET status = excluded.status`.pipe(Effect.asVoid, Effect.orDie);
+      ON CONFLICT (id) DO UPDATE SET status = excluded.status`;
+      for (const source of run.sources ?? []) {
+        yield* sql`INSERT INTO enterprise_ingestion_sources (run_id, path, hash)
+        VALUES (${run.id}, ${source.path}, ${source.hash})
+        ON CONFLICT (run_id, path) DO NOTHING`;
+      }
+    },
+    (effect) => sql.withTransaction(effect),
+    Effect.orDie,
+  );
+  const ingestedHashes = sql<{ hash: string }>`
+    SELECT DISTINCT s.hash FROM enterprise_ingestion_sources s
+    JOIN enterprise_ingestion_runs r ON r.id = s.run_id WHERE r.status = 'completed'
+  `.pipe(
+    Effect.map((rows) => new Set(rows.map((row) => row.hash))),
+    Effect.orDie,
+  );
+  const runningIngestions = sql<{ threadId: string }>`
+    SELECT thread_id AS threadId FROM enterprise_ingestion_runs WHERE status = 'running'
+  `.pipe(Effect.orDie);
   const getIngestionRun: EnterpriseStore["Service"]["getIngestionRun"] = (threadId) =>
     sql<{
       id: string;
@@ -549,6 +572,8 @@ const make = Effect.gen(function* () {
   return EnterpriseStore.of({
     saveIngestionRun,
     getIngestionRun,
+    ingestedHashes,
+    runningIngestions,
     listProposals,
     saveProposal,
     seed,

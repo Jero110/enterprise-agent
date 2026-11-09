@@ -120,7 +120,8 @@ const RevokeTool = Tool.make("enterprise_member_revoke", {
 const IngestStartTool = Tool.make("enterprise_ingest_start", {
   ...shared,
   dependencies: [McpInvocationContext.McpInvocationContext, EnterpriseIngestion],
-  description: "Admin only: start an enterprise knowledge ingestion thread on the hub.",
+  description:
+    "Admin only: propose incremental knowledge nodes from a hub folder, staged uploadProposalIds from knowledge_upload_files, and/or a free-text note. Completed content hashes are skipped; existing nodes are supplied to avoid duplicates. No knowledge changes are applied automatically.",
   parameters: EnterpriseIngestStartInput,
   success: hubResult(EnterpriseIngestStartResult),
 });

@@ -23,7 +23,11 @@ export const EnterpriseIdentity = Schema.Struct({
 export type EnterpriseIdentity = typeof EnterpriseIdentity.Type;
 
 export const EnterpriseIngestStartInput = Schema.Struct({
-  folder: TrimmedNonEmptyString,
+  folder: Schema.optionalKey(TrimmedNonEmptyString),
+  note: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(10_000))),
+  uploadProposalIds: Schema.optionalKey(
+    Schema.Array(TrimmedNonEmptyString).check(Schema.isMaxLength(20)),
+  ),
   modelSelection: ModelSelection,
 });
 export type EnterpriseIngestStartInput = typeof EnterpriseIngestStartInput.Type;

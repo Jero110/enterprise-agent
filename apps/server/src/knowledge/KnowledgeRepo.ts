@@ -12,6 +12,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
 import { parse as parseYaml } from "yaml";
 
 import * as ServerConfig from "../config.ts";
@@ -31,6 +32,9 @@ export class KnowledgeRepo extends Context.Service<
   {
     /** Every document, read from the working tree on each call; no scope filtering here. */
     readonly documents: Effect.Effect<ReadonlyArray<KnowledgeDocument>>;
+    readonly syncAiDocuments: (
+      files: ReadonlyArray<{ readonly path: string; readonly content: string }>,
+    ) => Effect.Effect<void, EnterpriseError>;
     readonly findApprovalCommit: (
       proposalId: string,
     ) => Effect.Effect<string | null, EnterpriseError>;
@@ -58,6 +62,7 @@ const Frontmatter = Schema.Struct({
 });
 
 const decodeFrontmatter = Schema.decodeUnknownSync(Frontmatter);
+const isEnterpriseError = Schema.is(EnterpriseError);
 
 export const documentOf = (id: string, raw: string): KnowledgeDocument => {
   const areaId = id.startsWith("global/") ? GENERAL_AREA : id.split("/")[1]!;
@@ -91,6 +96,7 @@ export const layer = Layer.effect(
     const digest = yield* Digest.Digest;
     const store = yield* EnterpriseStore.EnterpriseStore;
     const root = path.join(config.baseDir, "enterprise", "knowledge");
+    const writes = yield* Semaphore.make(1);
 
     const git = (...args: ReadonlyArray<string>) =>
       runner.run({
@@ -165,6 +171,48 @@ export const layer = Layer.effect(
         });
       return result.stdout.trim();
     });
+    const syncAiDocuments = Effect.fn("KnowledgeRepo.syncAiDocuments")(
+      function* (files: ReadonlyArray<{ readonly path: string; readonly content: string }>) {
+        if ((yield* checkedGit("status", "--porcelain")) !== "")
+          return yield* new EnterpriseError({
+            code: "conflict",
+            message: "Knowledge has uncommitted changes.",
+          });
+        const changed: string[] = [];
+        for (const file of files) {
+          if (!/^global\/ai\/(tools|skills)\/[A-Za-z0-9_%.-]+\.md$/.test(file.path))
+            return yield* new EnterpriseError({
+              code: "knowledge_write_failed",
+              message: "Invalid AI document path.",
+            });
+          const fullPath = path.join(root, file.path);
+          const existing = yield* fs
+            .readFileString(fullPath)
+            .pipe(Effect.orElseSucceed(() => null));
+          if (existing === file.content) continue;
+          yield* fs.makeDirectory(path.dirname(fullPath), { recursive: true });
+          yield* fs.writeFileString(fullPath, file.content);
+          changed.push(file.path);
+        }
+        if (changed.length === 0) return;
+        yield* checkedGit("add", "--", ...changed);
+        yield* checkedGit(
+          "commit",
+          "--quiet",
+          "-m",
+          "chore(knowledge): regenerate built-in AI layer",
+        );
+      },
+      writes.withPermits(1),
+      Effect.mapError((cause) =>
+        isEnterpriseError(cause)
+          ? cause
+          : new EnterpriseError({
+              code: "knowledge_write_failed",
+              message: "Could not generate the AI layer.",
+            }),
+      ),
+    );
     const contentHash = Effect.fn("KnowledgeRepo.contentHash")(
       function* (file: string) {
         const fullPath = path.join(root, file);
@@ -273,7 +321,7 @@ export const layer = Layer.effect(
           }),
         ),
       );
-    });
+    }, writes.withPermits(1));
     const revert = Effect.fn("KnowledgeRepo.revert")(function* (
       proposal: KnowledgeProposal,
       approver: string,
@@ -315,7 +363,15 @@ export const layer = Layer.effect(
         );
       }
       return yield* checkedGit("rev-parse", "HEAD");
+    }, writes.withPermits(1));
+    return KnowledgeRepo.of({
+      documents,
+      syncAiDocuments,
+      findApprovalCommit,
+      contentHash,
+      version,
+      apply,
+      revert,
     });
-    return KnowledgeRepo.of({ documents, findApprovalCommit, contentHash, version, apply, revert });
   }),
 );
