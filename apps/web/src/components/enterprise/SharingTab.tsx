@@ -7,21 +7,25 @@ import { Input } from "../ui/input";
 export interface PersonalSharing {
   readonly items: ReadonlyArray<{ id: string; title: string }>;
   readonly areas: ReadonlyArray<{ id: string; name: string }>;
-  readonly byMe: ReadonlyArray<{ id: string; title: string; recipient: string }>;
-  readonly withMe: ReadonlyArray<{ id: string; title: string; owner: string }>;
+  readonly listShared: {
+    readonly byMe: ReadonlyArray<{ id: string; title: string; recipient: string }>;
+    readonly withMe: ReadonlyArray<{ id: string; title: string; owner: string }>;
+  };
   readonly canShare: boolean;
   readonly canRevoke: boolean;
+  readonly canUnpublish: boolean;
   readonly share: (input: {
     itemId: string;
-    recipient: { kind: "person" | "area"; id: string };
+    grantee: { kind: "member" | "area"; id: string };
   }) => Promise<void>;
   readonly revoke: (id: string) => Promise<void>;
+  readonly unpublish: (itemId: string) => Promise<void>;
   readonly refresh: () => void;
 }
 
 export function SharingTab({ sharing }: { sharing?: PersonalSharing }) {
   const [itemId, setItemId] = useState("");
-  const [kind, setKind] = useState<"person" | "area">("person");
+  const [kind, setKind] = useState<"member" | "area">("member");
   const [recipient, setRecipient] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,15 +80,15 @@ export function SharingTab({ sharing }: { sharing?: PersonalSharing }) {
                 className="ml-2 rounded border bg-background p-1"
                 value={kind}
                 onChange={(event) => {
-                  setKind(event.target.value === "area" ? "area" : "person");
+                  setKind(event.target.value === "area" ? "area" : "member");
                   setRecipient("");
                 }}
               >
-                <option value="person">{t("Person")}</option>
+                <option value="member">{t("Person")}</option>
                 <option value="area">{t("Area")}</option>
               </select>
             </label>
-            {kind === "person" ? (
+            {kind === "member" ? (
               <Input
                 nativeInput
                 aria-label={t("Recipient email")}
@@ -111,19 +115,29 @@ export function SharingTab({ sharing }: { sharing?: PersonalSharing }) {
               size="sm"
               disabled={!itemId || !recipient.trim()}
               onClick={() =>
-                void run(() => sharing.share({ itemId, recipient: { kind, id: recipient.trim() } }))
+                void run(() => sharing.share({ itemId, grantee: { kind, id: recipient.trim() } }))
               }
             >
               {t("Share")}
             </Button>
           </fieldset>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy || !itemId || !sharing.canUnpublish}
+            onClick={() => void run(() => sharing.unpublish(itemId))}
+          >
+            {t("Stop sharing selected item with everyone")}
+          </Button>
           <Button size="xs" variant="outline" disabled={busy} onClick={sharing.refresh}>
             {t("Refresh")}
           </Button>
           <section className="space-y-2">
             <h3 className="text-sm font-medium">{t("Shared by me")}</h3>
-            {sharing.byMe.length === 0 && <p className="text-sm">{t("Nothing shared yet")}</p>}
-            {sharing.byMe.map((item) => (
+            {sharing.listShared.byMe.length === 0 && (
+              <p className="text-sm">{t("Nothing shared yet")}</p>
+            )}
+            {sharing.listShared.byMe.map((item) => (
               <div
                 key={item.id}
                 className="flex items-center justify-between gap-2 rounded border p-3 text-sm"
@@ -144,10 +158,10 @@ export function SharingTab({ sharing }: { sharing?: PersonalSharing }) {
           </section>
           <section className="space-y-2">
             <h3 className="text-sm font-medium">{t("Shared with me")}</h3>
-            {sharing.withMe.length === 0 && (
+            {sharing.listShared.withMe.length === 0 && (
               <p className="text-sm">{t("Nothing shared with you yet")}</p>
             )}
-            {sharing.withMe.map((item) => (
+            {sharing.listShared.withMe.map((item) => (
               <p key={item.id} className="rounded border p-3 text-sm">
                 {item.title} · {item.owner}
               </p>
