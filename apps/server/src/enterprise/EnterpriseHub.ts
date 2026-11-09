@@ -12,6 +12,8 @@ import {
   type EnterpriseHubIdentity,
   type EnterpriseMembers,
   type EnterpriseOrg,
+  type EnterpriseOrgFiles,
+  type EnterpriseOrgImportResult,
   type EnterpriseRevokeMemberInput,
   type KnowledgeDocument,
   type KnowledgeDocumentList,
@@ -27,6 +29,7 @@ import * as Layer from "effect/Layer";
 import * as AreaKnowledge from "../knowledge/AreaKnowledge.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
 import * as KnowledgeProposals from "./KnowledgeProposals.ts";
+import * as OrgImport from "./OrgImport.ts";
 
 /**
  * The hub never sees a member's environment id, so calls are keyed by the MCP
@@ -84,6 +87,12 @@ export class EnterpriseHub extends Context.Service<
     readonly listMembers: (sessionId: string) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
     /** Teams with their active members, for any enrolled member; the caller's access is marked. */
     readonly org: (sessionId: string) => Effect.Effect<EnterpriseOrg, EnterpriseError>;
+    /** Admin only: diffs the two org files against the store, and writes the diff when `apply`. */
+    readonly orgImport: (
+      sessionId: string,
+      files: EnterpriseOrgFiles,
+      apply: boolean,
+    ) => Effect.Effect<EnterpriseOrgImportResult, EnterpriseError>;
     readonly authorize: (
       sessionId: string,
       input: EnterpriseAuthorizeMemberInput,
@@ -210,10 +219,24 @@ const make = Effect.gen(function* () {
       const active = (yield* store.listMembers).filter(
         (member) => member.authorized && !member.revoked,
       );
+      const leadGrants = (yield* store.listAreaGrants).filter((grant) => grant.role === "lead");
+      const leadOf = (areaId: string) => {
+        const lead =
+          active.find((member) => member.teamId === areaId && member.role === "lead") ??
+          active.find((member) =>
+            leadGrants.some((grant) => grant.areaId === areaId && grant.email === member.email),
+          );
+        return lead === undefined
+          ? null
+          : { memberKey: teamMemberKey(lead.email), displayName: lead.displayName };
+      };
+      const activeEmails = new Set(active.map((member) => member.email));
       return {
         teams: (yield* store.listTeams).map((team) => ({
           id: team.id,
           name: team.name,
+          ...(team.description === null ? {} : { description: team.description }),
+          lead: leadOf(team.id),
           access:
             me.teamId === team.id
               ? ("member" as const)
@@ -227,6 +250,10 @@ const make = Effect.gen(function* () {
               memberKey: teamMemberKey(member.email),
               role: member.role,
               isMe: member.email === me.email,
+              reportsTo:
+                member.reportsTo !== null && activeEmails.has(member.reportsTo)
+                  ? teamMemberKey(member.reportsTo)
+                  : null,
             })),
         })),
       } satisfies EnterpriseOrg;
@@ -251,6 +278,26 @@ const make = Effect.gen(function* () {
       }
       yield* store.upsertMember({ ...input, authorizedBy: admin.email });
       return yield* members();
+    },
+  );
+
+  const orgImport: EnterpriseHub["Service"]["orgImport"] = Effect.fn("EnterpriseHub.orgImport")(
+    function* (sessionId, files, apply) {
+      const admin = yield* requireAdmin(sessionId);
+      const plan = yield* OrgImport.parse(files);
+      const self = plan.people.find((person) => person.email === admin.email);
+      if (self?.role !== "admin") {
+        return yield* new EnterpriseError({
+          code: "org_invalid",
+          message: `organization.yaml must keep you (${admin.email}) as an admin.`,
+        });
+      }
+      const changes = OrgImport.diff(plan, {
+        teams: yield* store.listTeams,
+        members: yield* store.listMembers,
+      });
+      if (apply && changes.length > 0) yield* store.applyOrg({ plan, changes, actor: admin.email });
+      return { applied: apply, changes };
     },
   );
 
@@ -383,6 +430,7 @@ const make = Effect.gen(function* () {
     disconnect,
     listMembers,
     org,
+    orgImport,
     authorize,
     revoke,
     knowledgeList,

@@ -114,6 +114,8 @@ export const EnterpriseOrgMember = Schema.Struct({
   displayName: TrimmedNonEmptyString,
   role: TeamMemberRole,
   isMe: Schema.Boolean,
+  /** The `memberKey` of the person this member reports to. */
+  reportsTo: Schema.optionalKey(Schema.NullOr(TrimmedNonEmptyString)),
 });
 export type EnterpriseOrgMember = typeof EnterpriseOrgMember.Type;
 
@@ -123,11 +125,42 @@ export const EnterpriseOrgTeam = Schema.Struct({
   /** The caller belongs to this team or holds an approved grant to its area. */
   access: Schema.Literals(["member", "granted", "none"]),
   members: Schema.Array(EnterpriseOrgMember),
+  description: Schema.optionalKey(Schema.String),
+  /** The area's lead, who approves access to it; may sit in another team. */
+  lead: Schema.optionalKey(
+    Schema.NullOr(
+      Schema.Struct({ memberKey: TrimmedNonEmptyString, displayName: TrimmedNonEmptyString }),
+    ),
+  ),
 });
 export type EnterpriseOrgTeam = typeof EnterpriseOrgTeam.Type;
 
 export const EnterpriseOrg = Schema.Struct({ teams: Schema.Array(EnterpriseOrgTeam) });
 export type EnterpriseOrg = typeof EnterpriseOrg.Type;
+
+/** The two YAML files an admin fills in: `organization.yaml` and `areas.yaml`. */
+export const EnterpriseOrgFiles = Schema.Struct({
+  organization: Schema.String.check(Schema.isMaxLength(1_000_000)),
+  areas: Schema.String.check(Schema.isMaxLength(1_000_000)),
+});
+export type EnterpriseOrgFiles = typeof EnterpriseOrgFiles.Type;
+
+export const EnterpriseOrgChange = Schema.Struct({
+  kind: Schema.Literals(["area", "person"]),
+  change: Schema.Literals(["added", "changed", "removed"]),
+  /** Area id or person email; only admins ever see an import. */
+  id: TrimmedNonEmptyString,
+  name: Schema.String,
+  /** Changed fields, e.g. `area`, `role`, `reportsTo`; empty for added and removed. */
+  fields: Schema.Array(Schema.String),
+});
+export type EnterpriseOrgChange = typeof EnterpriseOrgChange.Type;
+
+export const EnterpriseOrgImportResult = Schema.Struct({
+  applied: Schema.Boolean,
+  changes: Schema.Array(EnterpriseOrgChange),
+});
+export type EnterpriseOrgImportResult = typeof EnterpriseOrgImportResult.Type;
 
 /** Knowledge levels a conversation can switch off; the individual level has no source yet. */
 export const ThreadKnowledgeScope = Schema.Literals(["general", "area"]);
@@ -183,6 +216,13 @@ export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("Ente
     "knowledge_write_failed",
     "thread_not_found",
     "snapshot_unavailable",
+    "org_invalid_yaml",
+    "org_invalid",
+    "org_unknown_area",
+    "org_unknown_person",
+    "org_duplicate_email",
+    "org_duplicate_lead",
+    "org_reports_to_cycle",
   ]),
   message: Schema.String,
 }) {}

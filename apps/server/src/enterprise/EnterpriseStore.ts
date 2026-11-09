@@ -1,4 +1,4 @@
-import { KnowledgeProposal, TeamMemberRole } from "@t3tools/contracts";
+import { type EnterpriseOrgChange, KnowledgeProposal, TeamMemberRole } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -11,6 +11,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as ServerConfig from "../config.ts";
+import type { OrgPlan } from "./OrgImport.ts";
 
 export const normalizeEmail = (email: string): string => email.toLowerCase().trim();
 
@@ -25,6 +26,7 @@ export interface IngestionRun {
 export interface EnterpriseTeam {
   readonly id: string;
   readonly name: string;
+  readonly description: string | null;
   readonly createdAt: DateTime.Utc;
   readonly createdBy: string;
 }
@@ -34,6 +36,8 @@ export interface EnterpriseMember {
   readonly displayName: string;
   readonly teamId: string | null;
   readonly role: TeamMemberRole;
+  /** The manager's email, from the imported org chart. */
+  readonly reportsTo: string | null;
   readonly authorized: boolean;
   readonly revoked: boolean;
   readonly authorizedAt: DateTime.Utc;
@@ -126,12 +130,19 @@ export class EnterpriseStore extends Context.Service<
     readonly revokeArea: (email: string, areaId: string) => Effect.Effect<void>;
     readonly listGrants: (email: string) => Effect.Effect<ReadonlyArray<EnterpriseAreaGrant>>;
     readonly listAreaGrants: Effect.Effect<ReadonlyArray<EnterpriseAreaGrant>>;
+    /** Writes the changed rows of an org import in one transaction; removed people are revoked. */
+    readonly applyOrg: (input: {
+      readonly plan: OrgPlan;
+      readonly changes: ReadonlyArray<EnterpriseOrgChange>;
+      readonly actor: string;
+    }) => Effect.Effect<void>;
   }
 >()("t3/enterprise/EnterpriseStore") {}
 
 interface TeamRow {
   readonly id: string;
   readonly name: string;
+  readonly description: string | null;
   readonly created_at: string;
   readonly created_by: string;
 }
@@ -141,6 +152,7 @@ interface MemberRow {
   readonly display_name: string;
   readonly team_id: string | null;
   readonly role: TeamMemberRole;
+  readonly reports_to: string | null;
   readonly authorized: number;
   readonly revoked: number;
   readonly authorized_at: string;
@@ -164,6 +176,7 @@ interface GrantRow {
 const toTeam = (row: TeamRow): EnterpriseTeam => ({
   id: row.id,
   name: row.name,
+  description: row.description,
   createdAt: DateTime.makeUnsafe(row.created_at),
   createdBy: row.created_by,
 });
@@ -173,6 +186,7 @@ const toMember = (row: MemberRow): EnterpriseMember => ({
   displayName: row.display_name,
   teamId: row.team_id,
   role: row.role,
+  reportsTo: row.reports_to,
   authorized: row.authorized === 1,
   revoked: row.revoked === 1,
   authorizedAt: DateTime.makeUnsafe(row.authorized_at),
@@ -281,7 +295,13 @@ const make = Effect.gen(function* () {
       INSERT INTO enterprise_teams (id, name, created_at, created_by)
       VALUES (${input.id}, ${input.name}, ${now}, ${input.createdBy})
     `.pipe(Effect.orDie);
-    return toTeam({ id: input.id, name: input.name, created_at: now, created_by: input.createdBy });
+    return toTeam({
+      id: input.id,
+      name: input.name,
+      description: null,
+      created_at: now,
+      created_by: input.createdBy,
+    });
   });
 
   const deleteTeam: EnterpriseStore["Service"]["deleteTeam"] = Effect.fn(
@@ -336,11 +356,13 @@ const make = Effect.gen(function* () {
           VALUES (${email}, ${areaId}, 'member', ${now}, ${input.authorizedBy})`;
         }
       }
+      const stored = yield* selectMember(email);
       return toMember({
         email,
         display_name: input.displayName,
         team_id: input.teamId,
         role: input.role,
+        reports_to: stored?.reportsTo ?? null,
         authorized: 1,
         revoked: 0,
         authorized_at: now,
@@ -438,6 +460,52 @@ const make = Effect.gen(function* () {
     Effect.orDie,
   );
 
+  const applyOrg: EnterpriseStore["Service"]["applyOrg"] = Effect.fn("EnterpriseStore.applyOrg")(
+    function* ({ plan, changes, actor }) {
+      const now = yield* nowIso;
+      const touched = (kind: EnterpriseOrgChange["kind"], id: string) =>
+        changes.some((change) => change.kind === kind && change.id === id);
+      for (const area of plan.areas) {
+        if (!touched("area", area.id)) continue;
+        yield* sql`
+          INSERT INTO enterprise_teams (id, name, description, created_at, created_by)
+          VALUES (${area.id}, ${area.name}, ${area.description}, ${now}, ${actor})
+          ON CONFLICT (id) DO UPDATE SET name = excluded.name, description = excluded.description
+        `;
+      }
+      for (const person of plan.people) {
+        if (!touched("person", person.email)) continue;
+        yield* sql`
+          INSERT INTO enterprise_members (email, display_name, team_id, role, reports_to,
+            authorized, revoked, authorized_at, authorized_by)
+          VALUES (${person.email}, ${person.displayName}, ${person.areaId}, ${person.role},
+            ${person.reportsTo}, 1, 0, ${now}, ${actor})
+          ON CONFLICT (email) DO UPDATE SET
+            display_name = excluded.display_name,
+            team_id = excluded.team_id,
+            role = excluded.role,
+            reports_to = excluded.reports_to,
+            authorized = 1,
+            revoked = 0,
+            authorized_at = excluded.authorized_at,
+            authorized_by = excluded.authorized_by
+        `;
+      }
+      for (const change of changes) {
+        if (change.change !== "removed") continue;
+        if (change.kind === "person") {
+          yield* sql`UPDATE enterprise_members SET revoked = 1 WHERE email = ${change.id}`;
+        } else {
+          yield* sql`UPDATE enterprise_members SET team_id = NULL WHERE team_id = ${change.id}`;
+          yield* sql`DELETE FROM enterprise_area_grants WHERE area_id = ${change.id}`;
+          yield* sql`DELETE FROM enterprise_teams WHERE id = ${change.id}`;
+        }
+      }
+    },
+    (effect) => sql.withTransaction(effect),
+    Effect.orDie,
+  );
+
   const saveIngestionRun: EnterpriseStore["Service"]["saveIngestionRun"] = (run) =>
     sql`INSERT INTO enterprise_ingestion_runs (id, thread_id, admin_email, folder, status)
       VALUES (${run.id}, ${run.threadId}, ${normalizeEmail(run.adminEmail)}, ${run.folder}, ${run.status})
@@ -501,6 +569,7 @@ const make = Effect.gen(function* () {
     revokeArea,
     listGrants,
     listAreaGrants,
+    applyOrg,
   });
 });
 

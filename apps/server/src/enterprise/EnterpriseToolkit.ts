@@ -9,6 +9,8 @@ import {
   EnterpriseIngestStartResult,
   EnterpriseMembers,
   EnterpriseOrg,
+  EnterpriseOrgFiles,
+  EnterpriseOrgImportResult,
   OrchestratorMcpFailure,
   TeamThreadReport,
   TeamThreadSummary,
@@ -28,6 +30,7 @@ import { RunRecords } from "./RunRecords.ts";
 import { EnterpriseHub } from "./EnterpriseHub.ts";
 import { HOST_AGENT_SESSION } from "./EnterpriseSession.ts";
 import { EnterpriseIngestion } from "./EnterpriseIngestion.ts";
+import * as OrgImport from "./OrgImport.ts";
 import { TeamPublication } from "../team/TeamPublication.ts";
 
 /**
@@ -83,6 +86,23 @@ const OrgTool = Tool.make("enterprise_org", {
   parameters: emptyParameters,
   success: hubResult(EnterpriseOrg),
 }).annotate(Tool.Readonly, true);
+const TemplateTool = Tool.make("enterprise_template", {
+  ...shared,
+  description:
+    "The YAML templates for organization.yaml (people, area, role, reportsTo) and areas.yaml (area ids and names). Use them to convert an org chart the admin pasted or attached, in any format, before calling enterprise_org_import.",
+  parameters: emptyParameters,
+  success: EnterpriseOrgFiles,
+}).annotate(Tool.Readonly, true);
+const OrgImportTool = Tool.make("enterprise_org_import", {
+  ...shared,
+  description:
+    "Admin only: import organization.yaml and areas.yaml, both following enterprise_template. mode preview returns the added, changed and removed areas and people without writing; show it to the admin and apply only after they confirm. People missing from the file are revoked.",
+  parameters: Schema.Struct({
+    ...EnterpriseOrgFiles.fields,
+    mode: Schema.Literals(["preview", "apply"]),
+  }),
+  success: hubResult(EnterpriseOrgImportResult),
+}).annotate(Tool.Destructive, true);
 const AuthorizeTool = Tool.make("enterprise_member_authorize", {
   ...shared,
   description:
@@ -168,6 +188,8 @@ export const EnterpriseToolkit = Toolkit.make(
   DisconnectTool,
   MembersTool,
   OrgTool,
+  TemplateTool,
+  OrgImportTool,
   AuthorizeTool,
   RevokeTool,
 );
@@ -242,6 +264,10 @@ export const layer = McpToolAccess.toLayer(
         asResult(Effect.flatMap(sessionId, hub.listMembers)),
       ),
       enterprise_org: McpToolAccess.reads(() => asResult(Effect.flatMap(sessionId, hub.org))),
+      enterprise_template: McpToolAccess.reads(() => Effect.succeed(OrgImport.template)),
+      enterprise_org_import: McpToolAccess.reads(({ mode, ...files }) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.orgImport(id, files, mode === "apply"))),
+      ),
       enterprise_member_authorize: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => hub.authorize(id, input))),
       ),

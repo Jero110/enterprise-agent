@@ -1,0 +1,12 @@
+# Acme Bank areas, generated from acme-bank.seed.json.
+areas:
+  - id: platform
+    name: Platform
+  - id: ledger
+    name: Ledger
+  - id: frontend
+    name: Frontend
+  - id: accounts
+    name: Accounts
+  - id: risk
+    name: Risk

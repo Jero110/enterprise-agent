@@ -1,0 +1,101 @@
+# Acme Bank organization, generated from acme-bank.seed.json.
+people:
+  - email: jeronimo.deli@gmail.com
+    name: Jero
+    area: platform
+    role: admin
+  - email: ent.test.ana@gmail.com
+    name: Ana
+    area: ledger
+    role: lead
+    reportsTo: jeronimo.deli@gmail.com
+  - email: ent.test.bruno@gmail.com
+    name: Bruno
+    area: ledger
+    role: member
+    reportsTo: ent.test.ana@gmail.com
+  - email: ent.test.carla@gmail.com
+    name: Carla
+    area: ledger
+    role: member
+    reportsTo: ent.test.ana@gmail.com
+  - email: ent.test.diego@gmail.com
+    name: Diego
+    area: ledger
+    role: member
+    reportsTo: ent.test.ana@gmail.com
+  - email: ent.test.elena@gmail.com
+    name: Elena
+    area: ledger
+    role: member
+    reportsTo: ent.test.ana@gmail.com
+  - email: ent.test.fede@gmail.com
+    name: Fede
+    area: ledger
+    role: member
+    reportsTo: ent.test.ana@gmail.com
+  - email: ent.test.gerry@gmail.com
+    name: Gerry
+    area: frontend
+    role: lead
+    reportsTo: jeronimo.deli@gmail.com
+  - email: ent.test.hugo@gmail.com
+    name: Hugo
+    area: frontend
+    role: member
+    reportsTo: ent.test.gerry@gmail.com
+  - email: ent.test.ines@gmail.com
+    name: Inés
+    area: frontend
+    role: member
+    reportsTo: ent.test.gerry@gmail.com
+  - email: ent.test.juan@gmail.com
+    name: Juan
+    area: frontend
+    role: member
+    reportsTo: ent.test.gerry@gmail.com
+  - email: ent.test.karla@gmail.com
+    name: Karla
+    area: frontend
+    role: member
+    reportsTo: ent.test.gerry@gmail.com
+  - email: ent.test.luis@gmail.com
+    name: Luis
+    area: accounts
+    role: lead
+    reportsTo: jeronimo.deli@gmail.com
+  - email: ent.test.mara@gmail.com
+    name: Mara
+    area: accounts
+    role: member
+    reportsTo: ent.test.luis@gmail.com
+  - email: ent.test.nico@gmail.com
+    name: Nico
+    area: accounts
+    role: member
+    reportsTo: ent.test.luis@gmail.com
+  - email: ent.test.olga@gmail.com
+    name: Olga
+    area: accounts
+    role: member
+    reportsTo: ent.test.luis@gmail.com
+  - email: ent.test.pablo@gmail.com
+    name: Pablo
+    area: platform
+    role: lead
+    reportsTo: jeronimo.deli@gmail.com
+  - email: ent.test.quique@gmail.com
+    name: Quique
+    area: platform
+    role: member
+    reportsTo: ent.test.pablo@gmail.com
+  - email: ent.test.rosa@gmail.com
+    name: Rosa
+    area: risk
+    role: lead
+    reportsTo: jeronimo.deli@gmail.com
+  - email: ent.test.sofi@gmail.com
+    name: Sofi
+    area: risk
+    role: member
+    reportsTo: ent.test.rosa@gmail.com

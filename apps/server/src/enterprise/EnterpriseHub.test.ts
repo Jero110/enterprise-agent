@@ -228,8 +228,20 @@ describe("EnterpriseHub", () => {
         const ledger = teams.find((team) => team.id === "ledger");
         expect(ledger?.members).toHaveLength(6);
         expect(ledger?.members.filter((member) => member.isMe)).toEqual([
-          { memberKey: expect.any(String), displayName: "Ana", role: "lead", isMe: true },
+          {
+            memberKey: expect.any(String),
+            displayName: "Ana",
+            role: "lead",
+            isMe: true,
+            reportsTo: null,
+          },
         ]);
+        expect(ledger?.lead?.displayName).toBe("Ana");
+        // A lead grant names the lead of an area outside the member's own team.
+        yield* store.revokeMember("ent.test.rosa@gmail.com");
+        yield* store.grantArea({ email: ANA, areaId: "risk", role: "lead", grantedBy: JERO });
+        const risk = (yield* hub.org("session-ana")).teams.find((team) => team.id === "risk");
+        expect(risk?.lead?.displayName).toBe("Ana");
         expect(JSON.stringify(teams)).not.toContain("@");
       }).pipe(Effect.provide(layer)),
   );
