@@ -339,10 +339,15 @@ export const layer = Layer.effect(
           return;
         const current = yield* getMemberPrincipal(principal.email);
         if (current === null) return;
-        const root = pathService.join(config.cwd, ".agents", "skills");
+        const checkout =
+          pathService.basename(config.cwd) === "server" &&
+          pathService.basename(pathService.dirname(config.cwd)) === "apps"
+            ? pathService.resolve(config.cwd, "../..")
+            : config.cwd;
+        const root = pathService.join(checkout, ".agents", "skills");
         if (!(yield* fs.exists(root))) return;
         const realRoot = yield* fs.realPath(root);
-        if (realRoot !== pathService.join(yield* fs.realPath(config.cwd), ".agents", "skills"))
+        if (realRoot !== pathService.join(yield* fs.realPath(checkout), ".agents", "skills"))
           return;
         const names = yield* fs.readDirectory(root);
         for (const name of names.slice(0, 100)) {

@@ -37,6 +37,58 @@ const codeOf = <A>(effect: Effect.Effect<A, { readonly code: string }>) =>
   );
 
 describe("EnterpriseHub", () => {
+  it.effect("bootstraps private checkout skills only for the authenticated dev owner", () =>
+    Effect.gen(function* () {
+      const hub = yield* EnterpriseHub.EnterpriseHub;
+      yield* hub.enroll("other", { email: ANA, token: TOKEN });
+      yield* hub.enroll("owner", { email: JERO, token: TOKEN });
+      expect((yield* hub.whoami("owner")).email).toBe(JERO);
+      const ownerKey = teamMemberKey(JERO);
+      const path = `personal/${ownerKey}/test-t3-app.md`;
+      expect((yield* hub.knowledgeGraph("other")).nodes.some((node) => node.id === path)).toBe(
+        false,
+      );
+      expect(
+        (yield* hub.knowledgeGraph("owner")).nodes.find((node) => node.id === path),
+      ).toMatchObject({
+        areaId: "personal",
+        accessible: true,
+        itemKind: "skill",
+      });
+      const existing = (yield* hub.knowledgeSharing("owner")).sharedByMe.find(
+        (item) => item.id === path,
+      );
+      expect(existing).toMatchObject({ title: "test-t3-app", grants: [] });
+      expect((yield* hub.knowledgeSharing("other")).sharedWithMe).toEqual([]);
+      expect(yield* codeOf(hub.knowledgeGet("other", { path }))).toBe("document_not_found");
+      const grantee = { kind: "member", target: teamMemberKey(ANA) } as const;
+      yield* hub.knowledgeShare("owner", { path: existing!.id, grantee });
+      expect((yield* hub.knowledgeGet("other", { path })).content).toContain("test-t3-app");
+      yield* hub.knowledgeShareRevoke("owner", { path, grantee });
+      expect(yield* codeOf(hub.knowledgeGet("other", { path }))).toBe("document_not_found");
+    }).pipe(
+      Effect.provide(
+        EnterpriseHub.layer.pipe(
+          Layer.provideMerge(layerKnowledge),
+          Layer.provideMerge(layerSeededStore),
+          Layer.provideMerge(
+            Layer.effect(
+              ServerConfig.ServerConfig,
+              Effect.gen(function* () {
+                const config = yield* ServerConfig.ServerConfig;
+                return { ...config, devUrl: new URL("http://localhost:5173") };
+              }),
+            ).pipe(
+              Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-owner-skills-" })),
+            ),
+          ),
+          Layer.provideMerge(
+            Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, SecureRandom.layerWebCrypto),
+          ),
+        ),
+      ),
+    ),
+  );
   it.effect(
     "personal sharing gates previews and bodies, enforces ownership, and revokes immediately",
     () =>
@@ -129,6 +181,7 @@ describe("EnterpriseHub", () => {
           { id: itemPath },
         ]);
         expect((yield* hub.knowledgeSharing("admin")).sharedWithMe).toEqual([]);
+        expect((yield* hub.knowledgeSharing("admin")).sharedByMe).toEqual([]);
         expect(yield* codeOf(hub.knowledgeGet("admin", { path: itemPath }))).toBe(
           "document_not_found",
         );

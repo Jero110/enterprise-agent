@@ -104,6 +104,9 @@ export function KnowledgeMap(props: {
   const graph = useEnvironmentQuery(
     enterpriseEnvironment.knowledgeGraph({ environmentId: props.environmentId, input: {} }),
   );
+  const status = useEnvironmentQuery(
+    enterpriseEnvironment.status({ environmentId: props.environmentId, input: {} }),
+  );
   const [hiddenLayers, setHiddenLayers] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [documentOpen, setDocumentOpen] = useState(false);
@@ -245,13 +248,24 @@ export function KnowledgeMap(props: {
                   ? t("Shared across the organization")
                   : scope === "area"
                     ? t("Owned by your teams")
-                    : t("Your skills and tools")}{" "}
-                · {countLabel}
+                    : t("Your private skills and files")}{" "}
+                · {graph.data ? countLabel : graph.error ? t("Unavailable") : t("Loading…")}
               </div>
             </button>
           );
         })}
       </div>
+      {graph.data && personalNodes.length === 0 && (
+        <p className="mb-4 text-xs text-muted-foreground">
+          {status.data?.identity
+            ? t("No personal items for {email} yet. Add a skill or file in Ingest.", {
+                email: status.data.identity.email,
+              })
+            : status.error
+              ? t("Could not verify your connected identity.")
+              : t("Connect to your hub to see personal knowledge.")}
+        </p>
+      )}
       {areas.length > 0 && (
         <fieldset
           className="mb-4 flex flex-wrap gap-3"

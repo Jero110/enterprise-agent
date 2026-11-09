@@ -73,7 +73,14 @@ describe("AreaKnowledge", () => {
         const version = yield* repo.version(path);
         yield* knowledge.initializeLocalPersonalSkills(owner);
         expect(yield* repo.version(path)).toBe(version);
-      }).pipe(Effect.provide(layerAreaKnowledge({ devUrl: new URL("http://localhost:5173") }))),
+      }).pipe(
+        Effect.provide(
+          layerAreaKnowledge({
+            cwd: `${process.cwd()}/apps/server`,
+            devUrl: new URL("http://localhost:5173"),
+          }),
+        ),
+      ),
   );
   it.effect(
     "graph previews expose metadata but never a forbidden body, including guessed paths",
