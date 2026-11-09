@@ -42,14 +42,20 @@ export function visibleSettingsNavGroups(
   activePath: string,
 ): ReadonlyArray<SettingsNavGroup> {
   if (showAdvanced) return groups;
-  return groups
-    .map((group) => ({
-      heading: group.heading,
-      // The open section keeps its entry so the user still sees where they are.
-      paths: group.paths.filter(
-        (to) =>
-          !ADVANCED_SETTINGS_PATHS.has(to) || activePath === to || activePath.startsWith(`${to}/`),
-      ),
-    }))
-    .filter((group) => group.paths.length > 0);
+  return (
+    groups
+      .map((group) => ({
+        heading: group.heading,
+        // The open section keeps its entry so the user still sees where they are.
+        paths: group.paths.filter(
+          (to) =>
+            !ADVANCED_SETTINGS_PATHS.has(to) ||
+            activePath === to ||
+            activePath.startsWith(`${to}/`),
+        ),
+      }))
+      .filter((group) => group.paths.length > 0)
+      // A heading over a single entry (e.g. "Code" over just Projects) reads as noise in the short menu.
+      .map((group) => (group.paths.length === 1 ? { ...group, heading: null } : group))
+  );
 }

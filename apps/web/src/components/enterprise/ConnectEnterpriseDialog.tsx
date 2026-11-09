@@ -29,6 +29,9 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { toastManager } from "../ui/toast";
+import { parseEnterpriseInvite } from "./invite";
+
+const INVITE_PREFIX = "t3-enterprise-v1.";
 
 export function ConnectEnterpriseDialog({
   environmentId,
@@ -71,7 +74,8 @@ export function ConnectEnterpriseDialog({
       ? undefined
       : window.location.origin;
   const hubUrl = hubUrlInput ?? "";
-  const ready = email.trim().length > 0 && hubUrl.trim().length > 0;
+  const ready =
+    email.trim().length > 0 && (hubUrl.trim().length > 0 || token.trim().startsWith(INVITE_PREFIX));
 
   const handleOpenChange = (next: boolean) => {
     if (!next && busy) return;
@@ -86,9 +90,23 @@ export function ConnectEnterpriseDialog({
   const submit = async () => {
     if (busy || !ready) return;
     let origin: string | undefined;
-    const tokenless = token.trim().length === 0;
+    // A pasted "Create invite" string carries both the address and the token.
+    const pastedInvite = [hubUrl, token]
+      .map((value) => value.trim())
+      .find((value) => value.startsWith(INVITE_PREFIX));
+    const invite = pastedInvite === undefined ? null : parseEnterpriseInvite(pastedInvite);
+    if (pastedInvite !== undefined && invite === null) {
+      setError(t("Check the team address."));
+      return;
+    }
+    const rawAddress = invite?.link.url ?? hubUrl.trim();
+    const address = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawAddress)
+      ? rawAddress
+      : `http://${rawAddress}`;
+    const submittedToken = (invite?.token ?? token).trim();
+    const tokenless = submittedToken.length === 0;
     try {
-      origin = resolveEnterpriseHubOrigin(hubUrl, { tokenless });
+      origin = resolveEnterpriseHubOrigin(address, { tokenless });
       const isOwnHost = configured && ownUrl !== undefined && URL.parse(ownUrl)?.origin === origin;
       if (isOwnHost) {
         origin = undefined;
@@ -101,8 +119,8 @@ export function ConnectEnterpriseDialog({
             resolveEnterpriseHubOrigin(window.location.origin, { tokenless });
         }
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : t("Check the team address."));
+    } catch {
+      setError(t("Check the team address."));
       return;
     }
     setBusy(true);
@@ -112,7 +130,7 @@ export function ConnectEnterpriseDialog({
       input: {
         ...(origin === undefined ? {} : { hubUrl: origin }),
         email: email.trim(),
-        ...(token.trim().length > 0 ? { token: token.trim() } : {}),
+        ...(submittedToken.length > 0 ? { token: submittedToken } : {}),
       },
     });
     if (result._tag === "Success") {
@@ -157,7 +175,8 @@ export function ConnectEnterpriseDialog({
             <label className="block space-y-1.5">
               <span className="block text-xs font-medium text-foreground">{t("Team address")}</span>
               <Input
-                type="url"
+                type="text"
+                inputMode="url"
                 value={hubUrl}
                 onChange={(event) => setHubUrlInput(event.target.value)}
                 placeholder="http://192.168.0.10:13779"

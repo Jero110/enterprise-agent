@@ -1,4 +1,4 @@
-import { t } from "~/i18n";
+import { t, threadTitleForDisplay } from "~/i18n";
 import {
   foldSearchQuery,
   PALETTE_SECONDARY_LIMIT,
@@ -49,7 +49,7 @@ export function buildLinkedThreadActionItems(
   return input.threads.map((thread) => ({
     kind: "action",
     value: `thread:${input.environmentId}:${thread.id}`,
-    title: thread.title || "Untitled thread",
+    title: thread.title ? threadTitleForDisplay(thread.title) : t("Untitled thread"),
     description: thread.archivedAt === null ? "Linked thread" : "Archived thread",
     searchTerms: [input.query, thread.title],
     icon: input.icon,
@@ -477,7 +477,7 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
           projectTitle,
           input.environmentLabelOf?.(thread),
         ),
-        title: thread.title,
+        title: threadTitleForDisplay(thread.title),
         description,
         timestamp: formatRelativeTimeLabel(
           thread.latestUserMessageAt ?? thread.updatedAt ?? thread.createdAt,

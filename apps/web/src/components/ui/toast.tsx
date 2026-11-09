@@ -14,6 +14,7 @@ import { CircleAlertIcon, CircleCheckIcon, InfoIcon, TriangleAlertIcon, XIcon } 
 import { Check, ChevronDown, ChevronUp, Copy } from "lucide";
 
 import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { MorphIcon } from "~/components/MorphIcon";
 import { useComposerDraftStore } from "~/composerDraftStore";
@@ -71,6 +72,14 @@ type ToastManagerEvent = Parameters<ToastManagerListener>[0];
  * from before the first render (and while the root error view replaces the providers), so hold
  * those until a provider listens.
  */
+function translateToastText<T extends { title?: unknown; description?: unknown }>(options: T): T {
+  const translated = { ...options };
+  // Only touch keys that hold strings: an update without a title must not clear the shown one.
+  if (typeof options.title === "string") translated.title = t(options.title);
+  if (typeof options.description === "string") translated.description = t(options.description);
+  return translated;
+}
+
 function createBufferedToastManager(): BaseToastManager {
   const manager = Toast.createToastManager<ThreadToastData>();
   const listeners = new Set<ToastManagerListener>();
@@ -84,6 +93,18 @@ function createBufferedToastManager(): BaseToastManager {
   });
   return {
     ...manager,
+    // Callers pass English titles; plain strings get the user's language here. ReactNode values pass unchanged.
+    add(options) {
+      return manager.add(translateToastText(options));
+    },
+    update(id, updates) {
+      manager.update(
+        id,
+        typeof updates === "function"
+          ? (previous) => translateToastText(updates(previous))
+          : translateToastText(updates),
+      );
+    },
     " subscribe"(listener) {
       listeners.add(listener);
       for (const event of pending.splice(0)) listener(event);

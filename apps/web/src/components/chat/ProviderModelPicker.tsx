@@ -10,6 +10,7 @@ import { Badge } from "../ui/badge";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import { ModelPickerContent, resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { ChatGptSharingControl } from "./ChatGptSharingControl";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
@@ -139,10 +140,10 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   const triggerTitle = selectedModel
     ? getTriggerDisplayModelName(selectedModel, activeEntry?.driverKind)
     : props.model === ANTIGRAVITY_DEFAULT_MODEL
-      ? "Choose model"
-      : props.model || "Choose model";
+      ? t("Choose model")
+      : props.model || t("Choose model");
   const triggerLabel = selectedModel
-    ? `${getDisplayModelName(selectedModel)}${selectedModel.isUnavailable ? " (Unavailable)" : ""}`
+    ? `${getDisplayModelName(selectedModel)}${selectedModel.isUnavailable ? ` (${t("Unavailable")})` : ""}`
     : triggerTitle;
   const showInstanceBadge =
     activeEntry !== null && shouldShowInstanceBadge(activeEntry, props.instanceEntries);
@@ -219,14 +220,16 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   });
   const multipleLabel = selectedEntries
     ? selectedEntries.length === 0
-      ? "Choose models"
+      ? t("Choose models")
       : `${selectedEntries
           .slice(0, 2)
           .map((selection) => selection.label)
-          .join(", ")}${selectedEntries.length > 2 ? `, ${selectedEntries.length - 2} more` : ""}`
+          .join(
+            ", ",
+          )}${selectedEntries.length > 2 ? `, ${t("{count} more", { count: selectedEntries.length - 2 })}` : ""}`
     : undefined;
   const allModelNames = selectedEntries
-    ? selectedEntries.map((selection) => selection.fullLabel).join(", ") || "Choose models"
+    ? selectedEntries.map((selection) => selection.fullLabel).join(", ") || t("Choose models")
     : undefined;
   const triggerTooltipContent = [
     props.triggerLabel ?? allModelNames ?? triggerLabel,

@@ -43,7 +43,6 @@ export const startup = Promise.all([
     // Route chunk failures resolve router.load() and surface later through the error boundary.
     if (reloadScheduled) return;
     if (!chunkLoadFailed) clearChunkReloadGuard();
-    dismissBootSplash();
     ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <React.StrictMode>
         {ManagedAuthShell && clerkPublishableKey ? (
@@ -53,6 +52,8 @@ export const startup = Promise.all([
         )}
       </React.StrictMode>,
     );
+    // render() commits asynchronously; wait a frame so the splash never fades over an empty page.
+    window.requestAnimationFrame(() => dismissBootSplash());
   })
   .catch((error: unknown) => {
     if (reloadScheduled) return;

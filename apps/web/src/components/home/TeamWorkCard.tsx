@@ -10,7 +10,9 @@ import { ProjectsBoardDialog } from "../projects/ProjectsBoardDialog";
 import { Button } from "../ui/button";
 
 const CARD_CLASS_NAME =
-  "-mt-2 mx-auto hidden w-full min-w-0 flex-col gap-1.5 rounded-xl border border-border/70 bg-card/60 px-3 py-2.5 text-left shadow-xs sm:w-[calc(50%-0.25rem)] [@media(min-height:44rem)]:flex";
+  "-mt-2 hidden w-full min-w-0 flex-col gap-1.5 rounded-xl border border-border/70 bg-card/60 px-3 py-2.5 text-left shadow-xs [@media(min-height:40rem)]:flex";
+
+const SEPARATOR = <span className="mx-1">·</span>;
 
 function countLabel(count: number, one: string, many: string): string {
   return count === 1 ? t(one) : t(many, { count });
@@ -57,15 +59,17 @@ export const TeamWorkCard = memo(function TeamWorkCard({
     );
   }
 
+  const loading =
+    (board.data === null && board.error === null) ||
+    (shared.data === null && shared.error === null);
   const tasks = board.data?.boards.flatMap((entry) => entry.tasks) ?? [];
   const inProgress = tasks.filter((task) => task.status === "in_progress").length;
   const blocked = tasks.filter((task) => task.status === "blocked").length;
-  const teammateThreads = (shared.data ?? []).filter(
-    (thread) => thread.ownerEmail !== identity.email && thread.parentThreadId === null,
-  );
-
+  // Every top-level shared chat, yours included, so the count matches the sidebar.
+  const sharedThreads = (shared.data ?? []).filter((thread) => thread.parentThreadId === null);
+  // Skill requests have their own place in the inbox; only notes count as new messages.
   const unreadMessages = (inbox.data ?? []).filter(
-    (message) => !message.outgoing && message.status === "unread",
+    (message) => message.kind === "message" && !message.outgoing && message.status === "unread",
   ).length;
 
   return (
@@ -85,36 +89,47 @@ export const TeamWorkCard = memo(function TeamWorkCard({
           {t("Open board")}
         </Button>
       </div>
-      <p className="truncate text-muted-foreground text-xs tabular-nums">
-        {tasks.length === 0 ? (
-          t("No tasks yet")
-        ) : (
-          <>
-            {countLabel(inProgress, "1 in progress", "{count} in progress")}
-            {blocked > 0 ? (
+      {loading ? (
+        <p className="truncate text-muted-foreground text-xs">{t("Loading…")}</p>
+      ) : (
+        <>
+          <p className="truncate text-muted-foreground text-xs tabular-nums">
+            {tasks.length === 0 ? (
+              t("No tasks yet")
+            ) : inProgress === 0 && blocked === 0 ? (
+              countLabel(tasks.length, "1 task", "{count} tasks")
+            ) : (
               <>
-                <span className="mx-1">·</span>
-                <span className="font-medium text-warning-foreground">
-                  {countLabel(blocked, "1 blocked", "{count} blocked")}
+                {inProgress > 0
+                  ? countLabel(inProgress, "1 in progress", "{count} in progress")
+                  : null}
+                {inProgress > 0 && blocked > 0 ? SEPARATOR : null}
+                {blocked > 0 ? (
+                  <span className="font-medium text-warning-foreground">
+                    {countLabel(blocked, "1 blocked", "{count} blocked")}
+                  </span>
+                ) : null}
+              </>
+            )}
+          </p>
+          <p className="truncate text-muted-foreground text-xs tabular-nums">
+            <UsersIcon aria-hidden className="me-1 inline size-3.5 align-[-0.15em]" />
+            {unreadMessages > 0 ? (
+              <>
+                <span className="font-medium text-primary">
+                  {countLabel(unreadMessages, "1 new message", "{count} new messages")}
                 </span>
+                {SEPARATOR}
               </>
             ) : null}
-          </>
-        )}
-        <span className="mx-1">·</span>
-        <UsersIcon aria-hidden className="me-1 inline size-3.5 align-[-0.15em]" />
-        {teammateThreads.length === 0
-          ? t("nothing shared yet")
-          : countLabel(teammateThreads.length, "1 shared chat", "{count} shared chats")}
-        {unreadMessages > 0 ? (
-          <>
-            <span className="mx-1">·</span>
-            <span className="font-medium text-primary">
-              {countLabel(unreadMessages, "1 new message", "{count} new messages")}
-            </span>
-          </>
-        ) : null}
-      </p>
+            {sharedThreads.length === 0
+              ? unreadMessages > 0
+                ? t("nothing shared yet")
+                : t("Nothing shared yet")
+              : countLabel(sharedThreads.length, "1 shared chat", "{count} shared chats")}
+          </p>
+        </>
+      )}
       <ProjectsBoardDialog
         environmentId={environmentId}
         projectId={projectId}

@@ -129,7 +129,8 @@ export function summarizeHomeDay(
       run?.status === "completed" &&
       completedAtMs !== null &&
       completedAtMs >= windowStartMs &&
-      completedAtMs <= nowMs
+      // `nowMs` is the start of the current minute, so a task finished mid-minute still counts.
+      completedAtMs < nowMs + MINUTE_MS
     ) {
       const minutes = estimateTaskMinutes(startedAtMs, completedAtMs);
       weekMinutes += minutes;

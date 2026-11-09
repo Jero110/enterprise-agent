@@ -859,7 +859,7 @@ function OpenCommandPaletteDialog(props: {
           kind: "action" as const,
           value: NEW_THREAD_NO_PROJECT_VALUE,
           searchTerms: ["no project", "without project", "none"],
-          title: "No project",
+          title: t("No project"),
           icon: <MessageSquareDashedIcon className={ITEM_ICON_CLASS} />,
           shortcutCommand: "chat.newWithoutProject" as const,
           run: () => startScratchThread(scratchTargetEnvironmentId),
@@ -998,8 +998,8 @@ function OpenCommandPaletteDialog(props: {
         kind: "action",
         value: `action:add-project:${environmentId}:local`,
         searchTerms: ["local", "folder", "directory", "browse"],
-        title: "Local folder",
-        description: "Browse a folder on disk",
+        title: t("Local folder"),
+        description: t("Browse a folder on disk"),
         icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
         keepOpen: true,
         run: async () => {
@@ -1013,8 +1013,8 @@ function OpenCommandPaletteDialog(props: {
         kind: "action",
         value: `action:add-project:${environmentId}:new`,
         searchTerms: ["new project", "create", "empty", "repository", "git init"],
-        title: "New project",
-        description: "Start a new Git repository from a name",
+        title: t("New project"),
+        description: t("Start a new Git repository from a name"),
         icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
         keepOpen: true,
         run: async () => {
@@ -2264,8 +2264,8 @@ function OpenCommandPaletteDialog(props: {
               kind: "action",
               value: "new-project:existing",
               searchTerms: [],
-              title: "Add existing project",
-              description: "Open a folder or clone a repository",
+              title: t("Add existing project"),
+              description: t("Open a folder or clone a repository"),
               icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
               titleTrailingContent: (
                 <ChevronRightIcon className="-me-0.5 ms-auto size-4 shrink-0 text-muted-foreground/70" />

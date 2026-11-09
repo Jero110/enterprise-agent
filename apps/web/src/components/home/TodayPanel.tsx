@@ -50,7 +50,7 @@ export function TodayPanel() {
   return (
     <section
       aria-label={t("Your day")}
-      className="hidden gap-2 sm:grid-cols-2 [@media(min-height:44rem)]:grid"
+      className="hidden gap-2 sm:grid-cols-2 [@media(min-height:40rem)]:grid"
       data-home-today-panel
     >
       <TimeSavedCard summary={summary} />

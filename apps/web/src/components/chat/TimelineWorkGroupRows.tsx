@@ -282,7 +282,7 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
   const compacting = row.compacting === true || isCompacting;
   const shimmer = isPreparingWorktree || compacting;
   const label = isPreparingWorktree ? (
-    "Setting up worktree…"
+    t("Setting up worktree…")
   ) : compacting ? (
     <CompactingLabel createdAt={row.createdAt} />
   ) : row.createdAt ? (
@@ -290,7 +290,7 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
       {t("Working for")} <WorkingTimer createdAt={row.createdAt} />
     </>
   ) : (
-    "Working..."
+    t("Working...")
   );
   return (
     <div className="border-b border-border/60 pb-2 pt-1">
@@ -315,7 +315,7 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
   const terminalId = snapshot.setupScript?.terminalId ?? null;
   const openTerminal = ctx.onOpenWorktreeSetupTerminal;
   const onOpenTerminal = openTerminal && terminalId ? () => openTerminal(terminalId) : null;
-  const scriptName = snapshot.setupScript?.name ?? "Setup script";
+  const scriptName = snapshot.setupScript?.name ?? t("Setup script");
   return (
     <Popover>
       <PopoverTrigger
@@ -324,12 +324,14 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
             variant="ghost-muted"
             size="micro"
             className="ml-auto min-w-0 shrink-0"
-            aria-label={`Background setup is still running: ${scriptName}. Show setup progress.`}
+            aria-label={t("Background setup is still running: {name}. Show setup progress.", {
+              name: scriptName,
+            })}
           />
         }
       >
         <Spinner className="size-3 shrink-0" />
-        <span className="truncate">Background setup</span>
+        <span className="truncate">{t("Background setup")}</span>
       </PopoverTrigger>
       <PopoverPopup side="bottom" align="end" width="lg" padding="compact">
         <WorktreeSetupCard
@@ -350,10 +352,10 @@ function CompactingLabel({ createdAt }: { createdAt: string | null }) {
       <Minimize2Icon aria-hidden="true" className="size-3" />
       {createdAt ? (
         <span>
-          Compacting for <WorkingTimer createdAt={createdAt} />
+          {t("Compacting for")} <WorkingTimer createdAt={createdAt} />
         </span>
       ) : (
-        "Compacting…"
+        t("Compacting…")
       )}
     </span>
   );

@@ -5,7 +5,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, ServerProviderSkill, TeamMessage } from "@t3tools/contracts";
 import { MailIcon, PackageIcon } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
@@ -22,6 +22,7 @@ import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 const NO_SKILL = "__none__";
+const NO_PEOPLE = "__no_people__";
 
 function isPendingSkill(message: TeamMessage): boolean {
   return (
@@ -64,10 +65,14 @@ function statusLabel(message: TeamMessage): string | null {
 }
 
 function MessageRow({
+  environmentId,
   message,
+  highlighted,
   onReply,
 }: {
+  readonly environmentId: EnvironmentId;
   readonly message: TeamMessage;
+  readonly highlighted: boolean;
   readonly onReply: (recipientKey: string) => void;
 }) {
   const label = statusLabel(message);
@@ -75,7 +80,7 @@ function MessageRow({
     <li
       className={cn(
         "space-y-1 rounded-lg border border-border/60 p-3",
-        !message.outgoing && message.status === "unread" && "border-primary/50 bg-primary/5",
+        highlighted && "border-primary/50 bg-primary/5",
       )}
     >
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -116,6 +121,9 @@ function MessageRow({
       <p className="whitespace-pre-wrap text-sm">
         {message.note ?? <span className="text-muted-foreground italic">{t("No message")}</span>}
       </p>
+      {isPendingSkill(message) ? (
+        <SkillDecision environmentId={environmentId} message={message} className="pt-1" />
+      ) : null}
     </li>
   );
 }
@@ -193,6 +201,11 @@ function Compose(props: {
           <SelectValue placeholder={t("Who do you want to write to?")} />
         </SelectTrigger>
         <SelectPopup>
+          {people.size === 0 ? (
+            <SelectItem value={NO_PEOPLE} disabled>
+              {t("No colleagues yet")}
+            </SelectItem>
+          ) : null}
           {[...people].map(([key, label]) => (
             <SelectItem key={key} value={key}>
               {label}
@@ -219,7 +232,10 @@ function Compose(props: {
           onValueChange={(value) => setSkillPath(value ?? NO_SKILL)}
           items={[
             { value: NO_SKILL, label: t("No skill") },
-            ...skills.map((skill) => ({ value: skill.path, label: skill.name })),
+            ...skills.map((skill) => ({
+              value: skill.path,
+              label: skill.displayName ?? skill.name,
+            })),
           ]}
         >
           <SelectTrigger size="sm" aria-label={t("Share a skill")} className="min-w-0 flex-1">
@@ -254,27 +270,53 @@ export function TeamMessagesButton(props: {
 }) {
   const [open, setOpen] = useState(false);
   const [recipientKey, setRecipientKey] = useState<string | null>(null);
+  // What was new when the inbox opened stays highlighted while it is open (and while it fades out).
+  const [newIds, setNewIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [composeMounted, setComposeMounted] = useState(false);
+  const composeRef = useRef<HTMLDivElement | null>(null);
   const { query, messages } = useTeamMessages(props.environmentId);
   const markRead = useAtomCommand(enterpriseEnvironment.readTeamMessage, {
     label: "read team message",
     reportFailure: false,
   });
-  const unread = messages.filter((message) => !message.outgoing && message.status === "unread");
+  const isUnread = (message: TeamMessage) => !message.outgoing && message.status === "unread";
+  // Pending skill requests are counted by the "To approve" pill; the mail badge counts messages.
+  const unread = messages.filter((message) => message.kind === "message" && isUnread(message));
   const onOpenChange = (next: boolean) => {
+    if (next === open) return;
     setOpen(next);
-    // Opening the inbox reads plain messages; skill requests stay pending until answered.
-    if (next)
-      for (const message of unread)
-        if (message.kind === "message")
-          void markRead({ environmentId: props.environmentId, input: { id: message.id } });
+    if (next) {
+      setComposeMounted(true);
+      setNewIds(new Set(messages.filter(isUnread).map((message) => message.id)));
+      return;
+    }
+    // Closing the inbox reads the plain messages it showed; skill requests stay pending until answered.
+    for (const message of unread)
+      void markRead({ environmentId: props.environmentId, input: { id: message.id } });
+  };
+  const replyTo = (key: string) => {
+    setRecipientKey(key);
+    requestAnimationFrame(() => {
+      const compose = composeRef.current;
+      if (compose === null) return;
+      compose.scrollIntoView({ block: "start", behavior: "smooth" });
+      compose.querySelector("textarea")?.focus({ preventScroll: true });
+    });
   };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      // Keep the form until the close animation ends so the popup does not jump while fading out.
+      onOpenChangeComplete={(isOpen) => {
+        if (!isOpen) setComposeMounted(false);
+      }}
+    >
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
-              size={unread.length > 0 ? "sm" : "icon"}
+              size={unread.length > 0 ? "sm" : "icon-sm"}
               variant="ghost"
               aria-label={t("Messages")}
               className="shrink-0 [-webkit-app-region:no-drag]"
@@ -291,7 +333,7 @@ export function TeamMessagesButton(props: {
         </TooltipTrigger>
         <TooltipPopup side="bottom">{t("Messages")}</TooltipPopup>
       </Tooltip>
-      <DialogPopup className="flex h-[min(760px,90dvh)] w-[min(640px,94vw)] max-w-none flex-col overflow-hidden">
+      <DialogPopup className="flex max-h-[min(760px,90dvh)] w-[min(640px,94vw)] max-w-none flex-col overflow-hidden">
         <div className="shrink-0 border-b border-border/60 px-6 py-4">
           <DialogTitle>{t("Messages")}</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -301,22 +343,32 @@ export function TeamMessagesButton(props: {
           </p>
         </div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
-          {open && (
-            <Compose
-              environmentId={props.environmentId}
-              skills={props.skills}
-              recipientKey={recipientKey}
-              onRecipientChange={setRecipientKey}
-            />
+          {composeMounted && (
+            <div ref={composeRef} className="scroll-mt-4">
+              <Compose
+                environmentId={props.environmentId}
+                skills={props.skills}
+                recipientKey={recipientKey}
+                onRecipientChange={setRecipientKey}
+              />
+            </div>
           )}
           {query.error !== null && query.data === null ? (
             <p className="text-sm text-muted-foreground">{t(query.error)}</p>
+          ) : query.data === null ? (
+            <p className="text-sm text-muted-foreground">{t("Loading…")}</p>
           ) : messages.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("No messages yet.")}</p>
           ) : (
             <ul className="space-y-2">
               {messages.map((message) => (
-                <MessageRow key={message.id} message={message} onReply={setRecipientKey} />
+                <MessageRow
+                  key={message.id}
+                  environmentId={props.environmentId}
+                  message={message}
+                  highlighted={newIds.has(message.id) || isUnread(message)}
+                  onReply={replyTo}
+                />
               ))}
             </ul>
           )}
@@ -326,9 +378,11 @@ export function TeamMessagesButton(props: {
   );
 }
 
-function SharedSkillRow(props: {
+/** Install / Decline for a skill a colleague sent you. */
+function SkillDecision(props: {
   readonly environmentId: EnvironmentId;
   readonly message: TeamMessage;
+  readonly className?: string;
 }) {
   const decide = useAtomCommand(enterpriseEnvironment.decideTeamMessage, {
     label: "answer skill request",
@@ -361,6 +415,36 @@ function SharedSkillRow(props: {
       setError(enterpriseFailureMessage(squashAtomCommandFailure(result)));
     }
   };
+  return (
+    <div className={cn("space-y-2", props.className)}>
+      <div className="flex gap-2">
+        <Button size="sm" disabled={busy || !canDecide} onClick={() => void answer("installed")}>
+          {busy ? t("Installing…") : t("Install")}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy || !canDecide}
+          onClick={() => void answer("declined")}
+        >
+          {t("Decline")}
+        </Button>
+      </div>
+      {error !== null ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function SharedSkillRow(props: {
+  readonly environmentId: EnvironmentId;
+  readonly message: TeamMessage;
+}) {
+  const skill = props.message.skill;
+  if (skill === null) return null;
   const pending = isPendingSkill(props.message);
   return (
     <li className="space-y-2 rounded-lg border border-border/60 p-3">
@@ -404,24 +488,7 @@ function SharedSkillRow(props: {
         </pre>
       </details>
       {pending ? (
-        <div className="flex gap-2">
-          <Button size="sm" disabled={busy || !canDecide} onClick={() => void answer("installed")}>
-            {busy ? t("Installing…") : t("Install")}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy || !canDecide}
-            onClick={() => void answer("declined")}
-          >
-            {t("Decline")}
-          </Button>
-        </div>
-      ) : null}
-      {error !== null ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
+        <SkillDecision environmentId={props.environmentId} message={props.message} />
       ) : null}
     </li>
   );

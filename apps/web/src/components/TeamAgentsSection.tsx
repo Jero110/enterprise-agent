@@ -12,6 +12,7 @@ import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
 import { useState } from "react";
 
 import { t } from "~/i18n";
+import ChatMarkdown from "./ChatMarkdown";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { resolveProjectDefaultProviderModelSelection } from "../providerInstances";
 import { environmentServerConfigsAtom } from "../state/server";
@@ -51,7 +52,10 @@ export function TeamAgentsSection() {
 
   // Polls refresh every 10 s; keep the last list (a failure keeps its previous success) instead of
   // flashing "Loading" or an error while a refresh is in flight.
-  const summaries = summariesQuery.data ?? [];
+  // Subagent chats belong to their parent conversation; list top-level chats only.
+  const summaries = (summariesQuery.data ?? []).filter(
+    (summary) => summary.parentThreadId === null,
+  );
   const team = rosterQuery.data?.teams.find((team) => team.id === identity?.teamId);
   const groups = groupTeamThreads(summaries, team?.members ?? [], identity?.email ?? null);
   const hasSummaries = summariesQuery.data !== null;
@@ -59,8 +63,8 @@ export function TeamAgentsSection() {
   const loading =
     !hasSummaries && (summariesQuery.isPending || rosterQuery.isPending || enterpriseStatusPending);
   return (
-    <div className="border-b border-sidebar-border px-2 py-2">
-      <div className="flex items-center gap-2 px-2 pb-1 text-xs font-medium text-muted-foreground">
+    <div className="border-t border-sidebar-border px-2 py-2">
+      <div className="flex items-center gap-2 px-2 pb-1 text-xs font-medium text-sidebar-muted-foreground">
         <UsersIcon className="size-3.5" aria-hidden />
         <span className="flex-1">{t("CoWork Agents")}</span>
         <Button
@@ -76,17 +80,19 @@ export function TeamAgentsSection() {
         </Button>
       </div>
       {error !== null ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(error)}</p>
+        <p className="px-2 py-2 text-xs text-sidebar-muted-foreground">{t(error)}</p>
       ) : loading ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t("Loading team threads…")}</p>
+        <p className="px-2 py-2 text-xs text-sidebar-muted-foreground">
+          {t("Loading team threads…")}
+        </p>
       ) : groups.length === 0 ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">
+        <p className="px-2 py-2 text-xs text-sidebar-muted-foreground">
           {t("No shared conversations yet.")}
         </p>
       ) : null}
       {groups.map((owner) => (
         <Collapsible key={owner.key} className="mt-1">
-          <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-2xs text-muted-foreground hover:bg-accent">
+          <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-sidebar-muted-foreground hover:bg-sidebar-row-hover">
             <ChevronRightIcon
               className="size-3 shrink-0 transition-transform group-data-[panel-open]:rotate-90"
               aria-hidden
@@ -95,12 +101,16 @@ export function TeamAgentsSection() {
               {owner.displayName}
               {owner.isMe ? ` ${t("(you)")}` : ""}
             </span>
-            <span>{t("{count} shared", { count: owner.threads.length })}</span>
+            <span>
+              {owner.threads.length === 1
+                ? t("1 shared")
+                : t("{count} shared", { count: owner.threads.length })}
+            </span>
           </CollapsibleTrigger>
           <CollapsiblePanel animate={false}>
             {owner.threads.map((summary) => (
               <button
-                className="flex w-full items-center gap-2 rounded-md py-1.5 pl-7 pr-2 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-md py-1.5 pl-7 pr-2 text-left text-sm hover:bg-sidebar-row-hover"
                 key={summary.threadId}
                 onClick={() => {
                   setSelected(summary);
@@ -109,7 +119,7 @@ export function TeamAgentsSection() {
                 type="button"
               >
                 <span className="min-w-0 flex-1 truncate">{summary.title}</span>
-                <span className="text-3xs text-muted-foreground">
+                <span className="text-2xs text-sidebar-muted-foreground">
                   {t(summary.status, undefined, "teamThread")}
                 </span>
               </button>
@@ -125,8 +135,8 @@ export function TeamAgentsSection() {
         summary={selected}
         ownEmail={identity?.email ?? null}
         onUnpublish={() => {
+          // Keep `selected` so the dialog key stays stable and it fades out like any other close.
           setOpen(false);
-          setSelected(null);
           summariesQuery.refresh();
         }}
       />
@@ -227,6 +237,7 @@ function TeamThreadReadOnlyDialog(props: {
       ? undefined
       : [...snapshot.messages].reverse().find((message) => message.role === "assistant");
   const summaryOnly = props.summary?.publicationStatus === "summary";
+  const isOwn = props.ownEmail !== null && props.summary?.ownerEmail === props.ownEmail;
   const request = snapshot?.messages.find((message) => message.role === "user");
   const roleLabel = (role: "user" | "assistant" | "system") =>
     role === "user"
@@ -240,14 +251,16 @@ function TeamThreadReadOnlyDialog(props: {
         <DialogHeader>
           <DialogTitle>{props.summary?.title ?? t("Team thread")}</DialogTitle>
           <DialogDescription>
-            {t(
-              summaryOnly
-                ? "Summary shared by {name}. The full chat is not shared."
-                : "Read-only transcript from {name}.",
-              { name: props.summary?.ownerDisplayName ?? "" },
-            )}
+            {isOwn
+              ? t("Your conversation, shared with your team.")
+              : t(
+                  summaryOnly
+                    ? "Summary shared by {name}. The full chat is not shared."
+                    : "Read-only transcript from {name}.",
+                  { name: props.summary?.ownerDisplayName ?? "" },
+                )}
           </DialogDescription>
-          {props.summary?.ownerEmail === props.ownEmail && props.ownEmail !== null ? (
+          {isOwn ? (
             <div>
               <Button
                 variant="outline"
@@ -277,9 +290,11 @@ function TeamThreadReadOnlyDialog(props: {
               ) : null}
               <div>
                 <h3 className="mb-1 text-sm font-medium">{t("Result", undefined, "teamThread")}</h3>
-                <p className="whitespace-pre-wrap text-sm">
-                  {lastAssistantMessage?.text ?? t("The assistant has not replied yet.")}
-                </p>
+                {lastAssistantMessage ? (
+                  <ChatMarkdown text={lastAssistantMessage.text} cwd={undefined} />
+                ) : (
+                  <p className="text-sm">{t("The assistant has not replied yet.")}</p>
+                )}
               </div>
             </section>
           ) : (
@@ -288,9 +303,11 @@ function TeamThreadReadOnlyDialog(props: {
                 <h3 className="mb-2 text-sm font-medium">
                   {t("Summary", undefined, "teamThread")}
                 </h3>
-                <p className="whitespace-pre-wrap text-sm">
-                  {lastAssistantMessage?.text ?? t("The assistant has not replied yet.")}
-                </p>
+                {lastAssistantMessage ? (
+                  <ChatMarkdown text={lastAssistantMessage.text} cwd={undefined} />
+                ) : (
+                  <p className="text-sm">{t("The assistant has not replied yet.")}</p>
+                )}
               </section>
               <details>
                 <summary className="cursor-pointer text-sm text-muted-foreground">
@@ -305,29 +322,35 @@ function TeamThreadReadOnlyDialog(props: {
                       <div className="mb-1 text-xs font-medium text-muted-foreground">
                         {roleLabel(message.role)}
                       </div>
-                      <p className="whitespace-pre-wrap text-sm">{message.text}</p>
+                      {message.role === "user" ? (
+                        <p className="whitespace-pre-wrap text-sm">{message.text}</p>
+                      ) : (
+                        <ChatMarkdown text={message.text} cwd={undefined} />
+                      )}
                     </article>
                   ))}
                 </div>
               </details>
             </>
           )}
-          <div className="space-y-2">
-            <Button
-              size="sm"
-              disabled={!canContinue || snapshot === null || continuing}
-              onClick={() => void continueInMyThread()}
-            >
-              {continuing
-                ? t("Starting…", undefined, "teamThread")
-                : t("Take to my chat to summarize")}
-            </Button>
-            {continueError !== null ? (
-              <p role="alert" className="text-sm text-destructive">
-                {continueError}
-              </p>
-            ) : null}
-          </div>
+          {isOwn ? null : (
+            <div className="space-y-2">
+              <Button
+                size="sm"
+                disabled={!canContinue || snapshot === null || continuing}
+                onClick={() => void continueInMyThread()}
+              >
+                {continuing
+                  ? t("Starting…", undefined, "teamThread")
+                  : t("Take to my chat to summarize")}
+              </Button>
+              {continueError !== null ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {continueError}
+                </p>
+              ) : null}
+            </div>
+          )}
         </DialogPanel>
       </DialogPopup>
     </Dialog>

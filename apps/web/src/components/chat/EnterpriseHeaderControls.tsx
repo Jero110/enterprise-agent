@@ -116,7 +116,7 @@ function OrgPanel({ environmentId }: { readonly environmentId: EnvironmentId }) 
     <div className="max-h-[70dvh] w-full space-y-2 overflow-y-auto bg-popover p-3">
       <h2 className="text-sm font-medium">{t("Organization")}</h2>
       {org.error ? (
-        <p className="text-xs text-muted-foreground">{org.error}</p>
+        <p className="text-xs text-muted-foreground">{t(org.error)}</p>
       ) : teams.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           {org.isPending ? t("Loading organization…") : t("No teams yet.")}
@@ -165,7 +165,14 @@ function ContextPanel(props: {
       });
     }
   };
-  const cards = context.data?.cards ?? [];
+  if (!context.data) {
+    return (
+      <p className="px-8 py-6 text-xs text-muted-foreground" role="status">
+        {context.error ? t(context.error) : t("Loading…")}
+      </p>
+    );
+  }
+  const cards = context.data.cards;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <KnowledgeMap
@@ -203,7 +210,7 @@ function EnterpriseContextDialog(props: {
         <TooltipTrigger
           render={
             <Button
-              size={toAnswer > 0 ? "sm" : "icon"}
+              size={toAnswer > 0 ? "sm" : "icon-sm"}
               variant="ghost"
               aria-label={t("Conversation context and changes")}
               aria-haspopup="dialog"
@@ -220,7 +227,7 @@ function EnterpriseContextDialog(props: {
           <BrainCircuitIcon className="size-4" />
           {toAnswer > 0 ? (
             <span className="whitespace-nowrap rounded-full bg-primary px-1.5 text-2xs font-medium text-primary-foreground">
-              {t("To approve · {count}", { count: toAnswer })}
+              {t("Pending · {count}", { count: toAnswer })}
             </span>
           ) : null}
         </TooltipTrigger>
@@ -231,7 +238,7 @@ function EnterpriseContextDialog(props: {
         bottomStickOnMobile={false}
       >
         <div className="shrink-0 border-b border-border/60 px-8 py-5">
-          <DialogTitle>{t("Conversation context")}</DialogTitle>
+          <DialogTitle>{t("Knowledge and approvals")}</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
             {t("Knowledge for this conversation, pending proposals and review history.")}
           </p>
@@ -324,11 +331,16 @@ function SharePanel(props: {
       thread.parentThreadId === null &&
       thread.ownerEmail === props.ownerEmail,
   );
+  // Shows the choice right away; falls back to the server value once the save settles.
+  const [pendingStatus, setPendingStatus] = useState<PublicationStatus | null>(null);
   const change = async (status: PublicationStatus) => {
+    if (pendingStatus !== null) return;
+    setPendingStatus(status);
     const result = await publish({
       environmentId: props.environmentId,
       input: { threadId: props.threadId, status },
     });
+    setPendingStatus(null);
     if (result._tag === "Success") threads.refresh();
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add({
@@ -343,8 +355,8 @@ function SharePanel(props: {
       <h2 className="text-sm font-medium">{t("Share with your team")}</h2>
       <RadioGroup
         aria-label={t("Team sharing")}
-        disabled={!canPublish}
-        value={summary?.publicationStatus ?? "unpublished"}
+        disabled={!canPublish || pendingStatus !== null}
+        value={pendingStatus ?? summary?.publicationStatus ?? "unpublished"}
         onValueChange={(value) => void change(value as PublicationStatus)}
       >
         <label className="flex items-start gap-2 text-sm">

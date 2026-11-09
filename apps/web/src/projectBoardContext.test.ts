@@ -54,6 +54,10 @@ describe("projectBoardContextForMessage", () => {
     ["the whole board by name", "resume DS - PE", ["Tablero DS - PE"]],
     ["the whole board by keyword", "qué hay en el tablero", ["Tablero DS - PE"]],
     ["the board's cards by request", "lee las tarjetas", ["Tablero DS - PE"]],
+    ["the whole board by 'mi tablero'", "resume mi tablero", ["Tablero DS - PE"]],
+    ["the whole board by 'kanban'", "abre el kanban", ["Tablero DS - PE"]],
+    ["nothing for an everyday question about tasks", "¿qué tareas tengo hoy?", []],
+    ["nothing for an everyday mention of projects", "mis proyectos de esta semana", []],
   ] as const)("attaches %s", (_case, text, expected) => {
     expect(titles(text)).toEqual(expected);
   });
