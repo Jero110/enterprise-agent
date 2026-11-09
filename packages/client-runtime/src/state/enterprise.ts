@@ -53,6 +53,12 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     tag: WS_METHODS.enterpriseKnowledgeList,
     staleTimeMs: 10_000,
   });
+  const knowledgeSharing = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:knowledge-sharing",
+    tag: WS_METHODS.enterpriseKnowledgeSharing,
+    staleTimeMs: 0,
+    refreshIntervalMs: 10_000,
+  });
   const knowledgeGraph = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:enterprise:knowledge-graph",
     tag: WS_METHODS.enterpriseKnowledgeGraph,
@@ -89,6 +95,7 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     registry.refresh(org({ environmentId, input: {} }));
     registry.refresh(knowledgeList({ environmentId, input: {} }));
     registry.refresh(knowledgeGraph({ environmentId, input: {} }));
+    registry.refresh(knowledgeSharing({ environmentId, input: {} }));
     registry.refresh(proposalInbox({ environmentId, input: {} }));
     registry.refresh(proposalInbox({ environmentId, input: { countOnly: true } }));
     registry.refresh(teamThreads({ environmentId, input: {} }));
@@ -129,6 +136,34 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     }),
     knowledgeList,
     knowledgeGraph,
+    knowledgeSharing,
+    knowledgeShare: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:knowledge-share",
+      tag: WS_METHODS.enterpriseKnowledgeShare,
+      onSuccess: ({ environmentId, input }, registry) =>
+        Effect.sync(() => {
+          refreshAll(registry, environmentId);
+          registry.refresh(knowledgeGet({ environmentId, input: { path: input.path } }));
+        }),
+    }),
+    knowledgeShareRevoke: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:knowledge-share-revoke",
+      tag: WS_METHODS.enterpriseKnowledgeShareRevoke,
+      onSuccess: ({ environmentId, input }, registry) =>
+        Effect.sync(() => {
+          refreshAll(registry, environmentId);
+          registry.refresh(knowledgeGet({ environmentId, input: { path: input.path } }));
+        }),
+    }),
+    knowledgeUnpublish: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:knowledge-unpublish",
+      tag: WS_METHODS.enterpriseKnowledgeUnpublish,
+      onSuccess: ({ environmentId, input }, registry) =>
+        Effect.sync(() => {
+          refreshAll(registry, environmentId);
+          registry.refresh(knowledgeGet({ environmentId, input }));
+        }),
+    }),
     knowledgeRequestAccess: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:knowledge-request-access",
       tag: WS_METHODS.enterpriseKnowledgeRequestAccess,

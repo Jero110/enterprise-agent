@@ -79,6 +79,9 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   // The hub decides on the member's role; this scope only lets the client ask.
   [WS_METHODS.enterpriseMembersAuthorize]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseMembersRevoke]: AuthAccessWriteScope,
+  [WS_METHODS.enterpriseKnowledgeShare]: AuthAccessWriteScope,
+  [WS_METHODS.enterpriseKnowledgeShareRevoke]: AuthAccessWriteScope,
+  [WS_METHODS.enterpriseKnowledgeUnpublish]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseKnowledgeRequestAccess]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseKnowledgePropose]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseProposalDecide]: AuthAccessWriteScope,

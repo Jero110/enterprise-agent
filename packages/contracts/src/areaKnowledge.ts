@@ -19,12 +19,15 @@ export const KnowledgeNodeMetadata = Schema.Struct({
   links: Schema.Array(Schema.String),
 });
 
+export const PersonalKnowledgeKind = Schema.Literals(["skill", "node"]);
+
 export const KnowledgeGraphNode = Schema.Struct({
   id: TrimmedNonEmptyString,
   areaId: AreaId,
   title: TrimmedNonEmptyString,
   ...KnowledgeNodeMetadata.fields,
   accessible: Schema.Boolean,
+  itemKind: Schema.optionalKey(PersonalKnowledgeKind),
   content: Schema.optionalKey(Schema.String),
 });
 export const KnowledgeGraph = Schema.Struct({ nodes: Schema.Array(KnowledgeGraphNode) });
@@ -35,6 +38,7 @@ export const KnowledgeDocument = Schema.Struct({
   areaId: AreaId,
   title: TrimmedNonEmptyString,
   content: Schema.String,
+  itemKind: Schema.optionalKey(PersonalKnowledgeKind),
   description: Schema.optionalKey(Schema.String),
   layer: Schema.optionalKey(KnowledgeLayer),
   private: Schema.optionalKey(Schema.Boolean),
@@ -49,6 +53,46 @@ export const KnowledgeDocumentSummary = Schema.Struct({
   title: TrimmedNonEmptyString,
 });
 export type KnowledgeDocumentSummary = typeof KnowledgeDocumentSummary.Type;
+
+export const KnowledgeShareGrantee = Schema.Struct({
+  kind: Schema.Literals(["member", "area"]),
+  target: TrimmedNonEmptyString,
+});
+export type KnowledgeShareGrantee = typeof KnowledgeShareGrantee.Type;
+export const PersonalKnowledgeItem = Schema.Struct({
+  kind: PersonalKnowledgeKind,
+  title: TrimmedNonEmptyString,
+  description: Schema.String,
+  layer: KnowledgeLayer,
+  content: Schema.String.check(Schema.isMaxLength(200_000)),
+});
+export const KnowledgeShareInput = Schema.Struct({
+  path: TrimmedNonEmptyString,
+  item: Schema.optionalKey(PersonalKnowledgeItem),
+  grantee: KnowledgeShareGrantee,
+});
+export type KnowledgeShareInput = typeof KnowledgeShareInput.Type;
+export const KnowledgeShareRevokeInput = Schema.Struct({
+  path: TrimmedNonEmptyString,
+  grantee: KnowledgeShareGrantee,
+});
+export type KnowledgeShareRevokeInput = typeof KnowledgeShareRevokeInput.Type;
+export const KnowledgeSharing = Schema.Struct({
+  sharedByMe: Schema.Array(
+    Schema.Struct({
+      ...KnowledgeDocumentSummary.fields,
+      itemKind: Schema.optionalKey(PersonalKnowledgeKind),
+      grants: Schema.Array(KnowledgeShareGrantee),
+    }),
+  ),
+  sharedWithMe: Schema.Array(
+    Schema.Struct({
+      ...KnowledgeDocumentSummary.fields,
+      itemKind: Schema.optionalKey(PersonalKnowledgeKind),
+    }),
+  ),
+});
+export type KnowledgeSharing = typeof KnowledgeSharing.Type;
 
 export const KnowledgeDocumentList = Schema.Struct({
   documents: Schema.Array(KnowledgeDocumentSummary),

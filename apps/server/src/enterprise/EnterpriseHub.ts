@@ -18,6 +18,9 @@ import {
   type KnowledgeDocument,
   type KnowledgeDocumentList,
   type KnowledgeGraph,
+  type KnowledgeShareInput,
+  type KnowledgeShareRevokeInput,
+  type KnowledgeSharing,
   type KnowledgeGetInput,
   type KnowledgeSearchInput,
   type KnowledgeSearchResult,
@@ -103,6 +106,21 @@ export class EnterpriseHub extends Context.Service<
       input: EnterpriseRevokeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
     /** Knowledge calls are scoped by the enrolled member's team and grants, re-read each call. */
+    readonly knowledgeShare: (
+      sessionId: string,
+      input: KnowledgeShareInput,
+    ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
+    readonly knowledgeShareRevoke: (
+      sessionId: string,
+      input: KnowledgeShareRevokeInput,
+    ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
+    readonly knowledgeUnpublish: (
+      sessionId: string,
+      input: KnowledgeGetInput,
+    ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
+    readonly knowledgeSharing: (
+      sessionId: string,
+    ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
     readonly knowledgeGraph: (sessionId: string) => Effect.Effect<KnowledgeGraph, EnterpriseError>;
     readonly knowledgeRequestAccess: (
       sessionId: string,
@@ -440,6 +458,20 @@ const make = Effect.gen(function* () {
     orgImport,
     authorize,
     revoke,
+    knowledgeShare: Effect.fn("EnterpriseHub.knowledgeShare")(function* (sessionId, input) {
+      return yield* knowledge.share(yield* principalOf(sessionId), input);
+    }),
+    knowledgeShareRevoke: Effect.fn("EnterpriseHub.knowledgeShareRevoke")(
+      function* (sessionId, input) {
+        return yield* knowledge.revokeShare(yield* principalOf(sessionId), input);
+      },
+    ),
+    knowledgeUnpublish: Effect.fn("EnterpriseHub.knowledgeUnpublish")(function* (sessionId, input) {
+      return yield* knowledge.unpublish(yield* principalOf(sessionId), input.path);
+    }),
+    knowledgeSharing: Effect.fn("EnterpriseHub.knowledgeSharing")(function* (sessionId) {
+      return yield* knowledge.sharing(yield* principalOf(sessionId));
+    }),
     knowledgeGraph: Effect.fn("EnterpriseHub.knowledgeGraph")(function* (sessionId) {
       return yield* knowledge.graph(yield* principalOf(sessionId));
     }),

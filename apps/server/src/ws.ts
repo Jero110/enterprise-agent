@@ -2680,6 +2680,11 @@ export const layerWsRpc = (
         [WS_METHODS.enterpriseMembersList]: () => enterprise.listMembers,
         [WS_METHODS.enterpriseMembersAuthorize]: (input) => enterprise.authorize(input),
         [WS_METHODS.enterpriseMembersRevoke]: (input) => enterprise.revoke(input),
+        [WS_METHODS.enterpriseKnowledgeShare]: (input) => enterprise.knowledgeShare(input),
+        [WS_METHODS.enterpriseKnowledgeShareRevoke]: (input) =>
+          enterprise.knowledgeShareRevoke(input),
+        [WS_METHODS.enterpriseKnowledgeUnpublish]: (input) => enterprise.knowledgeUnpublish(input),
+        [WS_METHODS.enterpriseKnowledgeSharing]: () => enterprise.knowledgeSharing,
         [WS_METHODS.enterpriseKnowledgeGraph]: () => enterprise.knowledgeGraph,
         [WS_METHODS.enterpriseKnowledgeRequestAccess]: (input) =>
           enterprise.knowledgeRequestAccess(input),

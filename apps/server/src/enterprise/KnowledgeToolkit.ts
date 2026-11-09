@@ -11,6 +11,9 @@ import {
   KnowledgeProposalInboxInput,
   KnowledgeDocumentList,
   KnowledgeGraph,
+  KnowledgeShareInput,
+  KnowledgeShareRevokeInput,
+  KnowledgeSharing,
   KnowledgeGetInput,
   KnowledgeSearchInput,
   KnowledgeSearchResult,
@@ -54,6 +57,33 @@ const RequestAccessTool = Tool.make("knowledge_request_access", {
   parameters: KnowledgeGetInput,
   success: hubResult(KnowledgeProposal),
 }).annotate(Tool.Destructive, false);
+const ShareTool = Tool.make("knowledge_share", {
+  ...shared,
+  description:
+    "Publish a copy of your own personal skill or node and share it with a member key or area. Path: personal/<your member key>/<slug>.md. Send item content to publish; omit item to grant an existing copy. Skills use layer ai. Only an owner or admin may grant access.",
+  parameters: KnowledgeShareInput,
+  success: hubResult(KnowledgeSharing),
+}).annotate(Tool.Destructive, false);
+const ShareRevokeTool = Tool.make("knowledge_share_revoke", {
+  ...shared,
+  description: "Revoke one personal item grant as its owner or an admin. Other grants remain.",
+  parameters: KnowledgeShareRevokeInput,
+  success: hubResult(KnowledgeSharing),
+}).annotate(Tool.Destructive, true);
+const UnpublishTool = Tool.make("knowledge_unpublish", {
+  ...shared,
+  description:
+    "Remove a published personal item and all its grants as its owner or an admin. This does not delete the device original.",
+  parameters: KnowledgeGetInput,
+  success: hubResult(KnowledgeSharing),
+}).annotate(Tool.Destructive, true);
+const SharingTool = Tool.make("knowledge_sharing", {
+  ...shared,
+  description:
+    "List personal items shared by you and with you. Shared skills can be read with knowledge_get; they are not installed on your device.",
+  parameters: Tool.EmptyParams,
+  success: hubResult(KnowledgeSharing),
+}).annotate(Tool.Readonly, true);
 const SearchTool = Tool.make("knowledge_search", {
   ...shared,
   description:
@@ -112,6 +142,10 @@ export const KnowledgeToolkit = Toolkit.make(
   ListTool,
   GraphTool,
   RequestAccessTool,
+  ShareTool,
+  ShareRevokeTool,
+  UnpublishTool,
+  SharingTool,
   SearchTool,
   GetTool,
   ProposeTool,
@@ -125,6 +159,18 @@ const layerHub = McpToolAccess.toLayer(
   Effect.gen(function* () {
     const hub = yield* EnterpriseHub;
     return {
+      knowledge_share: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.knowledgeShare(id, input))),
+      ),
+      knowledge_share_revoke: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.knowledgeShareRevoke(id, input))),
+      ),
+      knowledge_unpublish: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => hub.knowledgeUnpublish(id, input))),
+      ),
+      knowledge_sharing: McpToolAccess.reads(() =>
+        asResult(Effect.flatMap(sessionId, hub.knowledgeSharing)),
+      ),
       knowledge_graph: McpToolAccess.reads(() =>
         asResult(Effect.flatMap(sessionId, hub.knowledgeGraph)),
       ),
@@ -186,7 +232,7 @@ const layerHub = McpToolAccess.toLayer(
 );
 
 /** On a member IDE, the agent's call goes over the enterprise connection; the hub still filters. */
-const layerMember = McpToolAccess.toLayer(
+export const layerMember = McpToolAccess.toLayer(
   KnowledgeToolkit,
   Effect.gen(function* () {
     const client = yield* EnterpriseClient;
@@ -203,7 +249,31 @@ const layerMember = McpToolAccess.toLayer(
           : Effect.filter(items, (item) => threadKnowledge.allows(threadId, item.areaId)),
       );
     return {
-      knowledge_graph: McpToolAccess.reads(() => asResult(client.knowledgeGraph)),
+      knowledge_share: McpToolAccess.reads((input) => asResult(client.knowledgeShare(input))),
+      knowledge_share_revoke: McpToolAccess.reads((input) =>
+        asResult(client.knowledgeShareRevoke(input)),
+      ),
+      knowledge_unpublish: McpToolAccess.reads((input) =>
+        asResult(client.knowledgeUnpublish(input)),
+      ),
+      knowledge_sharing: McpToolAccess.reads(() => asResult(client.knowledgeSharing)),
+      knowledge_graph: McpToolAccess.reads(() =>
+        asResult(
+          Effect.gen(function* () {
+            const graph = yield* client.knowledgeGraph;
+            const permitted = new Set((yield* allowed(graph.nodes)).map((node) => node.id));
+            return {
+              nodes: graph.nodes.flatMap((node) => {
+                if (permitted.has(node.id)) return [node];
+                if (node.id.startsWith("personal/")) return [];
+                const preview = { ...node, accessible: false };
+                delete preview.content;
+                return [preview];
+              }),
+            };
+          }),
+        ),
+      ),
       knowledge_request_access: McpToolAccess.reads((input) =>
         asResult(client.knowledgeRequestAccess(input)),
       ),

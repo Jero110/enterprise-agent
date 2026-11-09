@@ -58,6 +58,7 @@ import { PreviewToolkit } from "../../apps/server/src/mcp/toolkits/preview/tools
 import { PreviewControlsToolkit } from "../../apps/server/src/mcp/toolkits/previewControls/tools.ts";
 import { ProjectBoardToolkit } from "../../apps/server/src/project/ProjectBoardToolkit.ts";
 import { EnterpriseTeamToolkit } from "../../apps/server/src/enterprise/EnterpriseTeamToolkit.ts";
+import { KnowledgeToolkit } from "../../apps/server/src/enterprise/KnowledgeToolkit.ts";
 import { ProjectToolkit } from "../../apps/server/src/mcp/toolkits/project/tools.ts";
 import {
   CHILD_PULL_REQUEST_REPORT_NEXT,
@@ -419,6 +420,7 @@ const t3SourceTools: ReadonlyArray<Tool.Any> = [
   ProjectToolkit,
   ProjectBoardToolkit,
   EnterpriseTeamToolkit,
+  KnowledgeToolkit,
   EnvironmentToolkit,
   PreviewControlsToolkit,
   WorktreeToolkit,

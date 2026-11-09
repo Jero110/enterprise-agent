@@ -112,6 +112,14 @@ describe("EnterpriseStore", () => {
           status: "running",
         });
         yield* store.moveMember("ent.test.bruno@gmail.com", "frontend");
+        yield* store.grantKnowledgeShare("personal/owner/skill.md", {
+          kind: "area",
+          target: "risk",
+        });
+        yield* store.grantKnowledgeShare("personal/owner/skill.md", {
+          kind: "area",
+          target: "risk",
+        });
         yield* store.saveProposal({
           id: "durable-request",
           kind: "area-access",
@@ -152,6 +160,14 @@ describe("EnterpriseStore", () => {
           status: "running",
         });
         expect(yield* store.getIngestionRun("not-an-ingestion")).toBeNull();
+        expect(yield* store.listKnowledgeShares).toEqual([
+          { path: "personal/owner/skill.md", kind: "area", target: "risk" },
+        ]);
+        yield* store.revokeKnowledgeShare("personal/owner/skill.md", {
+          kind: "area",
+          target: "risk",
+        });
+        expect(yield* store.listKnowledgeShares).toEqual([]);
         expect(yield* store.listMembers).toHaveLength(20);
         expect((yield* store.getMember("ent.test.bruno@gmail.com"))?.teamId).toBe("frontend");
         expect((yield* store.getEnrollment("env-ana"))?.email).toBe("ent.test.ana@gmail.com");

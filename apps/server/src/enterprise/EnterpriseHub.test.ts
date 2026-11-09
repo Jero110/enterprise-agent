@@ -10,10 +10,12 @@ import * as SecureRandom from "effect/crypto/SecureRandom";
 
 import * as ServerConfig from "../config.ts";
 import { layerKnowledge } from "../knowledge/KnowledgeRepo.testkit.ts";
+import { KnowledgeRepo } from "../knowledge/KnowledgeRepo.ts";
 import * as Sqlite from "../persistence/Sqlite.ts";
 import { acmeSeedPath, layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
 
 const TOKEN = "ACME-BANK-DEV-2026";
 const ANA = "ent.test.ana@gmail.com";
@@ -35,6 +37,137 @@ const codeOf = <A>(effect: Effect.Effect<A, { readonly code: string }>) =>
   );
 
 describe("EnterpriseHub", () => {
+  it.effect(
+    "personal sharing gates previews and bodies, enforces ownership, and revokes immediately",
+    () =>
+      Effect.gen(function* () {
+        const hub = yield* EnterpriseHub.EnterpriseHub;
+        const store = yield* EnterpriseStore.EnterpriseStore;
+        const riskLead = (yield* store.listMembers).find(
+          (member) => member.teamId === "risk" && member.role === "lead",
+        )!;
+        yield* hub.enroll("owner", { email: ANA, token: TOKEN });
+        yield* hub.enroll("recipient", { email: riskLead.email, token: TOKEN });
+        yield* hub.enroll("stranger", { email: "ent.test.bruno@gmail.com", token: TOKEN });
+        yield* hub.enroll("admin", { email: JERO, token: TOKEN });
+        const ownerKey = teamMemberKey(ANA);
+        const itemPath = `personal/${ownerKey}/review.md`;
+        const grantee = { kind: "member", target: teamMemberKey(riskLead.email) } as const;
+        const item = {
+          kind: "skill",
+          title: "Review",
+          description: "Personal review skill",
+          layer: "ai",
+          content: "# Review\nPrivate skill instructions",
+        } as const;
+        const share = { path: itemPath, item, grantee };
+        expect(
+          yield* codeOf(hub.knowledgeShare("owner", { ...share, path: "../../escape.md" })),
+        ).toBe("invalid_proposal");
+        expect(
+          yield* codeOf(
+            hub.knowledgeShare("owner", {
+              ...share,
+              path: `personal/${teamMemberKey(riskLead.email)}/forged.md`,
+            }),
+          ),
+        ).toBe("access_denied");
+        expect(
+          yield* codeOf(
+            hub.knowledgeShare("owner", {
+              ...share,
+              grantee: { kind: "member", target: "absent" },
+            }),
+          ),
+        ).toBe("invalid_proposal");
+        expect(
+          yield* codeOf(
+            hub.knowledgeShare("owner", { ...share, item: { ...item, layer: "business" } }),
+          ),
+        ).toBe("invalid_proposal");
+        yield* hub.knowledgeShare("owner", share);
+        const repo = yield* KnowledgeRepo;
+        const version = yield* repo.version(itemPath);
+        yield* hub.knowledgeShare("owner", share);
+        expect(yield* repo.version(itemPath)).toBe(version);
+        expect((yield* hub.knowledgeSharing("owner")).sharedByMe).toMatchObject([
+          { id: itemPath, grants: [grantee] },
+        ]);
+        expect((yield* hub.knowledgeSharing("recipient")).sharedWithMe).toMatchObject([
+          { id: itemPath },
+        ]);
+        expect((yield* hub.knowledgeSharing("admin")).sharedWithMe).toEqual([]);
+        expect(
+          (yield* hub.knowledgeGraph("recipient")).nodes.find((node) => node.id === itemPath),
+        ).toMatchObject({ content: item.content, accessible: true, layer: "ai" });
+        expect((yield* hub.knowledgeGet("recipient", { path: itemPath })).content).toBe(
+          item.content,
+        );
+        expect(
+          (yield* hub.knowledgeList("recipient")).documents.some((doc) => doc.id === itemPath),
+        ).toBe(true);
+        expect(
+          (yield* hub.knowledgeList("stranger")).documents.some((doc) => doc.id === itemPath),
+        ).toBe(false);
+        expect(
+          (yield* hub.knowledgeSearch("stranger", { query: "Private skill instructions" })).hits,
+        ).toEqual([]);
+        expect(
+          (yield* hub.knowledgeGraph("stranger")).nodes.some((node) => node.id === itemPath),
+        ).toBe(false);
+        expect(yield* codeOf(hub.knowledgeGet("stranger", { path: itemPath }))).toBe(
+          "document_not_found",
+        );
+        expect(yield* codeOf(hub.knowledgeShare("recipient", { path: itemPath, grantee }))).toBe(
+          "access_denied",
+        );
+        expect(
+          yield* codeOf(hub.knowledgeShareRevoke("recipient", { path: itemPath, grantee })),
+        ).toBe("access_denied");
+        expect(yield* codeOf(hub.knowledgeUnpublish("recipient", { path: itemPath }))).toBe(
+          "access_denied",
+        );
+        yield* hub.knowledgeShareRevoke("owner", { path: itemPath, grantee });
+        expect((yield* hub.knowledgeSharing("recipient")).sharedWithMe).toEqual([]);
+        expect(
+          (yield* hub.knowledgeGraph("recipient")).nodes.some((node) => node.id === itemPath),
+        ).toBe(false);
+        yield* hub.knowledgeShare("owner", {
+          path: itemPath,
+          grantee: { kind: "area", target: "risk" },
+        });
+        expect((yield* hub.knowledgeGet("recipient", { path: itemPath })).content).toBe(
+          item.content,
+        );
+        yield* hub.knowledgeShareRevoke("admin", {
+          path: itemPath,
+          grantee: { kind: "area", target: "risk" },
+        });
+        expect(yield* codeOf(hub.knowledgeGet("recipient", { path: itemPath }))).toBe(
+          "document_not_found",
+        );
+        yield* hub.knowledgeShare("owner", { path: itemPath, grantee });
+        yield* store.revokeMember(ANA);
+        expect(yield* codeOf(hub.knowledgeGet("recipient", { path: itemPath }))).toBe(
+          "document_not_found",
+        );
+        yield* hub.knowledgeUnpublish("admin", { path: itemPath });
+        yield* hub.authorize("admin", {
+          email: ANA,
+          displayName: "Ana",
+          teamId: "ledger",
+          role: "lead",
+        });
+        expect((yield* hub.knowledgeSharing("owner")).sharedByMe).toEqual([]);
+        expect((yield* hub.knowledgeSharing("recipient")).sharedWithMe).toEqual([]);
+        expect(yield* codeOf(hub.knowledgeGet("owner", { path: itemPath }))).toBe(
+          "document_not_found",
+        );
+        expect(
+          yield* codeOf(hub.knowledgeShare("owner", { path: "areas/ledger/README.md", grantee })),
+        ).toBe("invalid_proposal");
+      }).pipe(Effect.provide(layer)),
+  );
   it.effect(
     "node access requests reach the area lead and bodies follow approval and revocation",
     () =>

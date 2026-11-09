@@ -26,6 +26,9 @@ import {
   KnowledgeDocument,
   KnowledgeDocumentList,
   KnowledgeGraph,
+  KnowledgeSharing,
+  type KnowledgeShareInput,
+  type KnowledgeShareRevokeInput,
   type KnowledgeGetInput,
   type KnowledgeSearchInput,
   KnowledgeSearchResult,
@@ -124,6 +127,16 @@ export class EnterpriseClient extends Context.Service<
       input: EnterpriseRevokeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
     /** The hub's answer for this member; the IDE never filters or caches knowledge itself. */
+    readonly knowledgeShare: (
+      input: KnowledgeShareInput,
+    ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
+    readonly knowledgeShareRevoke: (
+      input: KnowledgeShareRevokeInput,
+    ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
+    readonly knowledgeUnpublish: (
+      input: KnowledgeGetInput,
+    ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
+    readonly knowledgeSharing: Effect.Effect<KnowledgeSharing, EnterpriseError>;
     readonly knowledgeGraph: Effect.Effect<KnowledgeGraph, EnterpriseError>;
     readonly knowledgeRequestAccess: (
       input: KnowledgeGetInput,
@@ -440,6 +453,18 @@ const make = Effect.gen(function* () {
       withConnection((hub) =>
         callResult(hub, "enterprise_member_revoke", input, EnterpriseMembers),
       ),
+    ),
+    knowledgeShare: Effect.fn("EnterpriseClient.knowledgeShare")((input) =>
+      withConnection((hub) => callResult(hub, "knowledge_share", input, KnowledgeSharing)),
+    ),
+    knowledgeShareRevoke: Effect.fn("EnterpriseClient.knowledgeShareRevoke")((input) =>
+      withConnection((hub) => callResult(hub, "knowledge_share_revoke", input, KnowledgeSharing)),
+    ),
+    knowledgeUnpublish: Effect.fn("EnterpriseClient.knowledgeUnpublish")((input) =>
+      withConnection((hub) => callResult(hub, "knowledge_unpublish", input, KnowledgeSharing)),
+    ),
+    knowledgeSharing: withConnection((hub) =>
+      callResult(hub, "knowledge_sharing", {}, KnowledgeSharing),
     ),
     knowledgeGraph: withConnection((hub) => callResult(hub, "knowledge_graph", {}, KnowledgeGraph)),
     knowledgeRequestAccess: Effect.fn("EnterpriseClient.knowledgeRequestAccess")((input) =>

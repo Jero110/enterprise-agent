@@ -8,11 +8,20 @@ import {
   type TeamPrincipal,
   type AreaId,
   AreaKnowledgeError,
+  EnterpriseError,
+  KnowledgeShareInput,
+  type KnowledgeShareRevokeInput,
+  type KnowledgeSharing,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
+import * as SecureRandom from "effect/crypto/SecureRandom";
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
+import { stringify as stringifyYaml } from "yaml";
 import * as KnowledgeProposals from "../enterprise/KnowledgeProposals.ts";
 
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
@@ -25,6 +34,19 @@ export interface AreaKnowledgeService {
   readonly getMemberPrincipal: (email: string) => Effect.Effect<TeamPrincipal | null>;
 
   readonly graph: (principal: TeamPrincipal) => Effect.Effect<KnowledgeGraph>;
+  readonly sharing: (principal: TeamPrincipal) => Effect.Effect<KnowledgeSharing>;
+  readonly share: (
+    principal: TeamPrincipal,
+    input: KnowledgeShareInput,
+  ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
+  readonly revokeShare: (
+    principal: TeamPrincipal,
+    input: KnowledgeShareRevokeInput,
+  ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
+  readonly unpublish: (
+    principal: TeamPrincipal,
+    path: string,
+  ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
 
   readonly listDocuments: (
     principal: TeamPrincipal,
@@ -65,6 +87,8 @@ export class AreaKnowledge extends Context.Service<AreaKnowledge, AreaKnowledgeS
 
 const MAX_HITS = 20;
 const SNIPPET_CHARS = 160;
+const PERSONAL_PATH = /^personal\/([a-f0-9]{64})\/[a-z0-9][a-z0-9-]{0,79}\.md$/;
+const decodeShare = Schema.decodeUnknownEffect(KnowledgeShareInput);
 
 /** Path matches outrank headings, which outrank body text. */
 const scoreDocument = (doc: KnowledgeDocument, terms: ReadonlyArray<string>) => {
@@ -95,6 +119,8 @@ export const layer = Layer.effect(
     const proposals = yield* KnowledgeProposals.KnowledgeProposals;
 
     const repo = yield* KnowledgeRepo;
+    const random = yield* SecureRandom.SecureRandom;
+    const sharingMutex = yield* Semaphore.make(1);
 
     const principalOf = Effect.fn("AreaKnowledge.principalOf")(function* (
       email: string,
@@ -131,29 +157,230 @@ export const layer = Layer.effect(
       return member === null ? null : yield* principalOf(member.email, member.displayName, false);
     });
 
-    const readable = (principal: TeamPrincipal) =>
-      Effect.map(repo.documents, (docs) =>
-        docs.filter((doc) => canReadDocument(principal, doc.areaId)),
+    const accessFor = Effect.fn("AreaKnowledge.accessFor")(function* (principal: TeamPrincipal) {
+      const current = yield* getMemberPrincipal(principal.email);
+      const shares = yield* store.listKnowledgeShares;
+      const activeKeys = new Set(
+        (yield* store.listMembers)
+          .filter((member) => member.authorized && !member.revoked)
+          .map((member) => teamMemberKey(member.email)),
       );
+      return (doc: KnowledgeDocument) => {
+        if (!doc.id.startsWith("personal/"))
+          return canReadDocument(
+            current ?? { ...principal, isAdmin: false, areaIds: [] },
+            doc.areaId,
+          );
+        if (current === null) return false;
+        const owner = PERSONAL_PATH.exec(doc.id)?.[1];
+        if (owner === undefined) return false;
+        if (current.isAdmin) return true;
+        if (!activeKeys.has(owner)) return false;
+        const key = teamMemberKey(current.email);
+        return (
+          owner === key ||
+          shares.some(
+            (share) =>
+              share.path === doc.id &&
+              (share.kind === "member"
+                ? share.target === key
+                : current.areaIds.includes(share.target)),
+          )
+        );
+      };
+    });
+
+    const readable = Effect.fn("AreaKnowledge.readable")(function* (principal: TeamPrincipal) {
+      const canRead = yield* accessFor(principal);
+      return (yield* repo.documents).filter(canRead);
+    });
+
+    const sharing = Effect.fn("AreaKnowledge.sharing")(function* (
+      principal: TeamPrincipal,
+    ): Effect.fn.Return<KnowledgeSharing> {
+      const shares = yield* store.listKnowledgeShares;
+      const key = teamMemberKey(principal.email);
+      const member = yield* store.getMember(principal.email);
+      const areas = new Set([
+        member?.teamId,
+        ...(yield* store.listGrants(principal.email)).map((grant) => grant.areaId),
+      ]);
+      const summary = (doc: KnowledgeDocument) => ({
+        id: doc.id,
+        areaId: doc.areaId,
+        title: doc.title,
+        ...(doc.itemKind === undefined ? {} : { itemKind: doc.itemKind }),
+      });
+      const docs = (yield* readable(principal)).filter((doc) => PERSONAL_PATH.test(doc.id));
+      return {
+        sharedByMe: docs
+          .filter((doc) => PERSONAL_PATH.exec(doc.id)?.[1] === key)
+          .map((doc) => ({
+            ...summary(doc),
+            grants: shares
+              .filter((share) => share.path === doc.id)
+              .map(({ kind, target }) => ({ kind, target })),
+          })),
+        sharedWithMe: docs
+          .filter(
+            (doc) =>
+              PERSONAL_PATH.exec(doc.id)?.[1] !== key &&
+              shares.some(
+                (share) =>
+                  share.path === doc.id &&
+                  (share.kind === "member" ? share.target === key : areas.has(share.target)),
+              ),
+          )
+          .map(summary),
+      };
+    });
+
+    const ownedPersonal = Effect.fn("AreaKnowledge.ownedPersonal")(function* (
+      principal: TeamPrincipal,
+      path: string,
+    ) {
+      const owner = PERSONAL_PATH.exec(path)?.[1];
+      if (owner === undefined)
+        return yield* new EnterpriseError({
+          code: "invalid_proposal",
+          message: "Choose a personal item path: personal/<member key>/<slug>.md.",
+        });
+      const current = yield* getMemberPrincipal(principal.email);
+      if (current === null || (!current.isAdmin && teamMemberKey(current.email) !== owner))
+        return yield* new EnterpriseError({
+          code: "access_denied",
+          message: "Only the owner or an admin can manage this personal item.",
+        });
+      return { current, owner, existing: (yield* repo.documents).find((doc) => doc.id === path) };
+    });
+
+    const writePersonal = Effect.fn("AreaKnowledge.writePersonal")(function* (
+      principal: TeamPrincipal,
+      path: string,
+      content: string | null,
+      exists: boolean,
+    ) {
+      yield* repo.apply(
+        {
+          id: yield* random.uuidV4(),
+          kind: content === null ? "delete" : exists ? "update" : "create",
+          scope: "personal",
+          path,
+          ...(content === null ? {} : { content }),
+          reason: content === null ? "Unpublish personal item" : "Publish personal item copy",
+          evidence: [],
+          proposedBy: principal.email,
+          createdAt: DateTime.formatIso(yield* DateTime.now),
+          status: "pending",
+          baseContentHash: yield* repo.contentHash(path),
+          baseVersion: yield* repo.version(path),
+          targetVersion: "",
+        },
+        principal.email,
+      );
+    });
+
+    const share = Effect.fn("AreaKnowledge.share")(function* (
+      principal: TeamPrincipal,
+      raw: KnowledgeShareInput,
+    ) {
+      const input = yield* decodeShare(raw).pipe(
+        Effect.mapError(
+          () =>
+            new EnterpriseError({
+              code: "invalid_proposal",
+              message: "Invalid personal item or recipient.",
+            }),
+        ),
+      );
+      const { current, owner, existing } = yield* ownedPersonal(principal, input.path);
+      const { grantee, item } = input;
+      const recipientExists =
+        grantee.kind === "area"
+          ? (yield* store.getTeam(grantee.target)) !== null
+          : (yield* store.listMembers).some(
+              (member) =>
+                member.authorized &&
+                !member.revoked &&
+                teamMemberKey(member.email) === grantee.target,
+            );
+      if (
+        !recipientExists ||
+        (item?.kind === "skill" && item.layer !== "ai") ||
+        (item !== undefined && !item.content.trim())
+      )
+        return yield* new EnterpriseError({
+          code: "invalid_proposal",
+          message:
+            "Choose an active member or area and a nonempty personal item; skills belong to the AI layer.",
+        });
+      if (item !== undefined && teamMemberKey(current.email) !== owner)
+        return yield* new EnterpriseError({
+          code: "access_denied",
+          message: "Only the owner can publish or replace their personal item.",
+        });
+      if (!existing && item === undefined)
+        return yield* new EnterpriseError({
+          code: "document_not_found",
+          message: "Publish a personal item before sharing it.",
+        });
+      if (
+        item !== undefined &&
+        (!existing ||
+          existing.content !== item.content ||
+          existing.title !== item.title ||
+          existing.description !== item.description ||
+          existing.layer !== item.layer ||
+          existing.itemKind !== item.kind)
+      ) {
+        const content = `---\n${stringifyYaml({ title: item.title, description: item.description, area: "personal", layer: item.layer, private: true, links: [], itemKind: item.kind })}---\n${item.content}`;
+        yield* writePersonal(current, input.path, content, existing !== undefined);
+      }
+      yield* store.grantKnowledgeShare(input.path, grantee);
+      return yield* sharing(current);
+    }, sharingMutex.withPermits(1));
+
+    const revokeShare = Effect.fn("AreaKnowledge.revokeShare")(function* (
+      principal: TeamPrincipal,
+      input: KnowledgeShareRevokeInput,
+    ) {
+      const { current } = yield* ownedPersonal(principal, input.path);
+      yield* store.revokeKnowledgeShare(input.path, input.grantee);
+      return yield* sharing(current);
+    }, sharingMutex.withPermits(1));
+
+    const unpublish = Effect.fn("AreaKnowledge.unpublish")(function* (
+      principal: TeamPrincipal,
+      path: string,
+    ) {
+      const { current, existing } = yield* ownedPersonal(principal, path);
+      yield* store.revokeKnowledgeShare(path);
+      if (existing !== undefined) yield* writePersonal(current, path, null, true);
+      return yield* sharing(current);
+    }, sharingMutex.withPermits(1));
 
     const graph = Effect.fn("AreaKnowledge.graph")(function* (principal: TeamPrincipal) {
       const current = yield* getMemberPrincipal(principal.email);
       if (current === null) return { nodes: [] };
+      const canRead = yield* accessFor(current);
       return {
-        nodes: (yield* repo.documents).map((doc) => {
-          const accessible = canReadDocument(current, doc.areaId);
-          return {
-            id: doc.id,
-            areaId: doc.areaId,
-            title: doc.title,
-            description: doc.description ?? "",
-            layer: doc.layer ?? ("business" as const),
-            private: doc.private ?? doc.areaId !== GENERAL_AREA,
-            links: doc.links ?? [],
-            accessible,
-            ...(accessible ? { content: doc.content } : {}),
-          };
-        }),
+        nodes: (yield* repo.documents)
+          .filter((doc) => !doc.id.startsWith("personal/") || canRead(doc))
+          .map((doc) => {
+            const accessible = canRead(doc);
+            return {
+              id: doc.id,
+              areaId: doc.areaId,
+              title: doc.title,
+              description: doc.description ?? "",
+              layer: doc.layer ?? ("business" as const),
+              private: doc.private ?? doc.areaId !== GENERAL_AREA,
+              links: doc.links ?? [],
+              accessible,
+              ...(doc.itemKind === undefined ? {} : { itemKind: doc.itemKind }),
+              ...(accessible ? { content: doc.content } : {}),
+            };
+          }),
       };
     });
 
@@ -200,9 +427,9 @@ export const layer = Layer.effect(
         });
       }
 
-      if (!canReadDocument(principal, doc.areaId)) {
+      if (!(yield* accessFor(principal))(doc)) {
         return yield* new AreaKnowledgeError({
-          code: "access_denied",
+          code: doc.id.startsWith("personal/") ? "document_not_found" : "access_denied",
           message: "You do not have access to this document.",
         });
       }
@@ -299,6 +526,10 @@ export const layer = Layer.effect(
       getPrincipal,
       getMemberPrincipal,
       graph,
+      sharing,
+      share,
+      revokeShare,
+      unpublish,
       listDocuments,
       searchDocuments,
       readDocument,

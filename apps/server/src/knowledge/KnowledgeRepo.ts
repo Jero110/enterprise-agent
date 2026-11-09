@@ -1,6 +1,7 @@
 import {
   EnterpriseError,
   KnowledgeNodeMetadata,
+  PersonalKnowledgeKind,
   type KnowledgeDocument,
   type KnowledgeProposal,
 } from "@t3tools/contracts";
@@ -12,6 +13,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
 import { parse as parseYaml } from "yaml";
 
 import * as ServerConfig from "../config.ts";
@@ -53,6 +55,7 @@ const titleOf = (path: string, content: string): string =>
 const Frontmatter = Schema.Struct({
   title: Schema.NonEmptyString,
   area: Schema.NonEmptyString,
+  itemKind: Schema.optionalKey(PersonalKnowledgeKind),
   ...KnowledgeNodeMetadata.fields,
   links: Schema.optionalKey(Schema.Array(Schema.String)),
 });
@@ -75,6 +78,7 @@ const documentOf = (id: string, raw: string): KnowledgeDocument => {
       private: metadata.private,
       links: metadata.links ?? [],
       content: raw.slice(match[0].length),
+      ...(metadata.itemKind === undefined ? {} : { itemKind: metadata.itemKind }),
     };
   } catch {
     return fallback;
@@ -91,6 +95,7 @@ export const layer = Layer.effect(
     const digest = yield* Digest.Digest;
     const store = yield* EnterpriseStore.EnterpriseStore;
     const root = path.join(config.baseDir, "enterprise", "knowledge");
+    const mutex = yield* Semaphore.make(1);
 
     const git = (...args: ReadonlyArray<string>) =>
       runner.run({
@@ -135,6 +140,7 @@ export const layer = Layer.effect(
         .pipe(Effect.orElseSucceed(() => []));
       const paths = [
         ...(yield* markdownIn("global")).toSorted(),
+        ...(yield* markdownIn("personal")).toSorted(),
         ...(yield* Effect.forEach(teams.toSorted(), (team) => markdownIn(`areas/${team}`)))
           .flat()
           .toSorted(),
@@ -273,7 +279,7 @@ export const layer = Layer.effect(
           }),
         ),
       );
-    });
+    }, mutex.withPermits(1));
     const revert = Effect.fn("KnowledgeRepo.revert")(function* (
       proposal: KnowledgeProposal,
       approver: string,
@@ -315,7 +321,7 @@ export const layer = Layer.effect(
         );
       }
       return yield* checkedGit("rev-parse", "HEAD");
-    });
+    }, mutex.withPermits(1));
     return KnowledgeRepo.of({ documents, findApprovalCommit, contentHash, version, apply, revert });
   }),
 );

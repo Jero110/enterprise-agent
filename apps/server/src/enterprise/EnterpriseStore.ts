@@ -1,4 +1,9 @@
-import { type EnterpriseOrgChange, KnowledgeProposal, TeamMemberRole } from "@t3tools/contracts";
+import {
+  type KnowledgeShareGrantee,
+  type EnterpriseOrgChange,
+  KnowledgeProposal,
+  TeamMemberRole,
+} from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -130,6 +135,17 @@ export class EnterpriseStore extends Context.Service<
     readonly revokeArea: (email: string, areaId: string) => Effect.Effect<void>;
     readonly listGrants: (email: string) => Effect.Effect<ReadonlyArray<EnterpriseAreaGrant>>;
     readonly listAreaGrants: Effect.Effect<ReadonlyArray<EnterpriseAreaGrant>>;
+    readonly listKnowledgeShares: Effect.Effect<
+      ReadonlyArray<KnowledgeShareGrantee & { readonly path: string }>
+    >;
+    readonly grantKnowledgeShare: (
+      path: string,
+      grantee: KnowledgeShareGrantee,
+    ) => Effect.Effect<void>;
+    readonly revokeKnowledgeShare: (
+      path: string,
+      grantee?: KnowledgeShareGrantee,
+    ) => Effect.Effect<void>;
     /** Writes the changed rows of an org import in one transaction; removed people are revoked. */
     readonly applyOrg: (input: {
       readonly plan: OrgPlan;
@@ -459,6 +475,26 @@ const make = Effect.gen(function* () {
     Effect.orDie,
   );
 
+  const listKnowledgeShares = sql<
+    KnowledgeShareGrantee & { readonly path: string }
+  >`SELECT path, kind, target FROM enterprise_knowledge_shares ORDER BY path, kind, target`.pipe(
+    Effect.orDie,
+  );
+  const grantKnowledgeShare = Effect.fn("EnterpriseStore.grantKnowledgeShare")(
+    (path: string, grantee: KnowledgeShareGrantee) =>
+      sql`INSERT INTO enterprise_knowledge_shares (path, kind, target) VALUES (${path}, ${grantee.kind}, ${grantee.target}) ON CONFLICT DO NOTHING`.pipe(
+        Effect.asVoid,
+        Effect.orDie,
+      ),
+  );
+  const revokeKnowledgeShare = Effect.fn("EnterpriseStore.revokeKnowledgeShare")(
+    (path: string, grantee?: KnowledgeShareGrantee) =>
+      (grantee === undefined
+        ? sql`DELETE FROM enterprise_knowledge_shares WHERE path = ${path}`
+        : sql`DELETE FROM enterprise_knowledge_shares WHERE path = ${path} AND kind = ${grantee.kind} AND target = ${grantee.target}`
+      ).pipe(Effect.asVoid, Effect.orDie),
+  );
+
   const applyOrg: EnterpriseStore["Service"]["applyOrg"] = Effect.fn("EnterpriseStore.applyOrg")(
     function* ({ plan, actor }) {
       const changes = diff(plan, { teams: yield* listTeams, members: yield* listMembers });
@@ -571,6 +607,9 @@ const make = Effect.gen(function* () {
     listGrants,
     listAreaGrants,
     applyOrg,
+    listKnowledgeShares,
+    grantKnowledgeShare,
+    revokeKnowledgeShare,
   });
 });
 

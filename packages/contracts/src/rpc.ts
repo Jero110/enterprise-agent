@@ -51,6 +51,9 @@ import {
   ThreadContextSetInput,
 } from "./enterprise.ts";
 import {
+  KnowledgeShareInput,
+  KnowledgeShareRevokeInput,
+  KnowledgeSharing,
   KnowledgeGraph,
   KnowledgeDocument,
   KnowledgeDocumentList,
@@ -571,6 +574,10 @@ export const WS_METHODS = {
   enterpriseMembersList: "enterprise.members.list",
   enterpriseMembersAuthorize: "enterprise.members.authorize",
   enterpriseMembersRevoke: "enterprise.members.revoke",
+  enterpriseKnowledgeShare: "enterprise.knowledge.share",
+  enterpriseKnowledgeShareRevoke: "enterprise.knowledge.shareRevoke",
+  enterpriseKnowledgeUnpublish: "enterprise.knowledge.unpublish",
+  enterpriseKnowledgeSharing: "enterprise.knowledge.sharing",
   enterpriseKnowledgeGraph: "enterprise.knowledge.graph",
   enterpriseKnowledgeRequestAccess: "enterprise.knowledge.requestAccess",
   enterpriseKnowledgeList: "enterprise.knowledge.list",
@@ -1009,6 +1016,27 @@ const WsEnterpriseMembersAuthorizeRpc = Rpc.make(WS_METHODS.enterpriseMembersAut
 const WsEnterpriseMembersRevokeRpc = Rpc.make(WS_METHODS.enterpriseMembersRevoke, {
   payload: EnterpriseRevokeMemberInput,
   success: EnterpriseMembers,
+  error: enterpriseError,
+});
+
+const WsEnterpriseKnowledgeShareRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeShare, {
+  payload: KnowledgeShareInput,
+  success: KnowledgeSharing,
+  error: enterpriseError,
+});
+const WsEnterpriseKnowledgeShareRevokeRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeShareRevoke, {
+  payload: KnowledgeShareRevokeInput,
+  success: KnowledgeSharing,
+  error: enterpriseError,
+});
+const WsEnterpriseKnowledgeUnpublishRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeUnpublish, {
+  payload: KnowledgeGetInput,
+  success: KnowledgeSharing,
+  error: enterpriseError,
+});
+const WsEnterpriseKnowledgeSharingRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeSharing, {
+  payload: Schema.Struct({}),
+  success: KnowledgeSharing,
   error: enterpriseError,
 });
 
@@ -2251,6 +2279,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseMembersListRpc,
   WsEnterpriseMembersAuthorizeRpc,
   WsEnterpriseMembersRevokeRpc,
+  WsEnterpriseKnowledgeShareRpc,
+  WsEnterpriseKnowledgeShareRevokeRpc,
+  WsEnterpriseKnowledgeUnpublishRpc,
+  WsEnterpriseKnowledgeSharingRpc,
   WsEnterpriseKnowledgeGraphRpc,
   WsEnterpriseKnowledgeRequestAccessRpc,
   WsEnterpriseKnowledgeListRpc,

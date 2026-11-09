@@ -580,6 +580,18 @@ it.effect("connecting shows the identity and disconnecting clears it with the me
       expect((yield* connect)._tag).toBe("Failure");
       expect(client[WS_METHODS.enterpriseConnect]).not.toHaveBeenCalled();
       expect(registry.get(enterprise.knowledgePropose.permissionAtom(env))).toBe(false);
+      expect(registry.get(enterprise.knowledgeRequestAccess.permissionAtom(env))).toBe(false);
+      expect(registry.get(enterprise.knowledgeShare.permissionAtom(env))).toBe(false);
+      expect(registry.get(enterprise.knowledgeShareRevoke.permissionAtom(env))).toBe(false);
+      expect(registry.get(enterprise.knowledgeUnpublish.permissionAtom(env))).toBe(false);
+      expect(
+        (yield* Effect.promise(() =>
+          enterprise.knowledgeShare.run(registry, {
+            environmentId: env,
+            input: { path: "personal/owner/item.md", grantee: { kind: "area", target: "risk" } },
+          }),
+        ))._tag,
+      ).toBe("Failure");
       expect(registry.get(enterprise.proposalDecide.permissionAtom(env))).toBe(false);
       expect(registry.get(enterprise.ingestStart.permissionAtom(env))).toBe(false);
       expect(
@@ -618,6 +630,10 @@ it.effect("connecting shows the identity and disconnecting clears it with the me
 
       setAccess(true);
       expect(registry.get(enterprise.knowledgePropose.permissionAtom(env))).toBe(true);
+      expect(registry.get(enterprise.knowledgeRequestAccess.permissionAtom(env))).toBe(true);
+      expect(registry.get(enterprise.knowledgeShare.permissionAtom(env))).toBe(true);
+      expect(registry.get(enterprise.knowledgeShareRevoke.permissionAtom(env))).toBe(true);
+      expect(registry.get(enterprise.knowledgeUnpublish.permissionAtom(env))).toBe(true);
       expect(registry.get(enterprise.proposalDecide.permissionAtom(env))).toBe(true);
       expect(registry.get(enterprise.ingestStart.permissionAtom(env))).toBe(true);
       expect((yield* connect)._tag).toBe("Success");
