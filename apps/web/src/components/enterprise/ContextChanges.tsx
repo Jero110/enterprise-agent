@@ -26,10 +26,6 @@ import {
   proposalTitle,
 } from "./proposalGraph";
 
-const MAX_FILES = 20;
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_BATCH_BYTES = 35 * 1024 * 1024;
-
 const STATUS_LABELS: Record<KnowledgeProposal["status"], string> = {
   pending: "Pending",
   applied: "Applied",
@@ -68,15 +64,6 @@ function isToday(value: string | undefined): boolean {
   if (!value) return false;
   const date = new Date(value);
   return !Number.isNaN(date.getTime()) && date.toDateString() === new Date().toDateString();
-}
-
-function fileBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error(t("Could not read {name}.", { name: file.name })));
-    reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
-    reader.readAsDataURL(file);
-  });
 }
 
 function CurrentDocument({ environmentId, path }: { environmentId: EnvironmentId; path: string }) {
@@ -338,17 +325,6 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
     enterpriseEnvironment.proposalInbox({ environmentId, input: {} }),
   );
   const org = useEnvironmentQuery(enterpriseEnvironment.org({ environmentId, input: {} }));
-  const upload = useAtomCommand(enterpriseFiles.upload, {
-    label: "upload context files",
-    reportFailure: false,
-  });
-  const [scope, setScope] = useState("personal");
-  const [recipient, setRecipient] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const [fileInputKey, setFileInputKey] = useState(0);
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [graphReady, setGraphReady] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
@@ -401,74 +377,6 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
       { type: "knowledge-proposal-focus", id: `proposal:${id}` },
       "*",
     );
-  };
-  const scopes = [
-    { id: "personal", name: t("Personal") },
-    ...(org.data?.teams ?? [])
-      .filter((team) => identity?.role === "admin" || team.access !== "none")
-      .map((team) => ({ id: team.id, name: team.name })),
-    { id: "global", name: t("Company") },
-  ];
-  const submit = async () => {
-    if (busy) return;
-    if (
-      !reason.trim() ||
-      files.length === 0 ||
-      files.length > MAX_FILES ||
-      files.reduce((total, file) => total + file.size, 0) > MAX_BATCH_BYTES ||
-      files.some((file) => file.size === 0 || file.size > MAX_FILE_BYTES) ||
-      (scope === "personal" && !recipient.trim())
-    ) {
-      setError(
-        scope === "personal"
-          ? t(
-              "Select a destination and recipient, add a reason and 1–{max} nonempty files (up to 10 MiB each, 35 MiB total).",
-              { max: MAX_FILES },
-            )
-          : t(
-              "Select a destination, add a reason and 1–{max} nonempty files (up to 10 MiB each, 35 MiB total).",
-              { max: MAX_FILES },
-            ),
-      );
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const encoded = await Promise.all(
-        files.map(async (file) => ({
-          name: file.name,
-          mimeType: file.type || "application/octet-stream",
-          base64: await fileBase64(file),
-        })),
-      );
-      const result = await upload({
-        environmentId,
-        input: {
-          scope,
-          ...(scope === "personal" ? { recipient: recipient.trim() } : {}),
-          reason: reason.trim(),
-          files: encoded,
-        },
-      });
-      if (result._tag === "Failure") {
-        setError(enterpriseFailureMessage(squashAtomCommandFailure(result)));
-      } else {
-        setFiles([]);
-        setFileInputKey((value) => value + 1);
-        setReason("");
-        setSelected(result.value.id);
-        inbox.refresh();
-        toastManager.add({
-          type: "success",
-          title: t("Files staged for review"),
-          description: t("Approval does not process or add them to current context."),
-        });
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("Upload failed. Please try again."));
-    }
-    setBusy(false);
   };
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
@@ -621,69 +529,6 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           </div>
         )}
       </section>
-      <details aria-label={t("Ingest files")} className="space-y-3 rounded-xl border p-4">
-        <summary className="cursor-pointer font-medium">{t("Upload files (preview)")}</summary>
-        <p className="text-xs text-muted-foreground">
-          {t(
-            "Stage files from this device for review. Approved files await future processing and are not added to current context.",
-          )}
-        </p>
-        <label className="block text-sm">
-          {t("Destination")}{" "}
-          <select
-            aria-label={t("Destination")}
-            className="ml-2 rounded border bg-background p-1"
-            value={scope}
-            onChange={(event) => setScope(event.target.value)}
-            disabled={busy}
-          >
-            {scopes.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {scope === "personal" && (
-          <Input
-            nativeInput
-            type="email"
-            aria-label={t("Recipient email")}
-            placeholder={t("Enrolled recipient's email")}
-            value={recipient}
-            onChange={(event) => setRecipient(event.target.value)}
-            disabled={busy}
-          />
-        )}
-        <label className="block text-sm">
-          {t("Files")}{" "}
-          <input
-            className="block text-xs"
-            type="file"
-            key={fileInputKey}
-            multiple
-            disabled={busy}
-            onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
-          />
-        </label>
-        {files.length > 0 && <p className="text-xs">{files.map((file) => file.name).join(", ")}</p>}
-        <Input
-          nativeInput
-          aria-label={t("Reason for upload")}
-          placeholder={t("What should reviewers know?")}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          disabled={busy}
-        />
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        <Button size="xs" disabled={busy || files.length === 0} onClick={() => void submit()}>
-          {busy ? t("Uploading…") : t("Stage for review")}
-        </Button>
-      </details>
     </div>
   );
 }

@@ -5,7 +5,6 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import type {
-  EnterpriseOrgTeam,
   EnvironmentId,
   ServerProviderSkill,
   ThreadId,
@@ -22,8 +21,9 @@ import {
 import { t } from "~/i18n";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { cn } from "~/lib/utils";
-import { Badge } from "../ui/badge";
+import { OrganizationView } from "../enterprise/OrganizationView";
+import { IngestTab } from "../enterprise/IngestTab";
+import { SharingTab } from "../enterprise/SharingTab";
 import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { KnowledgeMap } from "../enterprise/KnowledgeMap";
@@ -63,62 +63,6 @@ function HeaderPopover(props: {
         {props.children}
       </PopoverPopup>
     </Popover>
-  );
-}
-
-const ACCESS_LABEL = { member: "Your team", granted: "Access granted", none: null } as const;
-
-function OrgTeam({ team }: { readonly team: EnterpriseOrgTeam }) {
-  const label = ACCESS_LABEL[team.access];
-  return (
-    <section
-      className={cn(
-        "rounded-lg border p-3",
-        team.access === "none" ? "border-border/60" : "border-primary/50 bg-primary/5",
-      )}
-      data-access={team.access}
-    >
-      <div className="flex items-center gap-2">
-        <h3 className="min-w-0 flex-1 truncate text-sm font-medium">{team.name}</h3>
-        {label ? <Badge variant="default">{t(label)}</Badge> : null}
-      </div>
-      <ul className="mt-2 space-y-1">
-        {team.members.map((member) => (
-          <li
-            className={cn(
-              "flex items-center gap-2 text-xs",
-              member.isMe ? "font-medium text-foreground" : "text-muted-foreground",
-            )}
-            key={`${member.displayName}:${member.role}`}
-          >
-            <span className="min-w-0 flex-1 truncate">
-              {member.displayName}
-              {member.isMe ? ` ${t("(you)")}` : ""}
-            </span>
-            <span>{t(member.role, undefined, "role")}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function OrgPanel({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const org = useEnvironmentQuery(enterpriseEnvironment.org({ environmentId, input: {} }));
-  const teams = org.data?.teams ?? [];
-  return (
-    <div className="max-h-[70dvh] w-full space-y-2 overflow-y-auto bg-popover p-3">
-      <h2 className="text-sm font-medium">{t("Organization")}</h2>
-      {org.error ? (
-        <p className="text-xs text-muted-foreground">{org.error}</p>
-      ) : teams.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          {org.isPending ? t("Loading organization…") : t("No teams yet.")}
-        </p>
-      ) : (
-        teams.map((team) => <OrgTeam key={team.id} team={team} />)
-      )}
-    </div>
   );
 }
 
@@ -180,6 +124,7 @@ function EnterpriseContextDialog(props: {
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("context");
+  const { identity } = useEnterpriseStatus();
   // Proposals this user can approve; the header shows a labeled pill and opens on that tab.
   const inbox = useEnvironmentQuery(
     enterpriseEnvironment.proposalInbox({
@@ -250,12 +195,34 @@ function EnterpriseContextDialog(props: {
                 ? t("To approve ({count})", { count: pendingCount })
                 : t("Changes", undefined, "knowledge")}
             </Tabs.Tab>
+            {identity?.role === "admin" && (
+              <Tabs.Tab
+                value="ingest"
+                render={<Button size="sm" variant={tab === "ingest" ? "secondary" : "ghost"} />}
+              >
+                {t("Ingest")}
+              </Tabs.Tab>
+            )}
+            <Tabs.Tab
+              value="sharing"
+              render={<Button size="sm" variant={tab === "sharing" ? "secondary" : "ghost"} />}
+            >
+              {t("Sharing")}
+            </Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="context" className="flex min-h-0 flex-1 flex-col">
             {open && <ContextPanel {...props} />}
           </Tabs.Panel>
           <Tabs.Panel value="changes" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             {open && <ContextChanges environmentId={props.environmentId} />}
+          </Tabs.Panel>
+          {identity?.role === "admin" && (
+            <Tabs.Panel value="ingest" className="flex min-h-0 flex-1 flex-col">
+              {open && <IngestTab environmentId={props.environmentId} />}
+            </Tabs.Panel>
+          )}
+          <Tabs.Panel value="sharing" className="flex min-h-0 flex-1 flex-col">
+            {open && <SharingTab />}
           </Tabs.Panel>
         </Tabs.Root>
       </DialogPopup>
@@ -362,7 +329,7 @@ export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(p
   return (
     <>
       <HeaderPopover icon={UsersRoundIcon} label={t("Organization")}>
-        <OrgPanel environmentId={environmentId} />
+        <OrganizationView environmentId={environmentId} />
       </HeaderPopover>
       <EnterpriseContextDialog
         key={`${environmentId}:${props.threadId}`}
