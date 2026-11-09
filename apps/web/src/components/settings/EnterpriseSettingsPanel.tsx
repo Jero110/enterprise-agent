@@ -11,6 +11,8 @@ import {
 } from "@t3tools/contracts";
 import { useState } from "react";
 
+import { t } from "~/i18n";
+
 import {
   enterpriseEnvironment,
   enterpriseFailureMessage,
@@ -35,7 +37,7 @@ export function EnterpriseSettingsPanel() {
     <SettingsPageContainer>
       <SettingsSection title="Enterprise">
         {environmentId === null || isPending ? (
-          <SettingsRow title="Loading…" role="status" />
+          <SettingsRow title={t("Loading…")} role="status" />
         ) : (
           <IdentityRows environmentId={environmentId} identity={identity} error={error} />
         )}
@@ -72,7 +74,7 @@ function IdentityRows({
       {identity ? (
         <SettingsRow
           title={`${identity.displayName} · ${identity.role}`}
-          description={`${identity.email} · ${identity.teamName ?? "No team"}`}
+          description={`${identity.email} · ${identity.teamName ?? t("No team")}`}
           control={
             <Button
               size="xs"
@@ -80,7 +82,7 @@ function IdentityRows({
               disabled={busy}
               onClick={() => void leave()}
             >
-              {busy ? "Disconnecting…" : "Disconnect"}
+              {busy ? t("Disconnecting…") : t("Disconnect")}
             </Button>
           }
         />
@@ -90,7 +92,7 @@ function IdentityRows({
           description="Connect with your work email and a one-time Enterprise invite. Nothing changes here until you do."
           control={
             <Button size="xs" onClick={() => setConnecting(true)}>
-              Connect Enterprise
+              {t("Connect Enterprise")}
             </Button>
           }
         />
@@ -113,15 +115,17 @@ function MembersSection({ environmentId }: { readonly environmentId: Environment
     <SettingsSection title="Members">
       <AuthorizeRow environmentId={environmentId} teams={members.data?.teams ?? []} />
       <details className="px-3 py-3 sm:px-4">
-        <summary className="cursor-pointer text-sm font-medium">Create an invite</summary>
+        <summary className="cursor-pointer text-sm font-medium">{t("Create an invite")}</summary>
         <InviteRow />
       </details>
       <details className="px-3 py-3 sm:px-4">
-        <summary className="cursor-pointer text-sm font-medium">Manage existing members</summary>
+        <summary className="cursor-pointer text-sm font-medium">
+          {t("Manage existing members")}
+        </summary>
         {members.error ? (
           <SettingsRow title="Could not load members" description={members.error} />
         ) : !members.data ? (
-          <SettingsRow title="Loading members…" role="status" />
+          <SettingsRow title={t("Loading members…")} role="status" />
         ) : (
           members.data.members.map((member) => (
             <MemberRow
@@ -158,12 +162,12 @@ function InviteRow() {
             setError("");
           } catch {
             setInvite("");
-            setError("Enter the hub address, pairing code and Enterprise token.");
+            setError(t("Enter the hub address, pairing code and Enterprise token."));
           }
         }}
       >
         <Input
-          aria-label="Hub address"
+          aria-label={t("Hub address")}
           value={url}
           onChange={(event) => {
             setUrl(event.target.value);
@@ -174,30 +178,30 @@ function InviteRow() {
           spellCheck={false}
         />
         <Input
-          aria-label="Hub pairing code"
+          aria-label={t("Hub pairing code")}
           value={pairingCode}
           onChange={(event) => {
             setPairingCode(event.target.value);
             setInvite("");
           }}
-          placeholder="Fresh pairing code"
+          placeholder={t("Fresh pairing code")}
           nativeInput
           spellCheck={false}
         />
         <Input
-          aria-label="Enterprise token"
+          aria-label={t("Enterprise token")}
           type="password"
           value={token}
           onChange={(event) => {
             setToken(event.target.value);
             setInvite("");
           }}
-          placeholder="Enterprise token"
+          placeholder={t("Enterprise token")}
           nativeInput
           spellCheck={false}
         />
         <Button size="xs" type="submit">
-          Create invite
+          {t("Create invite")}
         </Button>
       </form>
       {error ? (
@@ -208,7 +212,7 @@ function InviteRow() {
       {invite ? (
         <div className="mt-3 flex items-center gap-2">
           <Input
-            aria-label="Enterprise invite"
+            aria-label={t("Enterprise invite")}
             value={invite}
             readOnly
             nativeInput
@@ -219,7 +223,7 @@ function InviteRow() {
             variant="outline"
             onClick={() => void navigator.clipboard.writeText(invite)}
           >
-            Copy
+            {t("Copy")}
           </Button>
         </div>
       ) : null}
@@ -249,12 +253,14 @@ function TeamRoleControls({
           if (next !== null) onChange({ teamId: next === NO_TEAM ? null : next, role });
         }}
       >
-        <SelectTrigger size="xs" aria-label="Team">
-          <SelectValue>{teams.find((team) => team.id === teamId)?.name ?? "No team"}</SelectValue>
+        <SelectTrigger size="xs" aria-label={t("Team")}>
+          <SelectValue>
+            {teams.find((team) => team.id === teamId)?.name ?? t("No team")}
+          </SelectValue>
         </SelectTrigger>
         <SelectPopup alignItemWithTrigger={false}>
           <SelectItem value={NO_TEAM} hideIndicator>
-            No team
+            {t("No team")}
           </SelectItem>
           {teams.map((team) => (
             <SelectItem key={team.id} value={team.id} hideIndicator>
@@ -270,13 +276,13 @@ function TeamRoleControls({
           if (next !== null) onChange({ teamId, role: next as TeamMemberRole });
         }}
       >
-        <SelectTrigger size="xs" aria-label="Role">
-          <SelectValue>{role}</SelectValue>
+        <SelectTrigger size="xs" aria-label={t("Role")}>
+          <SelectValue>{t(role)}</SelectValue>
         </SelectTrigger>
         <SelectPopup alignItemWithTrigger={false}>
           {TeamMemberRole.literals.map((option) => (
             <SelectItem key={option} value={option} hideIndicator>
-              {option}
+              {t(option)}
             </SelectItem>
           ))}
         </SelectPopup>
@@ -338,12 +344,12 @@ function MemberRow({
           environmentId,
           input: { email: member.email, displayName: member.displayName, ...next },
         }),
-      "Could not update the member",
+      t("Could not update the member"),
     );
   return (
     <SettingsRow
       title={member.displayName}
-      description={member.active ? member.email : `${member.email} · revoked`}
+      description={member.active ? member.email : `${member.email} · ${t("revoked")}`}
       control={
         <div className="flex flex-wrap items-center gap-2">
           <TeamRoleControls
@@ -357,7 +363,7 @@ function MemberRow({
             disabled={busy || !canAuthorize || !member.active || member.areaIds === undefined}
             className="flex flex-wrap gap-2"
           >
-            <legend className="text-xs text-muted-foreground">Additional areas</legend>
+            <legend className="text-xs text-muted-foreground">{t("Additional areas")}</legend>
             {teams.map((team) => (
               <label key={team.id} className="flex items-center gap-1 text-xs">
                 <Checkbox
@@ -384,15 +390,15 @@ function MemberRow({
               onClick={() =>
                 void run(
                   () => revoke({ environmentId, input: { email: member.email } }),
-                  "Could not revoke the email",
+                  t("Could not revoke the email"),
                 )
               }
             >
-              Revoke
+              {t("Revoke")}
             </Button>
           ) : (
             <Button size="xs" variant="outline" disabled={busy} onClick={() => void save(member)}>
-              Authorize
+              {t("Authorize")}
             </Button>
           )}
         </div>
@@ -427,7 +433,7 @@ function AuthorizeRow({
           role: "member",
         },
       }),
-      "Could not authorize the email",
+      t("Could not authorize the email"),
     );
     setBusy(false);
     if (ok) setEmail("");
@@ -446,16 +452,16 @@ function AuthorizeRow({
         }}
       >
         <Input
-          aria-label="Email"
+          aria-label={t("Email")}
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder="email"
+          placeholder={t("email")}
           disabled={busy}
           nativeInput
           spellCheck={false}
         />
         <Button size="xs" type="submit" disabled={busy || !ready}>
-          Add member
+          {t("Add member")}
         </Button>
       </form>
     </SettingsRow>

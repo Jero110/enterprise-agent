@@ -1,4 +1,5 @@
 import type { KnowledgeProposal } from "@t3tools/contracts";
+import { t } from "~/i18n";
 
 type Team = { readonly id: string; readonly name: string };
 
@@ -18,9 +19,9 @@ export function pendingGraphNodes(
             : `area:${proposal.scope}`;
       const groupLabel =
         proposal.scope === "global"
-          ? "Company"
+          ? t("Company")
           : proposal.scope === "personal"
-            ? `Personal · ${proposal.recipient ?? proposal.proposedBy}`
+            ? t("Personal · {who}", { who: proposal.recipient ?? proposal.proposedBy })
             : (teamNames.get(proposal.scope) ?? proposal.scope);
       return {
         id: `proposal:${proposal.id}`,
@@ -29,7 +30,7 @@ export function pendingGraphNodes(
         groupLabel,
         title:
           proposal.kind === "upload"
-            ? proposal.files?.map((file) => file.name).join(", ") || "File upload"
+            ? proposal.files?.map((file) => file.name).join(", ") || t("File upload")
             : proposal.path || proposal.kind,
       };
     });

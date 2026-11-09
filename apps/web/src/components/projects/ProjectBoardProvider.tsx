@@ -2,6 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ProjectId, ProjectBoard, ProjectTask } from "@t3tools/contracts";
 import { createContext, useContext, useState, type ReactNode } from "react";
 
+import { t } from "~/i18n";
 import { randomUUID } from "~/lib/utils";
 import { useProjectBoardStore } from "~/projectBoardStore";
 import { enterpriseEnvironment } from "~/state/enterprise";
@@ -63,11 +64,11 @@ export function ProjectBoardProvider({
         saved = true;
       } else {
         setError(
-          "Could not save the board. Refresh and try again; your browser copy is preserved.",
+          t("Could not save the board. Refresh and try again; your browser copy is preserved."),
         );
       }
     } catch {
-      setError("Could not reach the server. Refresh and try again.");
+      setError(t("Could not reach the server. Refresh and try again."));
     }
     setSaving(false);
     return saved;
@@ -110,13 +111,13 @@ export function ProjectBoardProvider({
           {query.error ??
             error ??
             (saving
-              ? "Saving…"
+              ? t("Saving…")
               : query.data === null
-                ? "Loading…"
-                : "Saved on this environment · Current project")}
+                ? t("Loading…")
+                : t("Saved on this environment · Current project"))}
         </span>
         <Button variant="ghost" size="xs" onClick={query.refresh}>
-          Refresh
+          {t("Refresh")}
         </Button>
         {!imported && legacy.length > 0 && allowed && query.data !== null ? (
           <Button
@@ -134,7 +135,7 @@ export function ProjectBoardProvider({
               });
             }}
           >
-            Import browser boards into this project
+            {t("Import browser boards into this project")}
           </Button>
         ) : null}
       </div>

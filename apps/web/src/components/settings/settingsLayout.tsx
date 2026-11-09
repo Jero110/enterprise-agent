@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { SettingsGroup } from "./SettingsGroup";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
 import { usePrimaryEnvironmentId, usePrimaryEnvironment } from "../../state/environments";
@@ -222,6 +223,7 @@ export function SettingsSection({
   children: ReactNode;
 }) {
   const targetRef = useSettingsSearchTarget<HTMLElement>(sectionProps.id);
+  const shownTitle = t(title);
 
   return (
     <section
@@ -231,7 +233,7 @@ export function SettingsSection({
       className={cn(!hideTitle && "space-y-2.5", className)}
     >
       {hideTitle ? (
-        <h2 className="sr-only">{title}</h2>
+        <h2 className="sr-only">{shownTitle}</h2>
       ) : (
         <div
           data-settings-scroll-target
@@ -240,7 +242,7 @@ export function SettingsSection({
           <div className="flex min-w-0 items-center gap-1">
             <h2 className="flex min-h-7 items-center gap-2 text-base font-semibold text-foreground">
               {icon}
-              {title}
+              {shownTitle}
             </h2>
             {titleAction}
           </div>
@@ -426,7 +428,7 @@ export function SettingsRow({
     managed !== undefined && control
       ? inertControl(managed)
       : managedBy !== undefined && control
-        ? inertControl(`Managed by ${managedBy}.`)
+        ? inertControl(t("Managed by {name}.", { name: managedBy }))
         : unavailable && control
           ? inertControl(
               !canWriteSettings
@@ -439,11 +441,11 @@ export function SettingsRow({
                       : (primaryEnvironment?.label ?? "the primary environment")
                   }.`
                 : context
-                  ? "Reconnect the selected environment to change this setting."
+                  ? t("Reconnect the selected environment to change this setting.")
                   : PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE,
             )
           : environmentWide && control
-            ? inertControl("Environment-wide setting. Select an environment to change it.")
+            ? inertControl(t("Environment-wide setting. Select an environment to change it."))
             : control;
   const customized =
     context !== null &&
@@ -501,7 +503,9 @@ export function SettingsRow({
       <div className="flex flex-col gap-3 @min-[32rem]/settings-row:grid @min-[32rem]/settings-row:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)] @min-[32rem]/settings-row:items-center @min-[32rem]/settings-row:gap-8">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-h-5 items-center gap-1.5">
-            <h3 className="text-sm font-medium text-foreground">{title}</h3>
+            <h3 className="text-sm font-medium text-foreground">
+              {typeof title === "string" ? t(title) : title}
+            </h3>
             {renderedInheritance ? (
               <span
                 className={cn(
@@ -521,7 +525,7 @@ export function SettingsRow({
           </div>
           {description ? (
             <p className="max-w-2xl text-balance text-xs leading-normal text-muted-foreground">
-              {description}
+              {typeof description === "string" ? t(description) : description}
             </p>
           ) : null}
           {renderedStatus ? (
@@ -574,7 +578,7 @@ export function SettingResetButton({
           </Button>
         }
       />
-      <TooltipPopup side="top">{tooltip}</TooltipPopup>
+      <TooltipPopup side="top">{t(tooltip)}</TooltipPopup>
     </Tooltip>
   );
 }

@@ -1,3 +1,4 @@
+import { t, threadTitleForDisplay } from "~/i18n";
 import { ChildThreadApprovals } from "./chat/ChildThreadApprovals";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
@@ -259,6 +260,7 @@ import {
 import { useEnvironmentShellHasSnapshot } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
+import { DraftStarterSuggestions } from "./chat/DraftStarterSuggestions";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import {
   BranchRestoreConfirmHost,
@@ -1807,6 +1809,9 @@ export default function ChatView(props: ChatViewProps) {
     composerRef.current?.focusAtEnd();
   };
   const focusComposerStable = useStableCallback(focusComposer);
+  const insertStarterSuggestionStable = useStableCallback((prompt: string) => {
+    composerRef.current?.insertTextAtEnd(prompt);
+  });
   const canInterruptRunningThread =
     canOperateThread && deriveCanInterruptRunningThread(activeThread !== undefined, activeRuntime);
   const onInterrupt = async () => {
@@ -2474,7 +2479,7 @@ export default function ChatView(props: ChatViewProps) {
   const compactDisabled = compactThreadUnavailable;
   const compactDisabledReason = compactDisabled
     ? !canOperateThread
-      ? "This connection cannot change threads."
+      ? t("This connection cannot change threads.")
       : !activeProject
         ? "Choose a project before compacting"
         : !manualCompactionProviderAvailable
@@ -3330,7 +3335,7 @@ export default function ChatView(props: ChatViewProps) {
             {isElectron && rightPanelControlsAtRoot ? (
               <span
                 aria-hidden
-                className="pointer-events-none fixed top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] h-[var(--workspace-topbar-height)] w-28 [-webkit-app-region:no-drag]"
+                className="pointer-events-none fixed top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] h-[var(--workspace-topbar-height)] w-72 [-webkit-app-region:no-drag]"
               />
             ) : null}
             {!rightPanelControlsAtRoot && !rightPanelControlsInPanel ? panelLayoutControls : null}
@@ -3339,7 +3344,7 @@ export default function ChatView(props: ChatViewProps) {
               activeThreadEnvironmentId={activeThread.environmentId}
               activeThreadId={activeThread.id}
               isServerThread={isServerThread}
-              activeThreadTitle={activeThread.title}
+              activeThreadTitle={threadTitleForDisplay(activeThread.title)}
               activeThreadLinkOrigin={activeThreadShell?.linkOrigin?.label ?? null}
               activeProject={activeProject ?? null}
               parentThreadLink={headerParentThreadLink}
@@ -3636,17 +3641,17 @@ export default function ChatView(props: ChatViewProps) {
                               isRevertingCheckpoint={isRevertingCheckpoint}
                               sendDisabledReason={
                                 !canOperateThread
-                                  ? "This connection cannot change threads."
+                                  ? t("This connection cannot change threads.")
                                   : isEnvironmentChanging
-                                    ? "Preparing machine"
+                                    ? t("Preparing machine")
                                     : isRevertingCheckpoint
-                                      ? "Rewinding conversation"
+                                      ? t("Rewinding conversation")
                                       : feedbackUploading
-                                        ? "Sending feedback"
+                                        ? t("Sending feedback")
                                         : threadDetailLoading
-                                          ? "Messages loading"
+                                          ? t("Messages loading")
                                           : worktreeSetupBlocksSend
-                                            ? "Preparing worktree"
+                                            ? t("Preparing worktree")
                                             : projectCloneSendBlockReason
                               }
                               isPreparingWorktree={isPreparingWorktree && !sendQueuesBehindSetup}
@@ -3827,6 +3832,13 @@ export default function ChatView(props: ChatViewProps) {
                         // Out of flow, like the headline, so a notice never moves the centered composer.
                         <div className="absolute inset-x-0 top-full flex flex-col gap-1 pt-4">
                           <ComposerBannerStack items={composerBannerItems} detached />
+                        </div>
+                      ) : isDraftHeroState && !(isLocalDraftThread && activeProject === null) ? (
+                        <div className="absolute inset-x-0 top-full pt-4">
+                          <DraftStarterSuggestions
+                            draftTarget={composerDraftTarget}
+                            onPick={insertStarterSuggestionStable}
+                          />
                         </div>
                       ) : null}
                     </ComposerSurface.Shell>

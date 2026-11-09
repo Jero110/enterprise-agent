@@ -1,6 +1,9 @@
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { useState } from "react";
 
+import { APP_BASE_NAME } from "~/branding";
+import { t } from "~/i18n";
+
 import {
   hasDesktopNotifications,
   hasNotificationSound,
@@ -23,7 +26,10 @@ export function NotificationSettings() {
       {...searchableSetting("thread-notifications")}
       description={
         permissionMessage ??
-        "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while T3 Code is open."
+        t(
+          "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while {app} is open.",
+          { app: APP_BASE_NAME },
+        )
       }
       control={
         <Select
@@ -42,7 +48,9 @@ export function NotificationSettings() {
             if (hasDesktopNotifications(value)) {
               if (typeof Notification === "undefined" || !window.isSecureContext) {
                 setPermissionMessage(
-                  "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
+                  t(
+                    "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
+                  ),
                 );
                 return;
               }
@@ -51,13 +59,17 @@ export function NotificationSettings() {
               setRequesting(false);
               if (permission._tag === "Failure") {
                 setPermissionMessage(
-                  "Notifications are unavailable in this browser. Sound only is still available.",
+                  t(
+                    "Notifications are unavailable in this browser. Sound only is still available.",
+                  ),
                 );
                 return;
               }
               if (permission.value !== "granted") {
                 setPermissionMessage(
-                  "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
+                  t(
+                    "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
+                  ),
                 );
                 return;
               }
@@ -65,13 +77,17 @@ export function NotificationSettings() {
             updateSettings({ notificationMode: value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Thread notifications">
-            <SelectValue>{NOTIFICATION_MODE_LABELS[mode]}</SelectValue>
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-56"
+            aria-label={t("Thread notifications")}
+          >
+            <SelectValue>{t(NOTIFICATION_MODE_LABELS[mode])}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
             {Object.entries(NOTIFICATION_MODE_LABELS).map(([value, label]) => (
               <SelectItem key={value} hideIndicator value={value}>
-                {label}
+                {t(label)}
               </SelectItem>
             ))}
           </SelectPopup>

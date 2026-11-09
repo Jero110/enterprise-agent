@@ -7,6 +7,7 @@ import {
   enterpriseFailureMessage,
   useEnterpriseStatus,
 } from "~/state/enterprise";
+import { t } from "~/i18n";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import {
@@ -22,10 +23,22 @@ const MAX_FILES = 20;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_BATCH_BYTES = 35 * 1024 * 1024;
 
+const STATUS_LABELS: Record<KnowledgeProposal["status"], string> = {
+  pending: "Pending",
+  applied: "Applied",
+  rejected: "Rejected",
+  reverted: "Reverted",
+  "approved-awaiting-processing": "Approved, awaiting processing (not in current context)",
+};
+
+function statusLabel(status: KnowledgeProposal["status"]): string {
+  return t(STATUS_LABELS[status]);
+}
+
 function fileBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+    reader.onerror = () => reject(new Error(t("Could not read {name}.", { name: file.name })));
     reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
     reader.readAsDataURL(file);
   });
@@ -37,9 +50,9 @@ function CurrentDocument({ environmentId, path }: { environmentId: EnvironmentId
   );
   return (
     <div className="space-y-1">
-      <p>Current content</p>
+      <p>{t("Current content")}</p>
       <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs">
-        {document.error ?? document.data?.content ?? "Loading…"}
+        {document.error ?? document.data?.content ?? t("Loading…")}
       </pre>
     </div>
   );
@@ -79,7 +92,7 @@ function ProposalDetails({
     else if (!isAtomCommandInterrupted(result))
       toastManager.add({
         type: "error",
-        title: "Could not resolve proposal",
+        title: t("Could not resolve proposal"),
         description: enterpriseFailureMessage(squashAtomCommandFailure(result)),
       });
   };
@@ -94,7 +107,7 @@ function ProposalDetails({
       tab?.close();
       toastManager.add({
         type: "error",
-        title: "Could not download file",
+        title: t("Could not download file"),
         description: enterpriseFailureMessage(squashAtomCommandFailure(result)),
       });
       return;
@@ -115,7 +128,7 @@ function ProposalDetails({
   };
   return (
     <section
-      aria-label={`Proposal ${proposal.id}`}
+      aria-label={t("Proposal {id}", { id: proposal.id })}
       className="space-y-3 rounded-lg border p-4 text-sm"
     >
       <h3 className="font-medium">
@@ -125,24 +138,25 @@ function ProposalDetails({
       </h3>
       <p>
         {proposal.scope === "global"
-          ? "Company"
+          ? t("Company")
           : proposal.scope === "personal"
-            ? `Personal · ${proposal.recipient ?? proposal.proposedBy}`
-            : `Area · ${proposal.scope}`}
+            ? t("Personal · {who}", { who: proposal.recipient ?? proposal.proposedBy })
+            : t("Area · {area}", { area: proposal.scope })}
       </p>
       <p>
-        Authored by {proposal.proposedBy} ·{" "}
-        {proposal.status === "approved-awaiting-processing"
-          ? "Approved, awaiting processing (not in current context)"
-          : proposal.status}
+        {t("Authored by {who}", { who: proposal.proposedBy })} · {statusLabel(proposal.status)}
       </p>
       <p>
-        Reviewers:{" "}
+        {t("Reviewers:")}{" "}
         {proposal.reviewers?.map((reviewer) => `${reviewer.email} (${reviewer.role})`).join(", ") ||
-          "Not assigned"}
+          t("Not assigned")}
       </p>
       <p>{proposal.reason}</p>
-      {proposal.evidence.length > 0 && <p>Evidence: {proposal.evidence.join(", ")}</p>}
+      {proposal.evidence.length > 0 && (
+        <p>
+          {t("Evidence:")} {proposal.evidence.join(", ")}
+        </p>
+      )}
       {proposal.path &&
         proposal.kind !== "upload" &&
         proposal.kind !== "create" &&
@@ -157,19 +171,26 @@ function ProposalDetails({
       {proposal.files?.map((file) => (
         <div key={file.id} className="flex gap-2">
           <Button size="xs" variant="outline" onClick={() => void save(file)}>
-            Download {file.name} ({Math.ceil(file.sizeBytes / 1024)} KiB)
+            {t("Download {name} ({size} KiB)", {
+              name: file.name,
+              size: Math.ceil(file.sizeBytes / 1024),
+            })}
           </Button>
           {file.mimeType === "application/pdf" && (
             <Button size="xs" variant="outline" onClick={() => void save(file, true)}>
-              Preview PDF
+              {t("Preview PDF")}
             </Button>
           )}
         </div>
       ))}
-      {proposal.rejectionReason && <p>Rejected: {proposal.rejectionReason}</p>}
+      {proposal.rejectionReason && (
+        <p>
+          {t("Rejected:")} {proposal.rejectionReason}
+        </p>
+      )}
       {proposal.resolvedBy && (
         <p>
-          Resolved by {proposal.resolvedBy} · {proposal.resolvedAt}
+          {t("Resolved by {who}", { who: proposal.resolvedBy })} · {proposal.resolvedAt}
         </p>
       )}
       {proposal.status === "applied" &&
@@ -181,20 +202,20 @@ function ProposalDetails({
             disabled={busy}
             onClick={() => void resolve("revert")}
           >
-            Revert
+            {t("Revert")}
           </Button>
         )}
       {proposal.status === "pending" && proposal.canDecide === true && permission && (
         <div className="flex flex-wrap items-center gap-2">
           <Button size="xs" disabled={busy} onClick={() => void resolve("approve")}>
-            Approve
+            {t("Approve")}
           </Button>
           <Input
             nativeInput
-            aria-label="Rejection reason"
+            aria-label={t("Rejection reason")}
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            placeholder="Reason for rejection"
+            placeholder={t("Reason for rejection")}
             disabled={busy}
           />
           <Button
@@ -203,7 +224,7 @@ function ProposalDetails({
             disabled={busy || !reason.trim()}
             onClick={() => void resolve("reject")}
           >
-            Reject
+            {t("Reject")}
           </Button>
         </div>
       )}
@@ -238,7 +259,7 @@ function ProposalList({
           {proposal.kind === "upload"
             ? proposal.files?.map((file) => file.name).join(", ")
             : proposal.path || proposal.kind}{" "}
-          · {proposal.status} · {proposal.proposedBy}
+          · {statusLabel(proposal.status)} · {proposal.proposedBy}
         </button>
       ))}
     </div>
@@ -308,11 +329,11 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
     );
   };
   const scopes = [
-    { id: "personal", name: "Personal" },
+    { id: "personal", name: t("Personal") },
     ...(org.data?.teams ?? [])
       .filter((team) => identity?.role === "admin" || team.access !== "none")
       .map((team) => ({ id: team.id, name: team.name })),
-    { id: "global", name: "Company" },
+    { id: "global", name: t("Company") },
   ];
   const submit = async () => {
     if (busy) return;
@@ -325,7 +346,15 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
       (scope === "personal" && !recipient.trim())
     ) {
       setError(
-        `Select a destination${scope === "personal" ? " and recipient" : ""}, add a reason and 1–${MAX_FILES} nonempty files (up to 10 MiB each, 35 MiB total).`,
+        scope === "personal"
+          ? t(
+              "Select a destination and recipient, add a reason and 1–{max} nonempty files (up to 10 MiB each, 35 MiB total).",
+              { max: MAX_FILES },
+            )
+          : t(
+              "Select a destination, add a reason and 1–{max} nonempty files (up to 10 MiB each, 35 MiB total).",
+              { max: MAX_FILES },
+            ),
       );
       return;
     }
@@ -358,36 +387,36 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
         inbox.refresh();
         toastManager.add({
           type: "success",
-          title: "Files staged for review",
-          description: "Approval does not process or add them to current context.",
+          title: t("Files staged for review"),
+          description: t("Approval does not process or add them to current context."),
         });
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Upload failed. Please try again.");
+      setError(cause instanceof Error ? cause.message : t("Upload failed. Please try again."));
     }
     setBusy(false);
   };
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
       <section
-        aria-label="Pending context changes"
+        aria-label={t("Pending context changes")}
         className="overflow-hidden rounded-xl border bg-background"
       >
         <div className="grid lg:grid-cols-[minmax(0,1fr)_230px]">
           <iframe
             ref={frame}
-            title="Interactive context changes graph"
+            title={t("Interactive context changes graph")}
             sandbox="allow-scripts"
             src="/context-graph/index.html"
             className="h-[470px] w-full border-0"
           />
           <aside
-            aria-label="Pending proposals by scope"
+            aria-label={t("Pending proposals by scope")}
             className="max-h-[470px] space-y-3 overflow-y-auto border-t p-4 lg:border-t-0 lg:border-l"
           >
             {graphGroups.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                {inbox.data ? "No pending changes" : "Loading proposals…"}
+                {inbox.data ? t("No pending changes") : t("Loading proposals…")}
               </p>
             )}
             {graphGroups.map(([groupId, groupLabel]) => (
@@ -419,16 +448,17 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           refresh={inbox.refresh}
         />
       )}
-      <section aria-label="Ingest files" className="space-y-3 rounded-xl border p-4">
-        <h2 className="font-medium">Ingest files</h2>
+      <section aria-label={t("Ingest files")} className="space-y-3 rounded-xl border p-4">
+        <h2 className="font-medium">{t("Ingest files")}</h2>
         <p className="text-xs text-muted-foreground">
-          Stage files from this device for review. Approved files await future processing and are
-          not added to current context.
+          {t(
+            "Stage files from this device for review. Approved files await future processing and are not added to current context.",
+          )}
         </p>
         <label className="block text-sm">
-          Destination{" "}
+          {t("Destination")}{" "}
           <select
-            aria-label="Destination"
+            aria-label={t("Destination")}
             className="ml-2 rounded border bg-background p-1"
             value={scope}
             onChange={(event) => setScope(event.target.value)}
@@ -445,15 +475,15 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           <Input
             nativeInput
             type="email"
-            aria-label="Recipient email"
-            placeholder="Enrolled recipient's email"
+            aria-label={t("Recipient email")}
+            placeholder={t("Enrolled recipient's email")}
             value={recipient}
             onChange={(event) => setRecipient(event.target.value)}
             disabled={busy}
           />
         )}
         <label className="block text-sm">
-          Files{" "}
+          {t("Files")}{" "}
           <input
             className="block text-xs"
             type="file"
@@ -466,8 +496,8 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
         {files.length > 0 && <p className="text-xs">{files.map((file) => file.name).join(", ")}</p>}
         <Input
           nativeInput
-          aria-label="Reason for upload"
-          placeholder="What should reviewers know?"
+          aria-label={t("Reason for upload")}
+          placeholder={t("What should reviewers know?")}
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           disabled={busy}
@@ -478,26 +508,26 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           </p>
         )}
         <Button size="xs" disabled={busy || files.length === 0} onClick={() => void submit()}>
-          {busy ? "Uploading…" : "Stage for review"}
+          {busy ? t("Uploading…") : t("Stage for review")}
         </Button>
       </section>
-      <section aria-label="Context changes history" className="space-y-2">
+      <section aria-label={t("Context changes history")} className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="font-medium">Authored, assigned and history</h2>
+          <h2 className="font-medium">{t("Authored, assigned and history")}</h2>
           <Button size="xs" variant="outline" onClick={inbox.refresh}>
-            Refresh
+            {t("Refresh")}
           </Button>
         </div>
         {inbox.error ? (
           <p role="alert">{inbox.error}</p>
         ) : !inbox.data ? (
-          <p role="status">Loading proposals…</p>
+          <p role="status">{t("Loading proposals…")}</p>
         ) : proposals.length === 0 ? (
-          <p>No proposals yet.</p>
+          <p>{t("No proposals yet.")}</p>
         ) : (
           <div className="space-y-4">
             <ProposalList
-              title="Assigned to you"
+              title={t("Assigned to you")}
               proposals={pending.filter((proposal) =>
                 proposal.reviewers?.some((reviewer) => reviewer.email === identity?.email),
               )}
@@ -505,13 +535,13 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
               onSelect={selectProposal}
             />
             <ProposalList
-              title="Authored by you"
+              title={t("Authored by you")}
               proposals={pending.filter((proposal) => proposal.proposedBy === identity?.email)}
               selected={selected}
               onSelect={selectProposal}
             />
             <ProposalList
-              title="History"
+              title={t("History")}
               proposals={proposals.filter((proposal) => proposal.status !== "pending")}
               selected={selected}
               onSelect={selectProposal}

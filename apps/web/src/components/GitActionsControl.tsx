@@ -112,6 +112,7 @@ import { getSourceControlPresentation, sourceControlIcon } from "~/sourceControl
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { useOpenLink } from "~/browser/useOpenLink";
+import { t } from "~/i18n";
 
 interface GitActionsControlProps {
   gitCwd: string | null;
@@ -1111,9 +1112,9 @@ export default function GitActionsControl({
     hasPrimaryRemote,
   );
   const quickActionDisabledReason = !canWriteSourceControl
-    ? "This connection cannot change source control."
+    ? t("This connection cannot change source control.")
     : quickAction.disabled
-      ? (quickAction.hint ?? "This action is currently unavailable.")
+      ? t(quickAction.hint ?? "This action is currently unavailable.")
       : null;
   const gitActionProgress = resolveGitActionProgressPresentation(vcsActionState);
   // A fresh draft or a thread with no turns hides commit, push, and diff rows until there is work.
@@ -1323,8 +1324,8 @@ export default function GitActionsControl({
     if (quickAction.kind === "show_hint") {
       toastManager.add({
         type: "info",
-        title: quickAction.label,
-        description: quickAction.hint,
+        title: t(quickAction.label),
+        description: quickAction.hint ? t(quickAction.hint) : quickAction.hint,
         data: threadToastData,
       });
       return;
@@ -1429,11 +1430,11 @@ export default function GitActionsControl({
               >
                 <MenuItem className="w-full" disabled>
                   <GitActionItemIcon icon={item.icon} SourceControlIcon={SourceControlIcon} />
-                  <MenuItemLabel>{item.label}</MenuItemLabel>
+                  <MenuItemLabel>{t(item.label)}</MenuItemLabel>
                 </MenuItem>
               </PopoverTrigger>
               <PopoverPopup tooltipStyle side="left" align="center">
-                {disabledReason}
+                {t(disabledReason)}
               </PopoverPopup>
             </Popover>
           );
@@ -1448,7 +1449,7 @@ export default function GitActionsControl({
             }}
           >
             <GitActionItemIcon icon={item.icon} SourceControlIcon={SourceControlIcon} />
-            <MenuItemLabel>{item.label}</MenuItemLabel>
+            <MenuItemLabel>{t(item.label)}</MenuItemLabel>
           </MenuItem>
         );
       })}
@@ -1460,7 +1461,7 @@ export default function GitActionsControl({
           }}
         >
           <CloudUploadIcon />
-          <MenuItemLabel>Publish repository...</MenuItemLabel>
+          <MenuItemLabel>{t("Publish repository...")}</MenuItemLabel>
         </MenuItem>
       ) : null}
       {gitStatusForActions?.refName === null && (
@@ -1474,7 +1475,9 @@ export default function GitActionsControl({
         !gitStatusForActions.hasWorkingTreeChanges &&
         gitStatusForActions.behindCount > 0 &&
         gitStatusForActions.aheadCount === 0 && (
-          <p className="px-2 py-1.5 text-xs text-warning">Behind upstream. Pull/rebase first.</p>
+          <p className="px-2 py-1.5 text-xs text-warning">
+            {t("Behind upstream. Pull/rebase first.")}
+          </p>
         )}
       {gitStatusError && <p className="px-2 py-1.5 text-xs text-destructive">{gitStatusError}</p>}
     </>
@@ -1495,13 +1498,13 @@ export default function GitActionsControl({
         >
           <GitBranchPlusIcon className="size-3.5" aria-hidden />
           <span className={cn("ml-0.5", THREAD_DETAILS_PANEL_LABEL_CLASS)}>
-            {initAction.isPending ? "Initializing..." : "Initialize Git"}
+            {initAction.isPending ? t("Initializing...") : t("Initialize Git")}
           </span>
         </ThreadDetailsControl>
       ) : quietEmptyDraft || (compact && !gitActionProgress && !visibleInlineSuccess) ? null : (
         <div
           role="group"
-          aria-label="Git actions"
+          aria-label={t("Git actions")}
           ref={panelAnchorRef}
           className={cn(
             "shrink-0",
@@ -1554,7 +1557,7 @@ export default function GitActionsControl({
                     cn("not-sr-only ml-0 truncate", THREAD_DETAILS_PANEL_LABEL_CLASS),
                   )}
                 >
-                  {quickAction.label}
+                  {t(quickAction.label)}
                 </span>
               </PopoverTrigger>
               <PopoverPopup tooltipStyle side="bottom" align="start">
@@ -1581,7 +1584,7 @@ export default function GitActionsControl({
                   cn("not-sr-only ml-0 truncate", THREAD_DETAILS_PANEL_LABEL_CLASS),
                 )}
               >
-                {quickAction.label}
+                {t(quickAction.label)}
               </span>
             </ThreadDetailsControl>
           )}
@@ -1603,7 +1606,8 @@ export default function GitActionsControl({
                 <MenuTrigger
                   render={
                     <ThreadDetailsControl
-                      aria-label="Git action options"
+                      aria-label={t("Git action options")}
+                      title={t("Git action options")}
                       size="sm"
                       variant="ghost"
                       part="secondary"
@@ -1636,7 +1640,9 @@ export default function GitActionsControl({
           onClick={onOpenChanges}
         >
           <FileDiffIcon className={THREAD_DETAILS_PANEL_ICON_CLASS} aria-hidden />
-          <span className={cn("flex-1 text-left", THREAD_DETAILS_PANEL_LABEL_CLASS)}>Changes</span>
+          <span className={cn("flex-1 text-left", THREAD_DETAILS_PANEL_LABEL_CLASS)}>
+            {t("Changes")}
+          </span>
           <span className="flex items-center gap-1.5 font-mono text-xs tabular-nums">
             <span
               className={
@@ -1669,18 +1675,20 @@ export default function GitActionsControl({
       >
         <DialogPopup>
           <DialogHeader>
-            <DialogTitle>{COMMIT_DIALOG_TITLE}</DialogTitle>
-            <DialogDescription>{COMMIT_DIALOG_DESCRIPTION}</DialogDescription>
+            <DialogTitle>{t(COMMIT_DIALOG_TITLE)}</DialogTitle>
+            <DialogDescription>{t(COMMIT_DIALOG_DESCRIPTION)}</DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <div className="space-y-3 rounded-xl bg-zinc-25 p-3 text-sm ring-1 ring-black/5 dark:bg-white/[0.035] dark:ring-white/5">
               <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1">
-                <span className="text-muted-foreground">Branch</span>
+                <span className="text-muted-foreground">{t("Branch")}</span>
                 <span className="flex items-center justify-between gap-2">
                   <span className="font-medium">
                     {gitStatusForActions?.refName ?? "(detached HEAD)"}
                   </span>
-                  {isDefaultRef && <span className="text-right text-warning">Default branch</span>}
+                  {isDefaultRef && (
+                    <span className="text-right text-warning">{t("Default branch")}</span>
+                  )}
                 </span>
               </div>
               <div className="space-y-1">
@@ -1697,7 +1705,7 @@ export default function GitActionsControl({
                         }}
                       />
                     )}
-                    <span className="text-muted-foreground">Files</span>
+                    <span className="text-muted-foreground">{t("Files")}</span>
                     {!allSelected && !isEditingFiles && (
                       <span className="text-muted-foreground">
                         ({selectedFiles.length} of {allFiles.length})
@@ -1710,7 +1718,7 @@ export default function GitActionsControl({
                       size="xs"
                       onClick={() => setIsEditingFiles((prev) => !prev)}
                     >
-                      {isEditingFiles ? "Done" : "Edit"}
+                      {isEditingFiles ? t("Done") : t("Edit")}
                     </Button>
                   )}
                 </div>
@@ -1748,7 +1756,7 @@ export default function GitActionsControl({
                                   type="button"
                                   className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left enabled:cursor-pointer"
                                   disabled={!canOperateThread || workingTreeRoot === null}
-                                  aria-label={`Open ${file.path} in editor`}
+                                  aria-label={t("Open {path} in editor", { path: file.path })}
                                   onClick={() => openChangedFileInEditor(file.path)}
                                 >
                                   <StartTruncatedPath
@@ -1757,7 +1765,7 @@ export default function GitActionsControl({
                                   />
                                   <span className="shrink-0">
                                     {isExcluded ? (
-                                      <span className="text-muted-foreground">Excluded</span>
+                                      <span className="text-muted-foreground">{t("Excluded")}</span>
                                     ) : (
                                       <>
                                         <span className="text-diff-addition">
@@ -1791,11 +1799,11 @@ export default function GitActionsControl({
               </div>
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium">Commit message (optional)</p>
+              <p className="text-sm font-medium">{t("Commit message (optional)")}</p>
               <Textarea
                 value={dialogCommitMessage}
                 onChange={(event) => setDialogCommitMessage(event.target.value)}
-                placeholder="Leave empty to auto-generate"
+                placeholder={t("Leave empty to auto-generate")}
                 size="sm"
               />
             </div>
@@ -1811,7 +1819,7 @@ export default function GitActionsControl({
                 setIsEditingFiles(false);
               }}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               variant="outline"
@@ -1819,14 +1827,14 @@ export default function GitActionsControl({
               disabled={!canChangeThreadBranch || noneSelected}
               onClick={runDialogActionOnNewBranch}
             >
-              Commit on new branch
+              {t("Commit on new branch")}
             </Button>
             <Button
               size="sm"
               disabled={!canWriteSourceControl || noneSelected}
               onClick={runDialogAction}
             >
-              Commit
+              {t("Commit")}
             </Button>
           </DialogFooter>
         </DialogPopup>

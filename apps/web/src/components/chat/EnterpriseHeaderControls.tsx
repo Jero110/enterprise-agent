@@ -19,6 +19,7 @@ import {
   enterpriseFailureMessage,
   useEnterpriseStatus,
 } from "~/state/enterprise";
+import { t } from "~/i18n";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { cn } from "~/lib/utils";
@@ -79,7 +80,7 @@ function OrgTeam({ team }: { readonly team: EnterpriseOrgTeam }) {
     >
       <div className="flex items-center gap-2">
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium">{team.name}</h3>
-        {label ? <Badge variant="info">{label}</Badge> : null}
+        {label ? <Badge variant="info">{t(label)}</Badge> : null}
       </div>
       <ul className="mt-2 space-y-1">
         {team.members.map((member) => (
@@ -92,7 +93,7 @@ function OrgTeam({ team }: { readonly team: EnterpriseOrgTeam }) {
           >
             <span className="min-w-0 flex-1 truncate">
               {member.displayName}
-              {member.isMe ? " (you)" : ""}
+              {member.isMe ? ` ${t("(you)")}` : ""}
             </span>
             <span>{member.role}</span>
           </li>
@@ -107,12 +108,12 @@ function OrgPanel({ environmentId }: { readonly environmentId: EnvironmentId }) 
   const teams = org.data?.teams ?? [];
   return (
     <div className="max-h-[70dvh] w-full space-y-2 overflow-y-auto bg-popover p-3">
-      <h2 className="text-sm font-medium">Organization</h2>
+      <h2 className="text-sm font-medium">{t("Organization")}</h2>
       {org.error ? (
         <p className="text-xs text-muted-foreground">{org.error}</p>
       ) : teams.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          {org.isPending ? "Loading organization…" : "No teams yet."}
+          {org.isPending ? t("Loading organization…") : t("No teams yet.")}
         </p>
       ) : (
         teams.map((team) => <OrgTeam key={team.id} team={team} />)
@@ -153,7 +154,7 @@ function ContextPanel(props: {
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add({
         type: "error",
-        title: "Could not change this conversation's knowledge",
+        title: t("Could not change this conversation's knowledge"),
         description: enterpriseFailureMessage(squashAtomCommandFailure(result)),
       });
     }
@@ -187,7 +188,7 @@ function EnterpriseContextDialog(props: {
             <Button
               size="icon"
               variant="ghost"
-              aria-label="Conversation context and changes"
+              aria-label={t("Conversation context and changes")}
               aria-haspopup="dialog"
               aria-expanded={open}
               data-pressed={open ? "" : undefined}
@@ -198,16 +199,16 @@ function EnterpriseContextDialog(props: {
         >
           <BrainCircuitIcon className="size-5" />
         </TooltipTrigger>
-        <TooltipPopup side="bottom">Conversation context and changes</TooltipPopup>
+        <TooltipPopup side="bottom">{t("Conversation context and changes")}</TooltipPopup>
       </Tooltip>
       <DialogPopup
         className="flex h-[min(840px,90dvh)] w-[min(1050px,94vw)] max-w-none flex-col overflow-hidden"
         bottomStickOnMobile={false}
       >
         <div className="shrink-0 border-b border-border/60 px-8 py-5">
-          <DialogTitle>Conversation context</DialogTitle>
+          <DialogTitle>{t("Conversation context")}</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Knowledge for this conversation, pending proposals and review history.
+            {t("Knowledge for this conversation, pending proposals and review history.")}
           </p>
         </div>
         <Tabs.Root
@@ -215,18 +216,21 @@ function EnterpriseContextDialog(props: {
           onValueChange={(value) => setTab(String(value))}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <Tabs.List aria-label="Conversation knowledge" className="flex shrink-0 gap-2 px-8 py-3">
+          <Tabs.List
+            aria-label={t("Conversation knowledge")}
+            className="flex shrink-0 gap-2 px-8 py-3"
+          >
             <Tabs.Tab
               value="context"
               render={<Button size="sm" variant={tab === "context" ? "secondary" : "ghost"} />}
             >
-              Context
+              {t("Context")}
             </Tabs.Tab>
             <Tabs.Tab
               value="changes"
               render={<Button size="sm" variant={tab === "changes" ? "secondary" : "ghost"} />}
             >
-              Changes
+              {t("Changes", undefined, "knowledge")}
             </Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="context" className="flex min-h-0 flex-1 flex-col">
@@ -251,7 +255,7 @@ export function EnterpriseShareControl({
   const { environmentId: queryEnvironmentId, identity } = useEnterpriseStatus();
   if (queryEnvironmentId === null || identity === null) return null;
   return (
-    <HeaderPopover icon={UsersIcon} label="Share with team">
+    <HeaderPopover icon={UsersIcon} label={t("Share with team")}>
       <SharePanel
         environmentId={environmentId}
         queryEnvironmentId={queryEnvironmentId}
@@ -293,16 +297,16 @@ function SharePanel(props: {
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add({
         type: "error",
-        title: "Could not update sharing",
+        title: t("Could not update sharing"),
         description: enterpriseFailureMessage(squashAtomCommandFailure(result)),
       });
     }
   };
   return (
     <div className="w-full space-y-3 bg-popover p-3">
-      <h2 className="text-sm font-medium">Share with your team</h2>
+      <h2 className="text-sm font-medium">{t("Share with your team")}</h2>
       <RadioGroup
-        aria-label="Team sharing"
+        aria-label={t("Team sharing")}
         disabled={!canPublish}
         value={summary?.publicationStatus ?? "unpublished"}
         onValueChange={(value) => void change(value as "unpublished" | "read-only")}
@@ -310,18 +314,18 @@ function SharePanel(props: {
         <label className="flex items-start gap-2 text-sm">
           <Radio value="unpublished" />
           <span>
-            Not shared
+            {t("Not shared")}
             <span className="block text-xs text-muted-foreground">
-              Only you can see this conversation.
+              {t("Only you can see this conversation.")}
             </span>
           </span>
         </label>
         <label className="flex items-start gap-2 text-sm">
           <Radio value="read-only" />
           <span>
-            Team readable
+            {t("Team readable")}
             <span className="block text-xs text-muted-foreground">
-              Your team can read this conversation and its subagents. Stop sharing any time.
+              {t("Your team can read this conversation and its subagents. Stop sharing any time.")}
             </span>
           </span>
         </label>
@@ -339,7 +343,7 @@ export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(p
   if (environmentId === null || identity === null) return null;
   return (
     <>
-      <HeaderPopover icon={UsersRoundIcon} label="Organization">
+      <HeaderPopover icon={UsersRoundIcon} label={t("Organization")}>
         <OrgPanel environmentId={environmentId} />
       </HeaderPopover>
       <EnterpriseContextDialog

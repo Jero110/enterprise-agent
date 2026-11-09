@@ -86,6 +86,8 @@ import {
   TimelineRowTimestamp,
 } from "./TimelineRowParts";
 import { UserMessageContextReferenceChip } from "./UserMessageContextChips";
+import { t } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import {
   resolvePreviewAnnotationImage,
   userMessageFileLabel,
@@ -120,7 +122,7 @@ function UserFileCard({
         </span>
         <span className="block text-xs text-muted-foreground tabular-nums">
           {file.downloadable === false ? (
-            "Sending…"
+            t("Sending…")
           ) : (
             <>
               {!pastedText && `${extension} · `}
@@ -139,7 +141,12 @@ function UserFileCard({
       {file.downloadable === false ? (
         <>
           <div className="flex min-w-0 flex-1 items-center gap-3">{identity}</div>
-          <Button size="icon-xs" variant="ghost-muted" disabled aria-label="Sending attachment">
+          <Button
+            size="icon-xs"
+            variant="ghost-muted"
+            disabled
+            aria-label={t("Sending attachment")}
+          >
             <DownloadIcon />
           </Button>
         </>
@@ -147,7 +154,7 @@ function UserFileCard({
         <>
           <button
             type="button"
-            aria-label={`Preview ${label}`}
+            aria-label={t("Preview {name}", { name: label })}
             onClick={() => ctx.onFileOpen(file)}
             className="group/file focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
           >
@@ -159,7 +166,7 @@ function UserFileCard({
                 <Button
                   size="icon-xs"
                   variant="ghost-muted"
-                  aria-label={`Download ${label}`}
+                  aria-label={t("Download {name}", { name: label })}
                   onClick={() => ctx.onFileDownload(file)}
                 />
               }
@@ -304,10 +311,10 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
           expanded && "w-full",
         )}
       >
-        <MessageAuthorHeading>Automation</MessageAuthorHeading>
+        <MessageAuthorHeading>{t("Automation")}</MessageAuthorHeading>
         <FoldedMessageHeader
           icon={CalendarClockIcon}
-          label="Automation"
+          label={t("Automation")}
           summary={summary}
           expanded={expanded}
           onToggle={() => setExpanded((value) => !value)}
@@ -350,7 +357,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
               {promptLink !== null && (
                 <MessageCopyButton
                   text={promptLink}
-                  label="Copy prompt link"
+                  label={t("Copy prompt link")}
                   icon={LinkIconNode}
                   variant="ghost"
                 />
@@ -717,7 +724,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
               <button
                 type="button"
                 className="block h-full w-full cursor-zoom-in"
-                aria-label={`Preview ${image.name}`}
+                aria-label={t("Preview {name}", { name: image.name })}
                 onClick={() => {
                   const preview = buildExpandedImagePreview(regularImages, image.id);
                   if (!preview) return;
@@ -814,7 +821,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         {promptLink !== null && (
           <MessageCopyButton
             text={promptLink}
-            label="Copy prompt link"
+            label={t("Copy prompt link")}
             icon={LinkIconNode}
             variant="ghost"
           />
@@ -832,7 +839,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           className="me-1 text-2xs text-muted-foreground/70"
           data-user-message-attribution="t3code"
         >
-          Sent by T3 Code
+          {t("Sent by {name}", { name: APP_BASE_NAME })}
         </p>
       ) : null}
       {/* The row's heading already names the guest for screen readers. */}
@@ -849,7 +856,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
       {mediaAboveText ? (
         <div className="flex max-w-[80%] justify-end">
           {/* The heading leads the media so screen readers reach it before the images. */}
-          <MessageAuthorHeading>You</MessageAuthorHeading>
+          <MessageAuthorHeading>{t("You")}</MessageAuthorHeading>
           {mediaBlock}
         </div>
       ) : null}
@@ -947,7 +954,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                         <span className="block truncate">{label}</span>
                         {file.downloadable === false || pastedText ? (
                           <span className="block text-xs text-muted-foreground tabular-nums">
-                            {file.downloadable === false ? "Sending…" : formatBytes(file.sizeBytes)}
+                            {file.downloadable === false
+                              ? t("Sending…")
+                              : formatBytes(file.sizeBytes)}
                           </span>
                         ) : null}
                       </span>
@@ -958,7 +967,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                       <div key={file.id} className="flex min-w-0 items-center gap-1">
                         <button
                           type="button"
-                          aria-label={`Preview ${label}`}
+                          aria-label={t("Preview {name}", { name: label })}
                           onClick={() => ctx.onFileOpen(file)}
                           className="focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 text-left text-sm hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
                         >
@@ -971,7 +980,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                               <Button
                                 size="icon-xs"
                                 variant="ghost-muted"
-                                aria-label={`Download ${label}`}
+                                aria-label={t("Download {name}", { name: label })}
                                 onClick={() => ctx.onFileDownload(file)}
                               />
                             }
@@ -1061,12 +1070,12 @@ function UserMessageIntentMarker({
         }
       >
         <Redo2Icon aria-hidden="true" className="size-3" />
-        Steer
+        {t("Steer", undefined, "badge")}
       </TooltipTrigger>
       <TooltipPopup side="top">
         {intent === "promoted_queued_to_steer"
-          ? "Originally queued, then promoted to steer the active turn"
-          : "Steered the active turn"}
+          ? t("Originally queued, then promoted to steer the active turn")
+          : t("Steered the active turn")}
       </TooltipPopup>
     </Tooltip>
   );
@@ -1092,13 +1101,13 @@ function RevertUserMessageButton({
             variant="ghost"
             disabled={activity.isRevertingCheckpoint || activity.isWorking}
             onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
-            aria-label="Edit from here"
+            aria-label={t("Edit from here")}
           />
         }
       >
         <PencilIcon className="size-3" />
       </TooltipTrigger>
-      <TooltipPopup side="top">Edit from here</TooltipPopup>
+      <TooltipPopup side="top">{t("Edit from here")}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -1164,7 +1173,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
               onClick={() => setExpanded((value) => !value)}
               className="-ml-1"
             >
-              {expanded ? "Show less" : "Show full message"}
+              {expanded ? t("Show less") : t("Show full message")}
             </Button>
           ) : null}
         </div>

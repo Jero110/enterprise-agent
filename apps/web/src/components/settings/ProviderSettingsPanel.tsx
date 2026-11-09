@@ -1,5 +1,6 @@
 import { SettingsGroup } from "./SettingsGroup";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
+import { t } from "~/i18n";
 import {
   AuthSettingsWriteScope,
   AuthProvidersManageScope,
@@ -1000,13 +1001,13 @@ export function EnvironmentProviderSettings({
                     size="icon-xs"
                     variant="ghost-muted"
                     onClick={() => setIsAddInstanceDialogOpen(true)}
-                    aria-label="Add provider"
+                    aria-label={t("Add provider")}
                   >
                     <PlusIcon />
                   </Button>
                 }
               />
-              <TooltipPopup side="top">Add provider</TooltipPopup>
+              <TooltipPopup side="top">{t("Add provider")}</TooltipPopup>
             </Tooltip>
           ) : null
         }
@@ -1025,10 +1026,10 @@ export function EnvironmentProviderSettings({
                     onClick={() => void refreshProviders()}
                   >
                     <RefreshIcon refreshing={isRefreshingProviders} />
-                    <span className="sr-only">Refresh provider status</span>
+                    <span className="sr-only">{t("Refresh provider status")}</span>
                     <span className="hidden min-w-0 truncate sm:inline">
                       {isRefreshingProviders ? (
-                        "Refreshing providers"
+                        t("Refreshing providers")
                       ) : (
                         <ProviderLastChecked environmentId={environmentId} />
                       )}
@@ -1036,7 +1037,7 @@ export function EnvironmentProviderSettings({
                   </Button>
                 }
               />
-              <TooltipPopup side="top">Refresh provider status</TooltipPopup>
+              <TooltipPopup side="top">{t("Refresh provider status")}</TooltipPopup>
             </Tooltip>
           </div>
         }
@@ -1048,7 +1049,10 @@ export function EnvironmentProviderSettings({
           <SettingsGroup divided={false} className="overflow-hidden">
             <SettingsRow
               title="Limited permissions"
-              description={`This session can view ${environmentLabel}'s providers but can't change their settings.`}
+              description={t(
+                "This session can view {name}'s providers but can't change their settings.",
+                { name: environmentLabel },
+              )}
             />
           </SettingsGroup>
         ) : null}
@@ -1074,7 +1078,7 @@ export function EnvironmentProviderSettings({
                     onClick={() => setIsAddInstanceDialogOpen(true)}
                   >
                     <PlusIcon className="size-4 shrink-0" />
-                    Add provider
+                    {t("Add provider")}
                   </button>
                 ) : null}
               </div>
@@ -1092,8 +1096,8 @@ export function EnvironmentProviderSettings({
             ) : (
               <div className="p-6 text-sm text-muted-foreground">
                 {targetInstanceMissing
-                  ? "This provider instance is no longer available on this device."
-                  : "No providers configured."}
+                  ? t("This provider instance is no longer available on this device.")
+                  : t("No providers configured.")}
               </div>
             )}
           </div>

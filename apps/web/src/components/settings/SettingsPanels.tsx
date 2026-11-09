@@ -28,7 +28,14 @@ import { createModelSelection } from "@t3tools/shared/model";
 import { resolvePastedPath } from "@t3tools/shared/path";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
-import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
+import {
+  APP_BASE_NAME,
+  APP_VERSION,
+  HOSTED_APP_CHANNEL,
+  HOSTED_APP_CHANNEL_LABEL,
+} from "../../branding";
+import { getLocale, LOCALE_OPTIONS, setLocale, t } from "~/i18n";
+import { useShowAdvancedSettings } from "./settingsAdvancedMode";
 import { AboutVersionTitle } from "./AboutVersionTitle";
 import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
 import { MobileAppSettingsRow } from "./MobileAppSettingsRow";
@@ -281,18 +288,18 @@ function AboutVersionSection() {
       ? !canCheckForUpdate(updateState)
       : isDesktopUpdateButtonDisabled(updateState);
 
-  const actionLabel: Record<string, string> = { download: "Download", install: "Install" };
+  const actionLabel: Record<string, string> = { download: t("Download"), install: t("Install") };
   const statusLabel: Record<string, string> = {
-    checking: "Checking…",
-    downloading: "Downloading…",
+    checking: t("Checking…"),
+    downloading: t("Downloading…"),
     // Off its track, "up to date" only means no switch is pending; Review moves it.
-    ...(appOffTrack ? {} : { "up-to-date": "Up to Date" }),
+    ...(appOffTrack ? {} : { "up-to-date": t("Up to Date") }),
   };
   const buttonLabel =
-    actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? "Check for Updates";
+    actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? t("Check for Updates");
   const description =
     action === "download" || action === "install"
-      ? "Update available."
+      ? t("Update available.")
       : (getDesktopUpdateDisabledReason(updateState, updatesDenial) ??
         "Current version of the application.");
 
@@ -785,8 +792,53 @@ export function GeneralSettingsPanel() {
     readLastEnabledProjectGroupingMode(),
   );
 
+  const [showAdvanced, setShowAdvanced] = useShowAdvancedSettings();
+  const locale = getLocale();
+
   return (
     <SettingsPageContainer>
+      <SettingsSection id="language" title="Language">
+        <SettingsRow
+          id="language-select"
+          title="Language"
+          description="Choose the app language. The app reloads to apply it."
+          control={
+            <Select
+              value={locale}
+              onValueChange={(value) => {
+                const option = LOCALE_OPTIONS.find((candidate) => candidate.id === value);
+                if (option && option.id !== locale) setLocale(option.id);
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label={t("Language")}>
+                <SelectValue>
+                  {LOCALE_OPTIONS.find((option) => option.id === locale)?.label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {LOCALE_OPTIONS.map((option) => (
+                  <SelectItem hideIndicator key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          }
+        />
+        <SettingsRow
+          id="show-advanced-settings"
+          title="Show advanced settings"
+          description="Show developer sections in the settings menu. Off keeps the menu short."
+          control={
+            <Switch
+              checked={showAdvanced}
+              onCheckedChange={(checked) => setShowAdvanced(Boolean(checked))}
+              aria-label={t("Show advanced settings")}
+            />
+          }
+        />
+      </SettingsSection>
+
       <SettingsSection id="notifications" title="Notifications">
         <NotificationSettings />
         <SettingsRow
@@ -796,7 +848,7 @@ export function GeneralSettingsPanel() {
             <Switch
               checked={settings.inAppNotificationsEnabled}
               onCheckedChange={(checked) => updateSettings({ inAppNotificationsEnabled: checked })}
-              aria-label="In-app notifications"
+              aria-label={t("In-app notifications")}
             />
           }
         />
@@ -834,7 +886,7 @@ export function GeneralSettingsPanel() {
                   ),
                 });
               }}
-              aria-label="Project grouping"
+              aria-label={t("Project grouping")}
             />
           }
         />
@@ -863,15 +915,15 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-44" aria-label="Project order">
+              <SelectTrigger size="sm" className="w-full sm:w-44" aria-label={t("Project order")}>
                 <SelectValue>
-                  {SIDEBAR_PROJECT_SORT_ORDER_LABELS[settings.sidebarProjectSortOrder]}
+                  {t(SIDEBAR_PROJECT_SORT_ORDER_LABELS[settings.sidebarProjectSortOrder])}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 {SidebarProjectSortOrder.literals.map((sortOrder) => (
                   <SelectItem hideIndicator key={sortOrder} value={sortOrder}>
-                    {SIDEBAR_PROJECT_SORT_ORDER_LABELS[sortOrder]}
+                    {t(SIDEBAR_PROJECT_SORT_ORDER_LABELS[sortOrder])}
                   </SelectItem>
                 ))}
               </SelectPopup>
@@ -900,7 +952,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ sidebarWorkingShelfEnabled: Boolean(checked) })
               }
-              aria-label="Working section"
+              aria-label={t("Working section")}
             />
           }
         />
@@ -928,7 +980,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadUnpin: Boolean(checked) })
               }
-              aria-label="Confirm thread unpinning"
+              aria-label={t("Confirm thread unpinning")}
             />
           }
         />
@@ -953,7 +1005,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadArchive: Boolean(checked) })
               }
-              aria-label="Confirm thread archiving"
+              aria-label={t("Confirm thread archiving")}
             />
           }
         />
@@ -978,7 +1030,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadDelete: Boolean(checked) })
               }
-              aria-label="Confirm thread deletion"
+              aria-label={t("Confirm thread deletion")}
             />
           }
         />
@@ -1008,14 +1060,16 @@ export function GeneralSettingsPanel() {
                 <SelectTrigger
                   size="sm"
                   className="w-full sm:w-40"
-                  aria-label="Quit shortcut behavior"
+                  aria-label={t("Quit shortcut behavior")}
                 >
-                  <SelectValue>{QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit]}</SelectValue>
+                  <SelectValue>
+                    {t(QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit])}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   {Object.entries(QUIT_CONFIRMATION_MODE_LABELS).map(([value, label]) => (
                     <SelectItem hideIndicator key={value} value={value}>
-                      {label}
+                      {t(label)}
                     </SelectItem>
                   ))}
                 </SelectPopup>
@@ -1050,18 +1104,22 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Timestamp format">
-                <SelectValue>{TIMESTAMP_FORMAT_LABELS[settings.timestampFormat]}</SelectValue>
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-40"
+                aria-label={t("Timestamp format")}
+              >
+                <SelectValue>{t(TIMESTAMP_FORMAT_LABELS[settings.timestampFormat])}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="locale">
-                  {TIMESTAMP_FORMAT_LABELS.locale}
+                  {t(TIMESTAMP_FORMAT_LABELS.locale)}
                 </SelectItem>
                 <SelectItem hideIndicator value="12-hour">
-                  {TIMESTAMP_FORMAT_LABELS["12-hour"]}
+                  {t(TIMESTAMP_FORMAT_LABELS["12-hour"])}
                 </SelectItem>
                 <SelectItem hideIndicator value="24-hour">
-                  {TIMESTAMP_FORMAT_LABELS["24-hour"]}
+                  {t(TIMESTAMP_FORMAT_LABELS["24-hour"])}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1076,8 +1134,11 @@ export function ChatSettingsPanel() {
   const modifierLabel = isMacPlatform(navigator.platform) ? "⌘" : "Ctrl";
   const sendShortcutOptions = [
     { value: "enter", label: "Enter" },
-    { value: "mod-enter-multiline", label: `${modifierLabel} + Enter for multiline prompts` },
-    { value: "mod-enter", label: `${modifierLabel} + Enter always` },
+    {
+      value: "mod-enter-multiline",
+      label: t("{modifier} + Enter for multiline prompts", { modifier: modifierLabel }),
+    },
+    { value: "mod-enter", label: t("{modifier} + Enter always", { modifier: modifierLabel }) },
   ] as const;
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -1107,7 +1168,7 @@ export function ChatSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ composerRichTextEnabled: Boolean(checked) })
               }
-              aria-label="Rich text composer"
+              aria-label={t("Rich text composer")}
             />
           }
         />
@@ -1135,7 +1196,7 @@ export function ChatSettingsPanel() {
               <SelectTrigger
                 size="sm"
                 className="w-auto min-w-0 max-w-full"
-                aria-label="Send shortcut"
+                aria-label={t("Send shortcut")}
               >
                 <SelectValue>
                   {
@@ -1179,7 +1240,7 @@ export function ChatSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ showSkillsInSlashMenu: Boolean(checked) })
                 }
-                aria-label="Show skills in slash menu"
+                aria-label={t("Show skills in slash menu")}
               />
             }
           />
@@ -1190,10 +1251,16 @@ export function ChatSettingsPanel() {
         <SettingsRow
           {...searchableSetting("follow-up-behavior")}
           description={
-            "Queue follow-ups while the agent runs or steer the current run. " +
+            t("Queue follow-ups while the agent runs or steer the current run.") +
+            " " +
             (settings.sendShortcut === "mod-enter-multiline"
-              ? `Press ${modifierLabel} + Enter for single-line prompts or ${modifierLabel} + Shift + Enter for multiline prompts to do the opposite for one message.`
-              : `Press ${modifierLabel}${settings.sendShortcut === "mod-enter" ? " + Shift" : ""} + Enter to do the opposite for one message.`)
+              ? t(
+                  "Press {modifier} + Enter for single-line prompts or {modifier} + Shift + Enter for multiline prompts to do the opposite for one message.",
+                  { modifier: modifierLabel },
+                )
+              : t("Press {keys} + Enter to do the opposite for one message.", {
+                  keys: `${modifierLabel}${settings.sendShortcut === "mod-enter" ? " + Shift" : ""}`,
+                }))
           }
           resetAction={
             settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior ? (
@@ -1216,14 +1283,18 @@ export function ChatSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-auto min-w-0" aria-label="Follow-up behavior">
+              <SelectTrigger
+                size="sm"
+                className="w-auto min-w-0"
+                aria-label={t("Follow-up behavior")}
+              >
                 <SelectValue>
-                  {settings.followUpBehavior === "queue" ? "Queue" : "Steer"}
+                  {settings.followUpBehavior === "queue" ? t("Queue") : t("Steer")}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem value="queue">Queue</SelectItem>
-                <SelectItem value="steer">Steer</SelectItem>
+                <SelectItem value="queue">{t("Queue")}</SelectItem>
+                <SelectItem value="steer">{t("Steer")}</SelectItem>
               </SelectPopup>
             </Select>
           }
@@ -2012,7 +2083,10 @@ export function AboutSettingsPanel() {
         {primaryPolicy ? (
           <SettingsRow
             title="Organization"
-            description={`This environment is managed by ${primaryPolicy.organization}. Some settings and features follow its policy.`}
+            description={t(
+              "This environment is managed by {organization}. Some settings and features follow its policy.",
+              { organization: primaryPolicy.organization },
+            )}
             control={
               primaryPolicy.supportUrl ? (
                 <Button
@@ -2022,7 +2096,7 @@ export function AboutSettingsPanel() {
                   size="sm"
                   variant="outline"
                 >
-                  Get help
+                  {t("Get help")}
                 </Button>
               ) : null
             }
@@ -2047,8 +2121,10 @@ export function AboutSettingsPanel() {
           {...searchableSetting("privacy-policy")}
           description={
             telemetryOff === undefined
-              ? "How we handle your data, including the anonymous usage data T3 Code collects."
-              : `How we handle your data. ${telemetryOff}`
+              ? t("How we handle your data, including the anonymous usage data {app} collects.", {
+                  app: APP_BASE_NAME,
+                })
+              : `${t("How we handle your data.")} ${telemetryOff}`
           }
           control={
             <Button
@@ -2056,20 +2132,22 @@ export function AboutSettingsPanel() {
               size="sm"
               variant="outline"
             >
-              View policy
+              {t("View policy")}
             </Button>
           }
         />
         <SettingsRow
           {...searchableSetting("open-source-licenses")}
-          description="Notices for dependencies, assets, and optional tools used by T3 Code."
+          description={t("Notices for dependencies, assets, and optional tools used by {app}.", {
+            app: APP_BASE_NAME,
+          })}
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}
               size="sm"
               variant="outline"
             >
-              View licenses
+              {t("View licenses")}
             </Button>
           }
         />

@@ -15,6 +15,7 @@ import {
 import { enterpriseEnvironment, enterpriseFailureMessage } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
+import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -101,7 +102,7 @@ export function ConnectEnterpriseDialog({
         }
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Enter a secure environment URL.");
+      setError(error instanceof Error ? error.message : t("Check the team address."));
       return;
     }
     setBusy(true);
@@ -119,7 +120,7 @@ export function ConnectEnterpriseDialog({
       setBusy(false);
       toastManager.add({
         type: "success",
-        title: `Connected as ${result.value.displayName}`,
+        title: t("Connected as {name}", { name: result.value.displayName }),
         description: [result.value.teamName, result.value.role].filter(Boolean).join(" · "),
       });
       handleOpenChange(false);
@@ -134,16 +135,17 @@ export function ConnectEnterpriseDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Connect Enterprise</DialogTitle>
+          <DialogTitle>{t("Join your team")}</DialogTitle>
           <DialogDescription>
-            Connect with your Enterprise host URL and work email. Your name, team and permissions
-            load automatically.
+            {t(
+              "Your admin gives you the team address. Your name, area and permissions load on their own.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <form
             id={formId}
-            className="space-y-3"
+            className="space-y-4"
             autoComplete="off"
             onSubmit={(event) => {
               event.preventDefault();
@@ -151,26 +153,30 @@ export function ConnectEnterpriseDialog({
             }}
           >
             <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Host URL</span>
+              <span className="block text-xs font-medium text-foreground">{t("Team address")}</span>
               <Input
                 type="url"
                 value={hubUrl}
                 onChange={(event) => setHubUrlInput(event.target.value)}
-                placeholder="https://hub.example.com/pair#token=…"
+                placeholder="http://192.168.0.10:13779"
                 disabled={busy}
                 autoFocus
                 nativeInput
                 spellCheck={false}
               />
+              <span className="block text-xs text-muted-foreground">
+                {t("Your admin gives you this, for example http://192.168.0.10:13779")}
+              </span>
             </label>
             <label className="block space-y-1.5">
-              <span className="block text-xs font-medium text-foreground">Email</span>
+              <span className="block text-xs font-medium text-foreground">
+                {t("Your work email")}
+              </span>
               <Input
                 type="email"
-
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@company.com"
+                placeholder={t("you@company.com")}
                 disabled={busy}
                 nativeInput
                 spellCheck={false}
@@ -178,7 +184,7 @@ export function ConnectEnterpriseDialog({
             </label>
             <label className="block space-y-1.5">
               <span className="block text-xs font-medium text-foreground">
-                Enterprise token (optional)
+                {t("Invite code (optional)")}
               </span>
               <Input
                 type="password"
@@ -188,6 +194,9 @@ export function ConnectEnterpriseDialog({
                 nativeInput
                 spellCheck={false}
               />
+              <span className="block text-xs text-muted-foreground">
+                {t("Only if your admin gave you one.")}
+              </span>
             </label>
             {error ? (
               <p role="alert" className="text-xs text-destructive-foreground">
@@ -198,10 +207,10 @@ export function ConnectEnterpriseDialog({
         </DialogPanel>
         <DialogFooter variant="bare">
           <DialogClose disabled={busy} render={<Button variant="outline" type="button" />}>
-            Cancel
+            {t("Cancel")}
           </DialogClose>
           <Button form={formId} type="submit" disabled={busy || !ready}>
-            {busy ? "Connecting…" : "Connect"}
+            {busy ? t("Joining…") : t("Join")}
           </Button>
         </DialogFooter>
       </DialogPopup>

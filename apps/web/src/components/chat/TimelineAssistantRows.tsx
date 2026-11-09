@@ -18,6 +18,7 @@ import { AssistantCitationSource } from "./AssistantCitationSource";
 import { resolveAssistantMessageCopyState } from "./MessagesTimeline.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
+import { t } from "~/i18n";
 import { APP_BASE_NAME } from "~/branding";
 import { useUiStateStore } from "~/uiStateStore";
 import { formatChatTimestampTooltip, formatDayAwareTimestamp } from "../../timestampFormat";
@@ -33,7 +34,7 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
     row.projectedItem?.item.id,
   );
   const text = liveText ?? row.message.text;
-  const messageText = text || (row.message.streaming ? "" : "(empty response)");
+  const messageText = text || (row.message.streaming ? "" : t("(empty response)"));
 
   return (
     <>
@@ -119,13 +120,13 @@ function AssistantForkButton({
                 () => setBusy(false),
               );
             }}
-            aria-label="Fork from this response"
+            aria-label={t("Fork from this response")}
           />
         }
       >
         <GitForkIcon className={cn("size-3", busy && "animate-pulse")} />
       </TooltipTrigger>
-      <TooltipPopup side="top">Fork from this response</TooltipPopup>
+      <TooltipPopup side="top">{t("Fork from this response")}</TooltipPopup>
     </Tooltip>
   );
 }

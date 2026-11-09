@@ -39,6 +39,7 @@ import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
 import { vcsEnvironment } from "../state/vcs";
 import { cn } from "../lib/utils";
+import { t } from "~/i18n";
 import { THREAD_DETAILS_PANEL_ICON_CLASS } from "./chat/threadDetailsPanelStyles";
 import { ThreadDetailsPrRows } from "./chat/ThreadDetailsPrRows";
 import { parsePullRequestReference } from "@t3tools/client-runtime/pull-request-link-input";
@@ -63,6 +64,7 @@ import {
 } from "./ThreadStatusIndicators";
 
 import { ComboboxItem, ComboboxTrigger } from "./ui/combobox";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { ComposerControl } from "./chat/ComposerControl";
 import { MiddleTruncate } from "./ui/middle-truncate";
 import { BranchPicker, BranchPickerRefItem } from "./BranchPicker";
@@ -319,11 +321,11 @@ export function BranchToolbarBranchSelector({
   const [isBranchActionPending, startBranchActionTransition] = useTransition();
   const totalBranchCount = branchRefState.data?.totalCount ?? 0;
   const branchStatusText = isInitialBranchesLoadPending
-    ? "Loading refs..."
+    ? t("Loading versions...")
     : isFetchingNextPage
-      ? "Loading more refs..."
+      ? t("Loading more versions...")
       : hasNextPage
-        ? `Showing ${refs.length} of ${totalBranchCount} refs`
+        ? t("Showing {shown} of {total} versions", { shown: refs.length, total: totalBranchCount })
         : null;
 
   const copyBranchName = (branchName: string) => {
@@ -332,7 +334,7 @@ export function BranchToolbarBranchSelector({
         if (!didCopy) return;
         toastManager.add({
           type: "success",
-          title: "Branch name copied",
+          title: t("Branch name copied"),
           description: branchName,
         });
       },
@@ -340,7 +342,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to copy branch name",
+            title: t("Failed to copy branch name"),
             description: toBranchActionErrorMessage(error),
           }),
         );
@@ -355,7 +357,7 @@ export function BranchToolbarBranchSelector({
     event.preventDefault();
     event.stopPropagation();
     const items: ContextMenuItem<"copy-branch-name">[] = [
-      { id: "copy-branch-name", label: "Copy branch name", icon: "copy" },
+      { id: "copy-branch-name", label: t("Copy branch name"), icon: "copy" },
     ];
     void api.contextMenu.show(items, { x: event.clientX, y: event.clientY }).then((action) => {
       if (action === "copy-branch-name") copyBranchName(branchName);
@@ -370,8 +372,8 @@ export function BranchToolbarBranchSelector({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Action unavailable",
-          description: "This connection cannot change the thread's branch.",
+          title: t("Action unavailable"),
+          description: t("This connection cannot change the thread's branch."),
         }),
       );
       return;
@@ -437,7 +439,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to switch ref.",
+            title: t("Failed to switch ref."),
             description: toBranchActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
           }),
         );
@@ -474,7 +476,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to create and switch ref.",
+            title: t("Failed to create and switch ref."),
             description: toBranchActionErrorMessage(squashAtomCommandFailure(createBranchResult)),
           }),
         );
@@ -617,7 +619,7 @@ export function BranchToolbarBranchSelector({
           value={itemValue}
           onClick={() => selectPickerItem(itemValue)}
         >
-          <span className="truncate">Create new ref &quot;{newRefName}&quot;</span>
+          <span className="truncate">{t('Create new version "{name}"', { name: newRefName })}</span>
         </ComboboxItem>
       );
     }
@@ -713,27 +715,38 @@ export function BranchToolbarBranchSelector({
           }}
           onContextMenu={(event) => handleBranchContextMenu(event, resolvedActiveBranch)}
         >
-          <ComboboxTrigger
-            render={
-              displayMode === "panel" ? (
-                <ThreadDetailsControl part="select" />
-              ) : (
-                <ComposerControl size="xs" />
-              )
-            }
-            className="min-w-0 max-w-full active:scale-100"
-            disabled={isInitialBranchesLoadPending || isBranchActionPending}
-          >
-            <GitBranchIcon
-              className={cn(
-                "size-3 shrink-0",
-                displayMode === "panel" && THREAD_DETAILS_PANEL_ICON_CLASS,
-              )}
-            />
-            <ComposerContextLabel displayMode={displayMode}>
-              <MiddleTruncate value={triggerLabel} variant="cap-aligned" className="w-full" />
-            </ComposerContextLabel>
-          </ComboboxTrigger>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <ComboboxTrigger
+                  render={
+                    displayMode === "panel" ? (
+                      <ThreadDetailsControl part="select" />
+                    ) : (
+                      <ComposerControl size="xs" />
+                    )
+                  }
+                  className="min-w-0 max-w-full active:scale-100"
+                  disabled={isInitialBranchesLoadPending || isBranchActionPending}
+                />
+              }
+            >
+              <GitBranchIcon
+                className={cn(
+                  "size-3 shrink-0",
+                  displayMode === "panel" && THREAD_DETAILS_PANEL_ICON_CLASS,
+                )}
+              />
+              <ComposerContextLabel displayMode={displayMode}>
+                <MiddleTruncate value={triggerLabel} variant="cap-aligned" className="w-full" />
+              </ComposerContextLabel>
+            </TooltipTrigger>
+            <TooltipPopup side="top">
+              {t("Version (branch) of the project the agent works on: {name}", {
+                name: triggerLabel,
+              })}
+            </TooltipPopup>
+          </Tooltip>
         </span>
         {displayMode === "panel" && prNumber !== undefined && prUrl !== undefined ? (
           <ThreadDetailsPrRows

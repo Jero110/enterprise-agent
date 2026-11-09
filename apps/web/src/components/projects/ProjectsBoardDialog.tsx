@@ -13,6 +13,7 @@ import {
 import { useState, type CSSProperties, type DragEvent, type KeyboardEvent } from "react";
 
 import { requestConfirmDialog } from "~/confirmDialog";
+import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import {
   PROJECT_TASK_PRIORITIES,
@@ -125,7 +126,7 @@ function TaskCard(props: { readonly task: ProjectTask; readonly onOpen: () => vo
         {task.priority !== null ? (
           <span className="inline-flex items-center gap-1 rounded-md border border-border/70 px-1.5 py-0.5">
             <FlagIcon className={cn("size-3 fill-current", PRIORITY_COLOR[task.priority])} />
-            {PROJECT_TASK_PRIORITY_LABELS[task.priority]}
+            {t(PROJECT_TASK_PRIORITY_LABELS[task.priority], undefined, "priority")}
           </span>
         ) : null}
         {task.tags.map((tag) => (
@@ -167,7 +168,7 @@ function BoardColumn(props: {
   };
   return (
     <section
-      aria-label={PROJECT_TASK_STATUS_LABELS[props.status]}
+      aria-label={t(PROJECT_TASK_STATUS_LABELS[props.status])}
       className={cn(
         "flex max-h-full w-72 shrink-0 flex-col rounded-xl p-2",
         style.column,
@@ -182,7 +183,7 @@ function BoardColumn(props: {
     >
       <header className="flex items-center gap-2 px-1 pb-2 pt-1">
         <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold uppercase", style.pill)}>
-          {PROJECT_TASK_STATUS_LABELS[props.status]}
+          {t(PROJECT_TASK_STATUS_LABELS[props.status])}
         </span>
         <span className="text-xs text-muted-foreground">{props.tasks.length}</span>
       </header>
@@ -194,8 +195,10 @@ function BoardColumn(props: {
           <Input
             autoFocus
             size="sm"
-            placeholder="Task name, Enter to add"
-            aria-label={`New task in ${PROJECT_TASK_STATUS_LABELS[props.status]}`}
+            placeholder={t("Task name, Enter to add")}
+            aria-label={t("New task in {column}", {
+              column: t(PROJECT_TASK_STATUS_LABELS[props.status]),
+            })}
             onKeyDown={submit}
             onBlur={() => setAdding(false)}
           />
@@ -207,7 +210,7 @@ function BoardColumn(props: {
             onClick={() => setAdding(true)}
           >
             <PlusIcon />
-            Add Task
+            {t("Add Task")}
           </Button>
         )}
       </div>
@@ -230,8 +233,9 @@ function TaskEditor(props: {
   const update = (patch: Partial<ProjectTask>) => updateTask(board.id, task.id, patch);
   const remove = async () => {
     const confirmed =
-      (await requestConfirmDialog(`Delete "${task.title}"?`, { variant: "destructive" })) ??
-      window.confirm(`Delete "${task.title}"?`);
+      (await requestConfirmDialog(t('Delete "{title}"?', { title: task.title }), {
+        variant: "destructive",
+      })) ?? window.confirm(t('Delete "{title}"?', { title: task.title }));
     if (!confirmed) return;
     deleteTask(board.id, task.id);
     props.onClose();
@@ -240,9 +244,9 @@ function TaskEditor(props: {
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogPopup className="w-[min(520px,94vw)]" bottomStickOnMobile={false}>
         <div className="flex flex-col gap-4 p-6">
-          <DialogTitle>Edit task</DialogTitle>
+          <DialogTitle>{t("Edit task")}</DialogTitle>
           <label className={FIELD}>
-            Title
+            {t("Title")}
             <Input
               defaultValue={task.title}
               onBlur={(event) => {
@@ -252,7 +256,7 @@ function TaskEditor(props: {
             />
           </label>
           <label className={FIELD}>
-            Description
+            {t("Description")}
             <Textarea
               defaultValue={task.description}
               onBlur={(event) => update({ description: event.currentTarget.value })}
@@ -260,7 +264,7 @@ function TaskEditor(props: {
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className={FIELD}>
-              Status
+              {t("Status")}
               <select
                 className={NATIVE_SELECT}
                 value={task.status}
@@ -268,13 +272,13 @@ function TaskEditor(props: {
               >
                 {PROJECT_TASK_STATUSES.map((status) => (
                   <option key={status} value={status}>
-                    {PROJECT_TASK_STATUS_LABELS[status]}
+                    {t(PROJECT_TASK_STATUS_LABELS[status])}
                   </option>
                 ))}
               </select>
             </label>
             <label className={FIELD}>
-              Priority
+              {t("Priority")}
               <select
                 className={NATIVE_SELECT}
                 value={task.priority ?? ""}
@@ -287,23 +291,23 @@ function TaskEditor(props: {
                   })
                 }
               >
-                <option value="">None</option>
+                <option value="">{t("None", undefined, "priority")}</option>
                 {PROJECT_TASK_PRIORITIES.map((priority) => (
                   <option key={priority} value={priority}>
-                    {PROJECT_TASK_PRIORITY_LABELS[priority]}
+                    {t(PROJECT_TASK_PRIORITY_LABELS[priority], undefined, "priority")}
                   </option>
                 ))}
               </select>
             </label>
             <label className={FIELD}>
-              Assignees (initials, comma separated)
+              {t("Assignees (initials, comma separated)")}
               <Input
                 defaultValue={task.assignees.join(", ")}
                 onBlur={(event) => update({ assignees: splitList(event.currentTarget.value) })}
               />
             </label>
             <label className={FIELD}>
-              Due date
+              {t("Due date")}
               <Input
                 type="date"
                 defaultValue={task.dueDate ?? ""}
@@ -313,7 +317,7 @@ function TaskEditor(props: {
           </div>
           <label className={FIELD}>
             <span className="inline-flex items-center gap-1">
-              <TagIcon className="size-3" /> Tags (comma separated)
+              <TagIcon className="size-3" /> {t("Tags (comma separated)")}
             </span>
             <Input
               defaultValue={task.tags.join(", ")}
@@ -323,10 +327,10 @@ function TaskEditor(props: {
           <div className="flex items-center justify-between pt-1">
             <Button size="sm" variant="destructive-outline" onClick={() => void remove()}>
               <Trash2Icon />
-              Delete
+              {t("Delete")}
             </Button>
             <Button size="sm" onClick={props.onClose}>
-              Done
+              {t("Done")}
             </Button>
           </div>
         </div>
@@ -358,7 +362,10 @@ function BoardView() {
         task.assignees.some((assignee) => assignee.toLowerCase().includes(needle)),
     ) ?? [];
   const removeBoard = async (target: ProjectBoard) => {
-    const message = `Delete board "${target.name}" and its ${target.tasks.length} tasks?`;
+    const message = t('Delete board "{name}" and its {count} tasks?', {
+      name: target.name,
+      count: target.tasks.length,
+    });
     const confirmed =
       (await requestConfirmDialog(message, { variant: "destructive" })) ?? window.confirm(message);
     if (confirmed) deleteBoard(target.id);
@@ -371,8 +378,8 @@ function BoardView() {
             autoFocus
             size="sm"
             className="w-56"
-            placeholder="Board name, Enter to create"
-            aria-label="New board name"
+            placeholder={t("Board name, Enter to create")}
+            aria-label={t("New board name")}
             onBlur={() => setCreatingBoard(false)}
             onKeyDown={(event) => {
               if (event.key === "Escape") setCreatingBoard(false);
@@ -384,7 +391,7 @@ function BoardView() {
           />
         ) : (
           <select
-            aria-label="Board"
+            aria-label={t("Board")}
             className={NATIVE_SELECT}
             value={board?.id ?? ""}
             onChange={(event) => selectBoard(event.target.value)}
@@ -398,12 +405,12 @@ function BoardView() {
         )}
         <Button size="xs" variant="ghost" onClick={() => setCreatingBoard(true)}>
           <PlusIcon />
-          New board
+          {t("New board")}
         </Button>
         {board ? (
           <Button size="xs" variant="ghost-destructive" onClick={() => void removeBoard(board)}>
             <Trash2Icon />
-            Delete board
+            {t("Delete board")}
           </Button>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
@@ -411,8 +418,8 @@ function BoardView() {
           <Input
             size="sm"
             className="w-48"
-            placeholder="Search tasks"
-            aria-label="Search tasks"
+            placeholder={t("Search tasks")}
+            aria-label={t("Search tasks")}
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
@@ -442,7 +449,9 @@ function BoardView() {
           ))}
         </div>
       ) : (
-        <p className="p-6 text-sm text-muted-foreground">No boards yet. Create one to start.</p>
+        <p className="p-6 text-sm text-muted-foreground">
+          {t("No boards yet. Create one to start.")}
+        </p>
       )}
       {board && editingTask ? (
         <TaskEditor
@@ -473,7 +482,7 @@ export function ProjectsBoardButton({
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label="Proyectos"
+              aria-label={t("Projects")}
               className="[-webkit-app-region:no-drag]"
               onClick={() => setOpen(true)}
             />
@@ -481,17 +490,18 @@ export function ProjectsBoardButton({
         >
           <SquareKanbanIcon className="size-4" />
         </TooltipTrigger>
-        <TooltipPopup side="bottom">Proyectos</TooltipPopup>
+        <TooltipPopup side="bottom">{t("Projects")}</TooltipPopup>
       </Tooltip>
       <DialogPopup
         className="flex h-[min(860px,92dvh)] w-[min(1280px,96vw)] max-w-none flex-col overflow-hidden"
         bottomStickOnMobile={false}
       >
         <div className="shrink-0 border-b border-border/60 px-6 py-4">
-          <DialogTitle>Proyectos</DialogTitle>
+          <DialogTitle>{t("Projects")}</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Boards belong to this project on the connected server. Ask your agent to read the cards.
-            Browser boards can be imported; the original browser copy is kept.
+            {t(
+              "Boards belong to this project on the connected server. Ask your agent to read the cards. Browser boards can be imported; the original browser copy is kept.",
+            )}
           </p>
         </div>
         {open && (

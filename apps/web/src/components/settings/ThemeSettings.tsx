@@ -10,6 +10,7 @@ import {
   UploadIcon,
 } from "lucide-react";
 import { useState, type ReactElement } from "react";
+import { t } from "~/i18n";
 import { useEnvironmentThemeDefinitions } from "../../hooks/useEnvironmentTheme";
 import { readThemeHalvesRaw } from "../../hooks/useTheme";
 import { cn } from "../../lib/utils";
@@ -694,7 +695,7 @@ export function ThemeLibrary({
                 isActive ? "text-foreground" : "text-muted-foreground",
               )}
             >
-              {mode === "system" ? "System" : mode === "light" ? "Light" : "Dark"}
+              {t(mode === "system" ? "System" : mode === "light" ? "Light" : "Dark")}
             </span>
           </button>
         );

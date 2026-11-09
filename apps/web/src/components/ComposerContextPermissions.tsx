@@ -1,6 +1,7 @@
 import type { EnvironmentId, RuntimeMode } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 
+import { t } from "~/i18n";
 import { shortcutLabelForCommand } from "../keybindings";
 import { useManagedPolicy } from "../state/managedPolicy";
 import { primaryServerKeybindingsAtom } from "../state/server";
@@ -32,7 +33,7 @@ export function ComposerContextPermissions(props: {
   );
   const options = resolveRuntimeModeOptions(modes, useManagedPolicy(props.environmentId));
   const composerMenuProps = useComposerMenuProps();
-  const { icon: Icon, label } = runtimeModeConfig[mode];
+  const { icon: Icon, label, description } = runtimeModeConfig[mode];
   return (
     <Menu>
       <Tooltip>
@@ -43,7 +44,7 @@ export function ComposerContextPermissions(props: {
                 <ComposerControl
                   size="xs"
                   className="ms-auto min-w-0 shrink-0"
-                  aria-label={`Permissions: ${label}`}
+                  aria-label={t("Permissions: {mode}", { mode: label })}
                   data-composer-context-control
                 />
               }
@@ -53,7 +54,10 @@ export function ComposerContextPermissions(props: {
           <Icon aria-hidden="true" className="size-3" />
           <ComposerContextLabel>{label}</ComposerContextLabel>
         </TooltipTrigger>
-        <TooltipPopup>Permissions{shortcutLabel ? ` · ${shortcutLabel}` : null}</TooltipPopup>
+        <TooltipPopup>
+          {t("Permissions: {mode}. {description}", { mode: label, description })}
+          {shortcutLabel ? ` · ${shortcutLabel}` : null}
+        </TooltipPopup>
       </Tooltip>
       <MenuPopup side="top" align="end" {...composerMenuProps}>
         <ComposerPermissionsSection

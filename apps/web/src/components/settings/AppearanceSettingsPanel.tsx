@@ -24,6 +24,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
+import { t } from "~/i18n";
 import { ThemeLibrary } from "./ThemeSettings";
 import {
   SettingResetButton,
@@ -187,7 +188,7 @@ export function AppearanceSettingsPanel() {
                 {settings.appearanceContrast}%
               </output>
               <input
-                aria-label="Contrast"
+                aria-label={t("Contrast")}
                 className="settings-slider min-w-0 flex-1"
                 id="appearance-contrast"
                 max={MAX_APPEARANCE_CONTRAST}
@@ -233,7 +234,7 @@ export function AppearanceSettingsPanel() {
                 {settings.glassOpacity}%
               </output>
               <input
-                aria-label="Glass opacity"
+                aria-label={t("Glass opacity")}
                 className="settings-slider min-w-0 flex-1"
                 id="glass-opacity"
                 max={MAX_GLASS_OPACITY}
@@ -277,13 +278,13 @@ export function AppearanceSettingsPanel() {
                     updateSettings({ chatWidth: value });
                 }}
               >
-                <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Chat width">
-                  <SelectValue>{CHAT_WIDTH_LABELS[settings.chatWidth]}</SelectValue>
+                <SelectTrigger size="sm" className="w-full min-w-0" aria-label={t("Chat width")}>
+                  <SelectValue>{t(CHAT_WIDTH_LABELS[settings.chatWidth])}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="comfortable">Comfortable (default)</SelectItem>
-                  <SelectItem value="wide">Wide</SelectItem>
-                  <SelectItem value="full">Full</SelectItem>
+                  <SelectItem value="comfortable">{t("Comfortable (default)")}</SelectItem>
+                  <SelectItem value="wide">{t("Wide")}</SelectItem>
+                  <SelectItem value="full">{t("Full")}</SelectItem>
                 </SelectPopup>
               </Select>
             </div>
@@ -312,12 +313,16 @@ export function AppearanceSettingsPanel() {
                     updateSettings({ effortDisplay: value });
                 }}
               >
-                <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Effort display">
-                  <SelectValue>{EFFORT_DISPLAY_LABELS[settings.effortDisplay]}</SelectValue>
+                <SelectTrigger
+                  size="sm"
+                  className="w-full min-w-0"
+                  aria-label={t("Effort display")}
+                >
+                  <SelectValue>{t(EFFORT_DISPLAY_LABELS[settings.effortDisplay])}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="label">Word (default)</SelectItem>
-                  <SelectItem value="bars">Bars</SelectItem>
+                  <SelectItem value="label">{t("Word (default)")}</SelectItem>
+                  <SelectItem value="bars">{t("Bars")}</SelectItem>
                 </SelectPopup>
               </Select>
             </div>
@@ -344,7 +349,7 @@ export function AppearanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ mathRenderingEnabled: Boolean(checked) })
               }
-              aria-label="Render math"
+              aria-label={t("Render math")}
             />
           }
         />
@@ -371,7 +376,7 @@ export function AppearanceSettingsPanel() {
                     {settings.panelAnimationDurationMs} ms
                   </output>
                   <input
-                    aria-label="Panel animation duration"
+                    aria-label={t("Panel animation duration")}
                     className="settings-slider min-w-0 flex-1"
                     id="panel-animation-duration"
                     max={MAX_PANEL_ANIMATION_DURATION_MS}
@@ -436,14 +441,14 @@ export function AppearanceSettingsPanel() {
                 <SelectTrigger
                   size="sm"
                   className="w-full sm:w-40"
-                  aria-label="Environment identification"
+                  aria-label={t("Environment identification")}
                 >
-                  <SelectValue>{environmentIdentificationLabel}</SelectValue>
+                  <SelectValue>{t(environmentIdentificationLabel)}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   {environmentIdentificationOptionList.map(([value, label]) => (
                     <SelectItem hideIndicator key={value} value={value}>
-                      {label}
+                      {t(label)}
                     </SelectItem>
                   ))}
                 </SelectPopup>
@@ -473,7 +478,7 @@ export function AppearanceSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ persistComposerContextStrip: Boolean(checked) })
                 }
-                aria-label="Keep composer context visible in active threads"
+                aria-label={t("Keep composer context visible in active threads")}
               />
             }
           />
