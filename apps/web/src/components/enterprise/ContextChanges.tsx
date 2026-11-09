@@ -17,7 +17,7 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { toastManager } from "../ui/toast";
-import { pendingGraphNodes, personName, proposalAreaName, proposalTitle } from "./proposalGraph";
+import { personName, proposalAreaName, proposalTitle } from "./proposalGraph";
 import { decideDemoProposal, demoKnowledgeProposals, useDemoState } from "./noraiDemo";
 
 const STATUS_LABELS: Record<KnowledgeProposal["status"], string> = {
@@ -102,6 +102,7 @@ function ProposalDetails({
   });
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
   const isDemo = proposal.id.startsWith("demo-");
   const resolve = async (action: "approve" | "reject" | "revert") => {
     if (isDemo) {
@@ -199,7 +200,7 @@ function ProposalDetails({
         {t("Authored by {who}", { who: personName(proposal.proposedBy) })} ·{" "}
         {statusLabel(proposal.status)}
       </p>
-      {!isAccessRequest && (
+      {!isAccessRequest && (proposal.reviewers?.length ?? 0) > 0 && (
         <p>
           {t("Reviewers:")}{" "}
           {proposal.reviewers
@@ -266,26 +267,46 @@ function ProposalDetails({
           </Button>
         )}
       {proposal.status === "pending" && proposal.canDecide === true && (permission || isDemo) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="xs" disabled={busy} onClick={() => void resolve("approve")}>
-            {t("Approve")}
-          </Button>
-          <Input
-            nativeInput
-            aria-label={t("Rejection reason")}
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            placeholder={t("Reason for rejection")}
-            disabled={busy}
-          />
-          <Button
-            size="xs"
-            variant="destructive-outline"
-            disabled={busy || !reason.trim()}
-            onClick={() => void resolve("reject")}
-          >
-            {t("Reject")}
-          </Button>
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {!rejecting && (
+            <>
+              <Button size="sm" disabled={busy} onClick={() => void resolve("approve")}>
+                {t("Approve")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setRejecting(true)}
+              >
+                {t("Reject")}
+              </Button>
+            </>
+          )}
+          {rejecting && (
+            <>
+              <Input
+                nativeInput
+                autoFocus
+                aria-label={t("Rejection reason")}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                placeholder={t("Reason for rejection")}
+                disabled={busy}
+              />
+              <Button
+                size="sm"
+                variant="destructive-outline"
+                disabled={busy || !reason.trim()}
+                onClick={() => void resolve("reject")}
+              >
+                {t("Reject")}
+              </Button>
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => setRejecting(false)}>
+                {t("Cancel")}
+              </Button>
+            </>
+          )}
         </div>
       )}
     </section>
@@ -339,7 +360,6 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
   const pending = proposals.filter((proposal) => proposal.status === "pending");
   const selectedProposal = proposals.find((proposal) => proposal.id === selected) ?? pending[0];
   const teams = org.data?.teams ?? [];
-  const graphNodes = pendingGraphNodes(proposals, teams);
   // What the hub applied today, newest first: visible proof that the team's knowledge grew.
   const learnedToday = proposals
     .filter(
@@ -347,103 +367,37 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
         proposal.status === "applied" && proposal.kind !== "upload" && isToday(proposal.resolvedAt),
     )
     .toSorted((a, b) => (b.resolvedAt ?? "").localeCompare(a.resolvedAt ?? ""));
-  const graphGroups = [
-    ...new Map(graphNodes.map((node) => [node.groupId, node.groupLabel])).entries(),
-  ];
   const selectProposal = (id: string) => {
     setSelected(id);
   };
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
-      <div className="flex justify-end">
-        <Button size="xs" variant="outline" onClick={inbox.refresh}>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium">
+          {pending.length > 0
+            ? t("To approve ({count})", { count: pending.length })
+            : inbox.data || demo.active
+              ? t("No pending changes")
+              : t("Loading proposals…")}
+        </h2>
+        <Button size="xs" variant="ghost" onClick={inbox.refresh}>
           {t("Refresh")}
         </Button>
       </div>
-      {learnedToday.length > 0 && (
-        <section
-          aria-label={t("What the team learned today")}
-          className="space-y-3 rounded-xl border bg-background p-4"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium">{t("What the team learned today")}</h2>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-              {t("+{n} today", { n: learnedToday.length })}
-            </span>
-          </div>
-          <ul className="space-y-1">
-            {learnedToday.map((proposal) => (
-              <li key={proposal.id}>
-                <button
-                  type="button"
-                  aria-pressed={selected === proposal.id}
-                  className="flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left hover:bg-muted"
-                  onClick={() => selectProposal(proposal.id)}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">
-                      {proposal.kind === "area-access"
-                        ? t("Access to {area} granted to {who}", {
-                            area: proposalAreaName(proposal, teams),
-                            who: personName(proposal.proposedBy),
-                          })
-                        : proposalTitle(proposal, teams)}
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {t("proposed by {proposer} · approved by {approver} · {time}", {
-                        proposer: personName(proposal.proposedBy),
-                        approver: personName(proposal.resolvedBy),
-                        time: formatTime(proposal.resolvedAt),
-                      })}
-                    </span>
-                    {proposal.evidence[0] && (
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {proposal.evidence[0]}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <section
-        aria-label={t("Pending context changes")}
-        className="overflow-hidden rounded-xl border bg-background"
-      >
-        <div>
-          <aside aria-label={t("Pending proposals by scope")} className="space-y-3 p-4">
-            {graphGroups.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                {inbox.data || demo.active ? t("No pending changes") : t("Loading proposals…")}
-              </p>
-            )}
-            {graphGroups.map(([groupId, groupLabel]) => (
-              <div key={groupId} className="space-y-1">
-                <h3 className="text-xs font-medium">{groupLabel}</h3>
-                {graphNodes
-                  .filter((node) => node.groupId === groupId)
-                  .map((node) => (
-                    <button
-                      key={node.id}
-                      type="button"
-                      aria-pressed={selectedProposal?.id === node.proposalId}
-                      className="block w-full rounded border px-2 py-1 text-left text-xs hover:bg-muted"
-                      onClick={() => selectProposal(node.proposalId)}
-                    >
-                      {node.title}
-                    </button>
-                  ))}
-              </div>
-            ))}
-          </aside>
+      {pending.length > 1 && (
+        <div className="flex flex-wrap gap-2" aria-label={t("Pending proposals by scope")}>
+          {pending.map((proposal) => (
+            <Button
+              key={proposal.id}
+              size="xs"
+              variant={selectedProposal?.id === proposal.id ? "secondary" : "outline"}
+              onClick={() => selectProposal(proposal.id)}
+            >
+              {proposalTitle(proposal, teams)}
+            </Button>
+          ))}
         </div>
-      </section>
+      )}
       {selectedProposal && (
         <ProposalDetails
           key={selectedProposal.id}
@@ -452,8 +406,63 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           refresh={inbox.refresh}
         />
       )}
-      <section aria-label={t("Context changes history")} className="space-y-2">
-        <h2 className="font-medium">{t("Authored, assigned and history")}</h2>
+      <details aria-label={t("Context changes history")} className="space-y-2">
+        <summary className="cursor-pointer text-sm text-muted-foreground">
+          {t("Authored, assigned and history")}
+        </summary>
+        {learnedToday.length > 0 && (
+          <section
+            aria-label={t("What the team learned today")}
+            className="space-y-3 rounded-xl border bg-background p-4"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium">{t("What the team learned today")}</h2>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
+                {t("+{n} today", { n: learnedToday.length })}
+              </span>
+            </div>
+            <ul className="space-y-1">
+              {learnedToday.map((proposal) => (
+                <li key={proposal.id}>
+                  <button
+                    type="button"
+                    aria-pressed={selected === proposal.id}
+                    className="flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left hover:bg-muted"
+                    onClick={() => selectProposal(proposal.id)}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">
+                        {proposal.kind === "area-access"
+                          ? t("Access to {area} granted to {who}", {
+                              area: proposalAreaName(proposal, teams),
+                              who: personName(proposal.proposedBy),
+                            })
+                          : proposalTitle(proposal, teams)}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {t("proposed by {proposer} · approved by {approver} · {time}", {
+                          proposer: personName(proposal.proposedBy),
+                          approver: personName(proposal.resolvedBy),
+                          time: formatTime(proposal.resolvedAt),
+                        })}
+                      </span>
+                      {proposal.evidence[0] && (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {proposal.evidence[0]}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {inbox.error && !demo.active ? (
           <p role="alert">{inbox.error}</p>
         ) : !inbox.data && proposals.length === 0 ? (
@@ -487,7 +496,7 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
             />
           </div>
         )}
-      </section>
+      </details>
     </div>
   );
 }
