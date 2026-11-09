@@ -18,10 +18,7 @@ import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { areaDestinations, ingestStartError } from "./ingestDestinations";
-
-const MAX_FILES = 20;
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_BATCH_BYTES = 35 * 1024 * 1024;
+import { uploadBatches, uploadFileError, uploadPath } from "./ingestUploadFiles";
 
 function fileBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -71,7 +68,7 @@ export interface IncrementalIngestion {
     modelSelection: ModelSelection;
   }) => Promise<void>;
   readonly stageUpload?: (
-    files: ReadonlyArray<{ name: string; mimeType: string; base64: string }>,
+    files: ReadonlyArray<{ name: string; relativePath?: string; mimeType: string; base64: string }>,
     destination: string,
   ) => Promise<{ uploadProposalIds: ReadonlyArray<string> }>;
 }
@@ -94,37 +91,41 @@ function IngestionRun({
   const sourceUrls = urls.split(/[\s,]+/).filter(Boolean);
   const start = async () => {
     if (!ingestion || busy) return;
-    if (
-      sourceUrls.length > 10 ||
-      files.length > MAX_FILES ||
-      files.some((file) => file.size === 0 || file.size > MAX_FILE_BYTES) ||
-      files.reduce((sum, file) => sum + file.size, 0) > MAX_BATCH_BYTES
-    ) {
-      setError(t("Choose up to 20 nonempty files (10 MiB each, 35 MiB total) or 10 URLs."));
+    const fileError = uploadFileError(files);
+    if (sourceUrls.length > 10 || fileError) {
+      setError(t(fileError ?? "Choose at most 10 URLs."));
+      return;
+    }
+    if (files.length && !ingestion.stageUpload) {
+      setError(t("File upload is unavailable for this connection."));
       return;
     }
     setBusy(true);
     setError(null);
     setStatus(null);
     try {
-      const staged =
-        files.length > 0 && ingestion.stageUpload
-          ? await ingestion.stageUpload(
-              await Promise.all(
-                files.map(async (file) => ({
-                  name: file.name,
-                  mimeType: file.type || "application/octet-stream",
-                  base64: await fileBase64(file),
-                })),
-              ),
-              destination,
-            )
-          : { uploadProposalIds: [] };
+      const uploadProposalIds: string[] = [];
+      if (ingestion.stageUpload) {
+        for (const batch of uploadBatches(files)) {
+          const staged = await ingestion.stageUpload(
+            await Promise.all(
+              batch.map(async (file) => ({
+                name: file.name,
+                relativePath: uploadPath(file),
+                mimeType: file.type || "application/octet-stream",
+                base64: await fileBase64(file),
+              })),
+            ),
+            destination,
+          );
+          uploadProposalIds.push(...staged.uploadProposalIds);
+        }
+      }
       await ingestion.start({
         destination,
         ...(note.trim() ? { note: note.trim() } : {}),
         ...(sourceUrls.length ? { sourceUrls } : {}),
-        ...(staged.uploadProposalIds.length ? { uploadProposalIds: staged.uploadProposalIds } : {}),
+        ...(uploadProposalIds.length ? { uploadProposalIds } : {}),
         modelSelection: ingestion.modelSelection,
       });
       setFiles([]);
@@ -185,14 +186,30 @@ function IngestionRun({
       >
         {t("Drop files here or choose files")}
         <input
+          aria-label={t("Choose files")}
           className="block"
           type="file"
           multiple
           disabled={busy || !ingestion?.canStart}
           onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
         />
+        <input
+          aria-label={t("Choose folder")}
+          className="mt-2 block"
+          type="file"
+          multiple
+          ref={(input) => input?.setAttribute("webkitdirectory", "")}
+          disabled={busy || !ingestion?.canStart}
+          onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+        />
       </label>
-      {files.length > 0 && <p className="text-xs">{files.map((file) => file.name).join(", ")}</p>}
+      {files.length > 0 && (
+        <p className="text-xs">
+          {t("{count} files selected", { count: files.length })} ·{" "}
+          {files.slice(0, 3).map(uploadPath).join(", ")}
+          {files.length > 3 ? "…" : ""}
+        </p>
+      )}
       <textarea
         aria-label={t("Public HTTPS URLs")}
         placeholder={t("Paste public HTTPS URLs, one per line")}

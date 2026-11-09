@@ -36,6 +36,7 @@ export class KnowledgeProposals extends Context.Service<
         readonly reason: string;
         readonly files: ReadonlyArray<{
           readonly name: string;
+          readonly relativePath?: string;
           readonly mimeType: string;
           readonly bytes: Uint8Array;
         }>;
@@ -50,7 +51,12 @@ export class KnowledgeProposals extends Context.Service<
       proposalId: string,
       fileId: string,
     ) => Effect.Effect<
-      { readonly name: string; readonly mimeType: string; readonly bytes: Uint8Array },
+      {
+        readonly name: string;
+        readonly relativePath?: string;
+        readonly mimeType: string;
+        readonly bytes: Uint8Array;
+      },
       EnterpriseError
     >;
     readonly inbox: (
@@ -63,6 +69,19 @@ export class KnowledgeProposals extends Context.Service<
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
   }
 >()("t3/enterprise/KnowledgeProposals") {}
+
+export const safeUploadPath = (name: string, relativePath: string): boolean =>
+  relativePath.length <= 1024 &&
+  !relativePath.startsWith("/") &&
+  !/^[A-Za-z]:/.test(relativePath) &&
+  !/[\\\r\n\0]/.test(relativePath) &&
+  relativePath
+    .split("/")
+    .every(
+      (segment) =>
+        segment.length > 0 && segment.length <= 255 && segment !== "." && segment !== "..",
+    ) &&
+  relativePath.split("/").at(-1) === name;
 
 const canApprove = (
   member: EnterpriseStore.EnterpriseMember,
@@ -283,6 +302,7 @@ export const layer = Layer.effect(
         readonly reason: string;
         readonly files: ReadonlyArray<{
           readonly name: string;
+          readonly relativePath?: string;
           readonly mimeType: string;
           readonly bytes: Uint8Array;
         }>;
@@ -294,7 +314,9 @@ export const layer = Layer.effect(
         input.reason.length > 2_000 ||
         input.files.length < 1 ||
         input.files.length > 20 ||
-        input.files.reduce((size, file) => size + file.bytes.byteLength, 0) > 40 * 1024 * 1024 ||
+        input.files.reduce((size, file) => size + file.bytes.byteLength, 0) > 35 * 1024 * 1024 ||
+        new Set(input.files.map((file) => file.relativePath ?? file.name)).size !==
+          input.files.length ||
         input.files.some(
           (file) =>
             !file.name ||
@@ -302,6 +324,7 @@ export const layer = Layer.effect(
             file.name === "." ||
             file.name === ".." ||
             /[\\/\r\n\0]/.test(file.name) ||
+            !safeUploadPath(file.name, file.relativePath ?? file.name) ||
             !file.mimeType ||
             file.mimeType.length > 128 ||
             file.bytes.byteLength < 1 ||
@@ -331,6 +354,7 @@ export const layer = Layer.effect(
         Effect.map(random.uuidV4(), (fileId) => ({
           id: fileId,
           name: file.name,
+          ...(file.relativePath === undefined ? {} : { relativePath: file.relativePath }),
           mimeType: file.mimeType,
           sizeBytes: file.bytes.byteLength,
         })),
@@ -394,11 +418,12 @@ export const layer = Layer.effect(
         return yield* uploadInvalid;
       const files = input.files.map((file) => ({
         name: file.name,
+        ...(file.relativePath === undefined ? {} : { relativePath: file.relativePath }),
         mimeType: file.mimeType,
         bytes: Uint8Array.from(Buffer.from(file.base64, "base64")),
       }));
       if (
-        files.reduce((total, file) => total + file.bytes.byteLength, 0) > 40 * 1024 * 1024 ||
+        files.reduce((total, file) => total + file.bytes.byteLength, 0) > 35 * 1024 * 1024 ||
         files.some(
           (file, i) => Buffer.from(file.bytes).toString("base64") !== input.files[i]!.base64,
         )
@@ -432,7 +457,12 @@ export const layer = Layer.effect(
         .readFile(path.join(uploadDir, proposal.id, file.id))
         .pipe(Effect.mapError(() => missing));
       if (bytes.byteLength !== file.sizeBytes) return yield* missing;
-      return { name: file.name, mimeType: file.mimeType, bytes };
+      return {
+        name: file.name,
+        ...(file.relativePath === undefined ? {} : { relativePath: file.relativePath }),
+        mimeType: file.mimeType,
+        bytes,
+      };
     });
     const inbox = Effect.fn("KnowledgeProposals.inbox")(function* (
       email: string,
