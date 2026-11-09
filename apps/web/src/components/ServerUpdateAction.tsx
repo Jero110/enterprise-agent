@@ -1,4 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
+import { t } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import {
   AuthEnvironmentMaintainScope,
   type AuthSessionState,
@@ -201,7 +203,13 @@ export function ServerUpdatesAction({
       if (desktopTargets.length > 0) {
         const confirmed =
           (await requestConfirmDialog(
-            `Update the T3 Code desktop apps on ${desktopTargets.map((target) => target.serverLabel).join(", ")}? They will close and relaunch on those machines.`,
+            t(
+              "Update the {app} desktop app on {computers}? It will close and reopen on those computers.",
+              {
+                app: APP_BASE_NAME,
+                computers: desktopTargets.map((target) => target.serverLabel).join(", "),
+              },
+            ),
           )) ?? true;
         if (!confirmed) return;
       }
@@ -307,7 +315,13 @@ export function ServerUpdateAction({
     if (isDesktopAppUpdate) {
       const confirmed =
         (await requestConfirmDialog(
-          `Update the T3 Code desktop app that runs the ${serverLabel}? It will close and relaunch on that machine.`,
+          t(
+            "Update the {app} desktop app on {computer}? It will close and reopen on that computer.",
+            {
+              app: APP_BASE_NAME,
+              computer: serverLabel,
+            },
+          ),
         )) ?? true;
       if (!confirmed) {
         return;

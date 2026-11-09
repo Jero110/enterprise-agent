@@ -1,4 +1,6 @@
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { t } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import type { DesktopAppActivationRequest } from "@t3tools/contracts";
 import { useEffect, useEffectEvent, useRef } from "react";
 
@@ -68,7 +70,9 @@ export function DesktopAppActivationCoordinator() {
         });
         if (result._tag === "Failure") {
           const error = squashAtomCommandFailure(result);
-          throw error instanceof Error ? error : new Error("T3 Code could not add the project.");
+          throw error instanceof Error
+            ? error
+            : new Error(t("{app} could not add the project.", { app: APP_BASE_NAME }));
         }
         return projectId;
       },

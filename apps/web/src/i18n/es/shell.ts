@@ -113,8 +113,6 @@ export const ES_SHELL: Readonly<Record<string, string>> = {
   "Watch an iOS Simulator or Android Emulator.": "Ve un simulador de iOS o un emulador de Android.",
   "Ask a side question while this thread keeps working.":
     "Haz una pregunta aparte mientras este chat sigue trabajando.",
-  "Browser previews are only available in the T3 Code desktop app.":
-    "La vista del navegador solo está disponible en la app de escritorio.",
   "Terminal surfaces are only available from a project thread.":
     "La terminal solo está disponible en un chat con proyecto.",
   "Files are only available when a project is open.":
@@ -288,8 +286,6 @@ export const ES_SHELL: Readonly<Record<string, string>> = {
   "New thread without a project": "Nuevo chat sin proyecto",
   "Connect an environment": "Conecta un equipo",
   "Triage an issue": "Revisar un problema",
-  "An agent investigates a T3 Code problem and helps file an issue":
-    "Un agente investiga un problema de la app y te ayuda a reportarlo",
   "Find in current thread": "Buscar en este chat",
   "Copy prompt link": "Copiar enlace al mensaje",
   "Copy prompt link with repo and model": "Copiar enlace del mensaje con proyecto y modelo",

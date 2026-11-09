@@ -1,4 +1,6 @@
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+import { t } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import { applyPullRequestDraftFilterChange } from "@t3tools/client-runtime/pull-request-query";
 import { Spinner } from "~/components/ui/spinner";
 import type { PullRequestSpeedActionResult } from "~/components/pullRequest/PullRequestSpeedActions";
@@ -1143,8 +1145,8 @@ export function PullRequestsPage() {
         <PullRequestListGhost rows={7} caption="Loading pull requests…" />
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
-          title="Pull requests unavailable"
-          error="Update your T3 Code servers to browse pull requests."
+          title={t("Pull requests unavailable")}
+          error={t("Update {app} on your computers to see pull requests.", { app: APP_BASE_NAME })}
         />
       ) : firstLoad ? (
         <PullRequestListGhost rows={7} caption="Loading pull requests…" />

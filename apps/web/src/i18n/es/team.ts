@@ -184,8 +184,6 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "Could not read settings": "No se pudo leer tu configuración",
   "Still connecting": "Conectando…",
   "Your saved settings could not be loaded.": "No se pudo cargar tu configuración guardada.",
-  "T3 Code could not confirm this workspace.":
-    "Sequoia AI todavía no puede abrir tu espacio de trabajo.",
   Retry: "Reintentar",
   Reload: "Recargar",
   "Set up Sequoia AI": "Configura Sequoia AI",
@@ -208,8 +206,6 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
     "{names} no está conectada, así que la saltamos. Puedes prepararla después en Configuración.",
   "Not connected, so setup skips {names}. You can set them up later from Settings.":
     "{names} no están conectadas, así que las saltamos. Puedes prepararlas después en Configuración.",
-  "T3 Code collects anonymous usage data to help us improve it.":
-    "Sequoia AI guarda datos de uso anónimos para mejorar.",
   "To read more about how your data is used and how to opt out, see our":
     "Para saber cómo se usan tus datos y cómo desactivarlo, lee nuestra",
   "To read more about how your data is used, see our":
@@ -222,15 +218,11 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "No computers linked yet.": "Todavía no hay computadoras conectadas.",
   "Run this on each computer you want to connect.":
     "Corre esto en cada computadora que quieras conectar.",
-  "Keep T3 Code running. Select the computers you want to set up above.":
-    "Deja Sequoia AI abierto y elige arriba las computadoras que quieres preparar.",
   "Pairing failed.": "No se pudo conectar.",
   "Pairing link": "Enlace para conectar",
   "Need a pairing link?": "¿No tienes enlace?",
   "Pairing...": "Conectando…",
   Pair: "Conectar",
-  "On the computer with your code, start T3 Code or run":
-    "En la computadora con tus archivos, abre Sequoia AI o corre",
   ", then run:": " y luego corre:",
   "On a tailnet, run": "Si usas Tailscale, corre",
   "instead.": "en su lugar.",

@@ -19,6 +19,7 @@ import {
   settingsScopeEnvironmentLabels,
   settingsScopeProjectMachines,
 } from "./settingsScopeAxis";
+import { t } from "~/i18n";
 
 interface ScopeChoice {
   label: string;
@@ -66,7 +67,7 @@ export function SettingsScopeNotice({
           const { primary, secondary } = environment
             ? settingsScopeEnvironmentLabels(environment, environments)
             : {
-                primary: member.environmentLabel ?? "Environment",
+                primary: member.environmentLabel ?? t("Environment", undefined, "device"),
                 secondary: member.environmentId,
               };
           return {
@@ -84,7 +85,7 @@ export function SettingsScopeNotice({
         ? groups.map((group) => ({
             label: group.displayName,
             secondary: [
-              ...(group.archived ? ["Archived"] : []),
+              ...(group.archived ? [t("Archived")] : []),
               ...(groups.some(
                 (other) =>
                   other.projectKey !== group.projectKey && other.displayName === group.displayName,
@@ -114,7 +115,7 @@ export function SettingsScopeNotice({
               })
           : [
               {
-                label: "Open all environments",
+                label: t("Open all environments"),
                 icon: <LayersIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />,
                 search: {},
               },

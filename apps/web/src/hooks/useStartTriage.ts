@@ -1,4 +1,6 @@
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { t } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
@@ -77,7 +79,7 @@ export function useStartTriage() {
     // A null result means the user went elsewhere; only a throw is a failure.
     await handleNewThread(scopeProjectRef(project.value.environmentId, project.value.id), {
       prompt: prepared.value.prompt,
-    }).catch(() => fail("T3 Code could not open a new thread."));
+    }).catch(() => fail(t("{app} could not open a new chat.", { app: APP_BASE_NAME })));
   };
 
   return async (environmentId: EnvironmentId) => {

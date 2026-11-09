@@ -1,5 +1,6 @@
 import type { DesktopBridge, DesktopUpdateChannel, DesktopUpdateState } from "@t3tools/contracts";
 import { acceptsTrackSwitchRelease } from "@t3tools/shared/cliRelease";
+import { t } from "~/i18n";
 
 type TrackSwitchBridge = Pick<DesktopBridge, "setUpdateChannel">;
 
@@ -28,7 +29,7 @@ export async function prepareLocalTrackSwitch(
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "The update track did not change.",
+      message: error instanceof Error ? error.message : t("The update track did not change."),
     };
   }
   if (!input.reinstall) return { ok: true, local: null };
@@ -44,8 +45,12 @@ export async function prepareLocalTrackSwitch(
     ok: false,
     message:
       found !== null
-        ? `This app found ${found}, which is older than ${input.version}. Try again in a few minutes.`
-        : (local.message ?? `This app found no build of ${input.version} to install.`),
+        ? t("This app found {found}, which is older than {version}. Try again in a few minutes.", {
+            found,
+            version: input.version,
+          })
+        : (local.message ??
+          t("This app found no build of {version} to install.", { version: input.version })),
   };
 }
 

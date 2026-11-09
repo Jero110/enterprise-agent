@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import {
   SecretProviderId,
   SecretProviderKind,
@@ -79,11 +80,11 @@ export function secretProviderFromDraft(
   { readonly id: SecretProviderId; readonly config: SecretProviderConfig },
   SecretProviderDraftIssues
 > {
-  const label = decodeField(SecretProviderLabel, draft.name, "Enter a name.");
+  const label = decodeField(SecretProviderLabel, draft.name, t("Enter a name."));
   const account = decodeField(
     OnePasswordSecretProviderConfig.fields.account,
     draft.account,
-    "Enter the 1Password account.",
+    t("Enter the 1Password account."),
   );
 
   let id: SecretProviderId | null = null;
@@ -92,9 +93,9 @@ export function secretProviderFromDraft(
     nameIssue = label.failure;
   } else {
     id = target.mode === "edit" ? target.id : secretProviderIdFromName(label.success);
-    if (id === null) nameIssue = "The name needs at least one letter or digit.";
+    if (id === null) nameIssue = t("The name needs at least one letter or digit.");
     else if (target.mode === "add" && existingIds.has(id))
-      nameIssue = "A secret provider with this name exists.";
+      nameIssue = t("A secret provider with this name exists.");
   }
 
   if (

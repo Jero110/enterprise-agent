@@ -8,6 +8,8 @@ import type {
   ThreadLinkedPullRequest,
   ThreadPullRequestLink,
 } from "@t3tools/contracts";
+import { t } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { lazy, Suspense } from "react";
 import SideChatPane from "./SideChatPane";
@@ -122,8 +124,8 @@ export function RightPanelSurfaceContent(props: {
       if (!pullRequest.supported) {
         return (
           <PullRequestsUnavailableState
-            title="Pull requests unavailable"
-            error="Update this environment's T3 Code server to browse pull requests."
+            title={t("Pull requests unavailable")}
+            error={t("Update {app} on this computer to see pull requests.", { app: APP_BASE_NAME })}
           />
         );
       }

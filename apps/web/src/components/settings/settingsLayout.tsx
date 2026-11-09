@@ -193,7 +193,11 @@ export function PolicyTooltip({ children }: { readonly children: string }) {
       <TooltipTrigger
         delay={200}
         render={
-          <Button size="icon-micro" variant="ghost-muted" aria-label="Background policy details">
+          <Button
+            size="icon-micro"
+            variant="ghost-muted"
+            aria-label={t("Background policy details")}
+          >
             <InfoIcon className="size-3.5" />
           </Button>
         }
@@ -381,8 +385,8 @@ export function SettingsRow({
     source === "environment" && context?.scope.environmentIds.length === 1
       ? (context.environments.find(
           (environment) => environment.environmentId === context.scope.environmentIds[0],
-        )?.label ?? "environment")
-      : "environment";
+        )?.label ?? t("environment", undefined, "inheritedFrom"))
+      : t("environment", undefined, "inheritedFrom");
   const environmentSettingsById = new Map(
     (context?.connectedEnvironments ?? []).flatMap((environment) =>
       environment.serverConfig
@@ -396,7 +400,7 @@ export function SettingsRow({
       scopedKeys.length > 0 ? (
       source === "project" || source === "mixed" ? (
         <SettingResetButton
-          label={typeof title === "string" ? title : "override"}
+          label={typeof title === "string" ? title : t("override")}
           tooltip="Reset to inherited value"
           onClick={() => (onResetOverride ? onResetOverride() : clearOverrides(scopedKeys))}
         />
@@ -432,17 +436,17 @@ export function SettingsRow({
         : unavailable && control
           ? inertControl(
               !canWriteSettings
-                ? `This connection lacks permission to change settings on ${
-                    context
+                ? t("This connection lacks permission to change settings on {target}.", {
+                    target: context
                       ? context.connectedEnvironments
                           .filter((target) => !writableIds.has(target.environmentId))
                           .map((target) => target.label)
-                          .join(", ") || "the selected environment"
-                      : (primaryEnvironment?.label ?? "the primary environment")
-                  }.`
+                          .join(", ") || t("the selected environment")
+                      : (primaryEnvironment?.label ?? t("the primary environment")),
+                  })
                 : context
                   ? t("Reconnect the selected environment to change this setting.")
-                  : PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE,
+                  : t(PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE),
             )
           : environmentWide && control
             ? inertControl(t("Environment-wide setting. Select an environment to change it."))
@@ -459,16 +463,16 @@ export function SettingsRow({
       }),
     );
   const inheritance: { state: SettingInheritanceState; summary: string } = mixed
-    ? { state: "mixed", summary: "Mixed across selected environments" }
+    ? { state: "mixed", summary: t("Mixed across selected environments") }
     : source === "project"
-      ? { state: "overridden", summary: "Overridden for this project" }
+      ? { state: "overridden", summary: t("Overridden for this project") }
       : source === "t3.json"
-        ? { state: "inherited", summary: "Inherited from the repository's t3.json" }
+        ? { state: "inherited", summary: t("Inherited from the repository's t3.json") }
         : source === "environment" && scopedKeys.length > 0
-          ? { state: "inherited", summary: `Inherited from ${inheritedFrom}` }
+          ? { state: "inherited", summary: t("Inherited from {source}", { source: inheritedFrom }) }
           : customized
-            ? { state: "environment", summary: "Set on the environment" }
-            : { state: "default", summary: "Built-in default" };
+            ? { state: "environment", summary: t("Set on the environment") }
+            : { state: "default", summary: t("Built-in default") };
   const renderedInheritance =
     context && serverScoped && settingKeys.length > 0 ? (
       <SettingInheritance
@@ -567,7 +571,7 @@ export function SettingResetButton({
           <Button
             size="icon-micro"
             variant="ghost-muted"
-            aria-label={`Reset ${label} to default`}
+            aria-label={t("Reset {label} to default", { label: t(label) })}
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();

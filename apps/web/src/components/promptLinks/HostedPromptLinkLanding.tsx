@@ -5,11 +5,12 @@ import {
   promptLinkAppPath,
   promptLinkDeepLink,
 } from "@t3tools/shared/promptLinks";
+import { t } from "~/i18n";
 import { useLocation } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { DESKTOP_DOWNLOAD_URL } from "~/branding";
+import { APP_BASE_NAME, DESKTOP_DOWNLOAD_URL } from "~/branding";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { isHostedStaticApp } from "~/hostedPairing";
 import { useEnvironments } from "~/state/environments";
@@ -18,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
+import { describeRemovedHiddenCharacters } from "./linkedPrompt";
 
 const OPENER_STORAGE_KEY = "t3code:prompt-link-opener";
 const Opener = Schema.NullOr(Schema.Literals(["app", "browser"]));
@@ -46,8 +48,10 @@ function summarize(
       value:
         prompt.value === null
           ? {
-              title: "Open this thread",
-              description: "It opens in T3 Code if you're connected to the machine it runs on.",
+              title: t("Open this chat"),
+              description: t("It opens in {app} if you're connected to the computer it runs on.", {
+                app: APP_BASE_NAME,
+              }),
               prompt: null,
               details: [],
             }
@@ -147,10 +151,9 @@ function HostedPromptLinkLanding({
       <StandalonePageHeader title={title} description={description} />
       {prompt !== null && prompt.hiddenCharacters > 0 ? (
         <Alert className="mt-5" variant="error">
-          <AlertTitle>This prompt had hidden characters, it may be malicious</AlertTitle>
+          <AlertTitle>{t("This prompt had hidden characters, it may be malicious")}</AlertTitle>
           <AlertDescription>
-            T3 Code removed {prompt.hiddenCharacters} hidden character
-            {prompt.hiddenCharacters === 1 ? "" : "s"}. Read the prompt before you send it.
+            {describeRemovedHiddenCharacters(prompt.hiddenCharacters)}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -172,7 +175,7 @@ function HostedPromptLinkLanding({
           </Button>
         ) : null}
         <Button variant="ghost" render={<a href={DESKTOP_DOWNLOAD_URL} />}>
-          Get T3 Code
+          {t("Get {app}", { app: APP_BASE_NAME })}
         </Button>
       </div>
       <label className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">

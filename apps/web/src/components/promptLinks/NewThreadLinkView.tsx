@@ -1,4 +1,6 @@
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { t } from "~/i18n";
+import { APP_BASE_NAME } from "~/branding";
 import { getCloneDestinationPath } from "@t3tools/client-runtime/operations/projects";
 import {
   findPromptLinkProjects,
@@ -137,7 +139,10 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
       replace: true,
     }).catch(() => null);
     if (opened === null) {
-      setState({ status: "failed", message: "T3 Code could not open a new thread." });
+      setState({
+        status: "failed",
+        message: t("{app} could not open a new chat.", { app: APP_BASE_NAME }),
+      });
       return;
     }
     setState({ status: "opened" });
@@ -202,8 +207,10 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
     if (environmentId === null || newProjectsRoot === null) {
       setState({
         status: "failed",
-        message:
-          "This machine cannot clone from a link. Update T3 Code on it, or clone the repository from the command palette.",
+        message: t(
+          "This computer cannot copy a project from a link. Update {app} on it, or copy the project from the command palette.",
+          { app: APP_BASE_NAME },
+        ),
       });
       return;
     }

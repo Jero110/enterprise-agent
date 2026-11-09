@@ -1,4 +1,5 @@
 import { useAuth } from "@clerk/react";
+import { APP_BASE_NAME } from "~/branding";
 import { useAtomValue } from "@effect/atom-react";
 import type {
   AgentSessionProjectCandidate,
@@ -454,7 +455,10 @@ function ConnectionStep({
       ) : null}
       <div className="mt-6 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <p className="min-w-0 text-xs leading-relaxed text-muted-foreground">
-          {telemetryOff ?? t("T3 Code collects anonymous usage data to help us improve it.")}{" "}
+          {telemetryOff ??
+            t("{app} collects anonymous usage data to help us improve it.", {
+              app: APP_BASE_NAME,
+            })}{" "}
           {telemetryOff === undefined
             ? t("To read more about how your data is used and how to opt out, see our")
             : t("To read more about how your data is used, see our")}{" "}
@@ -518,7 +522,7 @@ function ConnectAccountOption({
           }
         >
           <CloudIcon className="size-4 text-muted-foreground" />
-          <span className="flex-1 text-left">T3 Connect</span>
+          <span className="flex-1 text-left">{t("Remote connection")}</span>
           <span className="text-xs text-muted-foreground">
             {!isLoaded
               ? t("Loading sign-in…")
@@ -556,7 +560,9 @@ function ConnectAccountOption({
             </p>
             <CommandBlock command="npx t3 connect" className="mt-3" />
             <p className="mt-3 text-xs text-muted-foreground">
-              {t("Keep T3 Code running. Select the computers you want to set up above.")}
+              {t("Keep {app} running. Select the computers you want to set up above.", {
+                app: APP_BASE_NAME,
+              })}
             </p>
           </div>
         </CollapsiblePanel>
@@ -662,7 +668,7 @@ function PairingForm({
           </div>
           <CollapsiblePanel>
             <p className="pt-3 text-sm text-muted-foreground">
-              {t("On the computer with your code, start T3 Code or run")}{" "}
+              {t("On the computer with your code, start {app} or run", { app: APP_BASE_NAME })}{" "}
               <code className="font-mono">npx t3 serve</code>
               {t(", then run:")}
             </p>

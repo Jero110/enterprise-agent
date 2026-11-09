@@ -14,6 +14,7 @@ import {
 } from "@t3tools/contracts";
 import { PlusIcon, XIcon } from "lucide-react";
 
+import { t } from "~/i18n";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { DraftInput } from "../ui/draft-input";
@@ -150,6 +151,19 @@ export function deriveProviderSettingsFields(
     });
 }
 
+/** Display copy of a field: labels and hints come from shared schemas in English. */
+function translateProviderSettingsField(
+  field: ProviderSettingsFieldModel,
+): ProviderSettingsFieldModel {
+  return {
+    ...field,
+    label: t(field.label),
+    description: field.description ? t(field.description) : field.description,
+    placeholder: field.placeholder ? t(field.placeholder) : field.placeholder,
+    options: field.options?.map((option) => ({ ...option, label: t(option.label) })),
+  };
+}
+
 let commandArgumentDraftId = 0;
 /**
  * Editable rows seeded from a configured value. `seen` is the value the rows
@@ -226,8 +240,8 @@ function ProviderCommandArguments({
 
   return (
     <SettingsRow
-      title="Arguments"
-      description="One literal argument per row, in launch order."
+      title={t("Arguments")}
+      description={t("One literal argument per row, in launch order.")}
       managed={managedReason}
       control={
         <Button
@@ -237,7 +251,7 @@ function ProviderCommandArguments({
           onClick={() => updateArguments([...rows, makeCommandArgumentDraftRow("")])}
         >
           <PlusIcon />
-          Add argument
+          {t("Add argument")}
         </Button>
       }
     >
@@ -261,7 +275,7 @@ function ProviderCommandArguments({
                       ),
                     )
                   }
-                  aria-label={`Argument ${index + 1}`}
+                  aria-label={t("Argument {index}", { index: index + 1 })}
                   spellCheck={false}
                 />
                 <Button
@@ -271,7 +285,7 @@ function ProviderCommandArguments({
                   onClick={() =>
                     updateArguments(rows.filter((current) => current.id !== argument.id))
                   }
-                  aria-label={`Remove argument ${index + 1}`}
+                  aria-label={t("Remove argument {index}", { index: index + 1 })}
                 >
                   <XIcon />
                 </Button>
@@ -384,7 +398,7 @@ function SecretSettingsControl({
           size="icon-sm"
           variant="ghost-destructive"
           onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
-          aria-label={`Clear ${field.label}`}
+          aria-label={t("Clear {name}", { name: field.label })}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -534,7 +548,7 @@ function ProviderSettingsFieldRow({
               size="icon-sm"
               variant="ghost-destructive"
               onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
-              aria-label={`Clear ${field.label}`}
+              aria-label={t("Clear {name}", { name: field.label })}
             >
               <XIcon className="size-3.5" />
             </Button>
@@ -678,7 +692,9 @@ export function ProviderSettingsForm({
   managed,
   environmentId,
 }: ProviderSettingsFormProps) {
-  const fields = deriveProviderSettingsFields(definition, value);
+  const fields = deriveProviderSettingsFields(definition, value).map(
+    translateProviderSettingsField,
+  );
   const isLocalAcp =
     definition.driverKind === "acpRegistry" &&
     readProviderConfigString(value, "source") === "local";

@@ -9,6 +9,7 @@ import {
 import { CheckIcon, ChevronRightIcon, LayersIcon } from "lucide-react";
 import * as Equal from "effect/Equal";
 
+import { t } from "~/i18n";
 import { cn } from "../../lib/utils";
 import type { EnvironmentPresentation } from "../../state/environments";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
@@ -46,54 +47,62 @@ const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<string, string> = {
 
 function formatValue(key: keyof ServerSettings, value: unknown): string {
   if (value === null || value === undefined) {
-    return key === "pullRequestMergeMethod"
-      ? "Last selected"
-      : key === "sidebarAutoSettleAfterDays"
-        ? "Never"
-        : key === "defaultModelSelection"
-          ? "Automatic"
-          : key === "sourceControlWriterModelSelection"
-            ? "Text generation model"
-            : key === "reviewGuideModelSelection"
-              ? "Source control writer model"
-              : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
-                ? "Inherit"
-                : "Not set";
+    return t(
+      key === "pullRequestMergeMethod"
+        ? "Last selected"
+        : key === "sidebarAutoSettleAfterDays"
+          ? "Never"
+          : key === "defaultModelSelection"
+            ? "Automatic"
+            : key === "sourceControlWriterModelSelection"
+              ? "Text generation model"
+              : key === "reviewGuideModelSelection"
+                ? "Source control writer model"
+                : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
+                  ? "Inherit"
+                  : "Not set",
+    );
   }
-  if (typeof value === "boolean") return value ? "On" : "Off";
+  if (typeof value === "boolean") return value ? t("On") : t("Off");
   if (typeof value === "number") {
     return key === "sidebarAutoSettleAfterDays"
-      ? `${value} ${value === 1 ? "day" : "days"}`
+      ? value === 1
+        ? t("1 day")
+        : t("{count} days", { count: value })
       : String(value);
   }
   if (typeof value === "string") {
     if (key === "defaultThreadEnvMode" && (value === "local" || value === "worktree")) {
-      return resolveEnvModeLabel(value);
+      return t(resolveEnvModeLabel(value));
     }
     if (key === "worktreeSubmodules" && value in WORKTREE_SUBMODULES_LABELS) {
-      return WORKTREE_SUBMODULES_LABELS[value as WorktreeSubmodules];
+      return t(WORKTREE_SUBMODULES_LABELS[value as WorktreeSubmodules]);
     }
     if (key === "pullRequestMergeMethod" && value in PULL_REQUEST_MERGE_METHOD_LABELS) {
-      return PULL_REQUEST_MERGE_METHOD_LABELS[
-        value as keyof typeof PULL_REQUEST_MERGE_METHOD_LABELS
-      ];
+      return t(
+        PULL_REQUEST_MERGE_METHOD_LABELS[value as keyof typeof PULL_REQUEST_MERGE_METHOD_LABELS],
+      );
     }
-    return value === "" ? "Empty" : value;
+    return value === "" ? t("Empty") : value;
   }
-  if (Array.isArray(value)) return `${value.length} ${value.length === 1 ? "item" : "items"}`;
+  if (Array.isArray(value)) {
+    return value.length === 1 ? t("1 item") : t("{count} items", { count: value.length });
+  }
   if (typeof value === "object") {
     if (key === "backgroundActivity" && "profile" in value && typeof value.profile === "string") {
-      return BACKGROUND_ACTIVITY_PROFILE_LABELS[value.profile] ?? value.profile;
+      const profileLabel = BACKGROUND_ACTIVITY_PROFILE_LABELS[value.profile];
+      return profileLabel ? t(profileLabel) : value.profile;
     }
     if ("model" in value && typeof value.model === "string") return value.model;
     if ("mode" in value && typeof value.mode === "string") {
-      if (key === "worktreeCleanup") return value.mode === "off" ? "Off" : "Custom";
-      return key === "sourceControlWritingStyle"
-        ? (WRITING_STYLE_LABELS[value.mode] ?? value.mode)
+      if (key === "worktreeCleanup") return value.mode === "off" ? t("Off") : t("Custom");
+      const writingStyleLabel = WRITING_STYLE_LABELS[value.mode];
+      return key === "sourceControlWritingStyle" && writingStyleLabel
+        ? t(writingStyleLabel)
         : value.mode;
     }
   }
-  return "Custom";
+  return t("Custom");
 }
 
 /** Matches resolveProjectSettings order. */
@@ -110,8 +119,8 @@ export function settingInheritanceLayers(
   if (target.projectId !== null && isProjectScopedSettingKey(key)) {
     layers.push({
       key: "project",
-      label: "Project",
-      value: source === "project" ? formatValue(key, target.settings[key]) : "Inherits",
+      label: t("Project"),
+      value: source === "project" ? formatValue(key, target.settings[key]) : t("Inherits"),
       effective: source === "project",
       set: source === "project",
     });
@@ -119,7 +128,7 @@ export function settingInheritanceLayers(
   layers.push({
     key: "environment",
     label: target.label,
-    value: environmentSet ? formatValue(key, environmentValue) : "Inherits",
+    value: environmentSet ? formatValue(key, environmentValue) : t("Inherits"),
     effective: source === "environment" && environmentSet,
     set: environmentSet,
   });
@@ -127,7 +136,7 @@ export function settingInheritanceLayers(
     layers.push({
       key: "t3.json",
       label: "t3.json",
-      value: source === "t3.json" ? formatValue(key, target.settings[key]) : "Inherits",
+      value: source === "t3.json" ? formatValue(key, target.settings[key]) : t("Inherits"),
       effective: source === "t3.json",
       set: source === "t3.json",
     });
@@ -138,7 +147,7 @@ export function settingInheritanceLayers(
     : DEFAULT_SERVER_SETTINGS[key];
   layers.push({
     key: "built-in",
-    label: "Default",
+    label: t("Default"),
     value: formatValue(key, builtIn),
     effective: source === "environment" && !environmentSet,
     set: true,
@@ -190,7 +199,11 @@ export function SettingInheritance({
   const hasMultipleEnvironments = new Set(targets.map((target) => target.environmentId)).size > 1;
   const overrideSummary =
     overridingProjects.length > 0
-      ? `${summary} · ${overridingProjects.length} project ${overridingProjects.length === 1 ? "override" : "overrides"}`
+      ? `${summary} · ${
+          overridingProjects.length === 1
+            ? t("1 project override")
+            : t("{count} project overrides", { count: overridingProjects.length })
+        }`
       : summary;
   const chains = targets.flatMap((target) => {
     const environment = environments.find(
@@ -252,7 +265,9 @@ export function SettingInheritance({
                 <Button
                   size="icon-micro"
                   variant="ghost-muted"
-                  aria-label={`${overrideSummary}. Show where this value comes from`}
+                  aria-label={t("{summary}. Show where this value comes from", {
+                    summary: overrideSummary,
+                  })}
                 />
               }
             />
@@ -290,7 +305,9 @@ export function SettingInheritance({
                         layer.effective ? "font-medium text-foreground" : "text-muted-foreground",
                       )}
                     >
-                      {layer.key === "environment" ? "Environment" : layer.label}
+                      {layer.key === "environment"
+                        ? t("Environment", undefined, "device")
+                        : layer.label}
                     </span>
                     <span
                       className={cn(
@@ -343,7 +360,7 @@ export function SettingInheritance({
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {winningLayer?.key === "environment"
-                              ? "Environment"
+                              ? t("Environment", undefined, "device")
                               : winningLayer?.label}
                           </span>
                           <ChevronRightIcon
@@ -377,7 +394,7 @@ export function SettingInheritance({
                     {chain}
                     {hasMultipleEnvironments ? (
                       <p className="px-2 pt-1.5 text-xs text-muted-foreground">
-                        Same on all machines
+                        {t("Same on all machines")}
                       </p>
                     ) : null}
                   </>
@@ -396,14 +413,14 @@ export function SettingInheritance({
                             aria-hidden
                             className="size-3 [[data-panel-open]_&]:rotate-90"
                           />
-                          Overridden by
+                          {t("Overridden by")}
                         </CollapsibleTrigger>
                       ) : (
-                        <span>Overridden by</span>
+                        <span>{t("Overridden by")}</span>
                       )}
                       {onClearOverrides ? (
                         <InlineButton onClick={() => onClearOverrides(overriding)}>
-                          Reset {overriding.length === 1 ? "it" : "all"}
+                          {overriding.length === 1 ? t("Reset it") : t("Reset all")}
                         </InlineButton>
                       ) : null}
                     </div>
