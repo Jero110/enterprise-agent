@@ -10,6 +10,7 @@ import { createContext, useContext, useRef, useState, type ReactNode } from "rea
 
 import { t } from "~/i18n";
 import { randomUUID } from "~/lib/utils";
+import { useProjectBoardStore } from "~/projectBoardStore";
 import { enterpriseEnvironment } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -57,6 +58,9 @@ export function ProjectBoardProvider({
   const [activeBoardId, selectBoard] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Boards an older version kept in this browser; they can be copied into the project once.
+  const browserBoards = useProjectBoardStore((state) => state.boards);
+  const [imported, setImported] = useState(false);
   // Edits show at once; the server copy takes over again once the query reaches the saved revision.
   const [optimistic, setOptimisticState] = useState<Boards | null>(null);
   const [awaitRevision, setAwaitRevision] = useState<number | null>(null);
@@ -185,6 +189,23 @@ export function ProjectBoardProvider({
         <Button variant="ghost" size="xs" onClick={query.refresh}>
           {t("Refresh")}
         </Button>
+        {!imported && browserBoards.length > 0 && allowed && query.data !== null ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              const copies = browserBoards.map((board) => ({
+                ...board,
+                id: randomUUID(),
+                tasks: board.tasks.map((task) => ({ ...task, id: randomUUID() })),
+              }));
+              replace((current) => [...current, ...copies]);
+              setImported(true);
+            }}
+          >
+            {t("Import browser boards into this project")}
+          </Button>
+        ) : null}
       </div>
       <fieldset
         // Never on a save or a poll: dimming the board on each edit dropped focus mid-typing.

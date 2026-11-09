@@ -25,8 +25,6 @@ import {
   type ProjectTaskPriority,
   type ProjectTaskStatus,
 } from "~/projectBoardStore";
-import { enterpriseEnvironment, useEnterpriseStatus } from "~/state/enterprise";
-import { useEnvironmentQuery } from "~/state/query";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
@@ -511,7 +509,7 @@ function BoardView() {
   );
 }
 
-/** Company project boards, only while signed in to an enterprise; mentioning a board, task or tag gives the agent that context. */
+/** This project's boards, saved on the connected server; the composer attaches the tasks a message talks about. */
 export function ProjectsBoardButton({
   environmentId,
   projectId,
@@ -520,15 +518,6 @@ export function ProjectsBoardButton({
   readonly projectId: ProjectId;
 }) {
   const [open, setOpen] = useState(false);
-  const { identity } = useEnterpriseStatus();
-  // Keeps the board query mounted while a thread is open, so a message that mentions a task
-  // finds the board already loaded and attaches it on the first send.
-  useEnvironmentQuery(
-    identity !== null
-      ? enterpriseEnvironment.projectBoard({ environmentId, input: { projectId } })
-      : null,
-  );
-  if (identity === null) return null;
   return (
     <>
       <Tooltip>

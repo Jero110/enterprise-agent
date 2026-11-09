@@ -75,6 +75,7 @@ import {
   type DraftThreadEnvMode,
   useComposerDraftStore,
   DraftId,
+  composerTargetKey,
 } from "../../composerDraftStore";
 import {
   filterTerminalContextsWithText,
@@ -89,6 +90,10 @@ import {
   isProjectBoardContextKind,
   projectBoardContextForMessage,
 } from "../../projectBoardContext";
+import {
+  clearBoardContextDismissals,
+  readBoardContextDismissals,
+} from "../projects/boardContextDismissals";
 import { AsyncResult } from "effect/reactivity";
 import { enterpriseEnvironment } from "../../state/enterprise";
 import { environmentServerConfigsAtom } from "../../state/server";
@@ -894,6 +899,7 @@ export function useComposerSend(input: ComposerSendInput) {
     // Records bind attachments by the id each side knows: the local id for the optimistic
     // row, the upload id (or local id on the data-URL path) on the wire; the server
     // rebinds them to the persisted id.
+    const boardDraftKey = composerTargetKey(composerDraftTarget);
     const projectBoardContext = projectBoardContextForMessage(
       messageTextForSend,
       AsyncResult.getOrElse(
@@ -905,6 +911,7 @@ export function useComposerSend(input: ComposerSendInput) {
         ),
         () => null,
       )?.boards ?? [],
+      readBoardContextDismissals(boardDraftKey),
     );
     const buildOutgoingMessageContext = (attachmentIds: ReadonlyArray<string>) => {
       const context = buildMessageContext({
@@ -941,6 +948,7 @@ export function useComposerSend(input: ComposerSendInput) {
     if (composerRef.current?.validateProviderInput(outgoingMessageText) === false) {
       return;
     }
+    clearBoardContextDismissals(boardDraftKey);
 
     const readLiveAttachmentCapabilities = () => {
       const config = appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId) ?? null;

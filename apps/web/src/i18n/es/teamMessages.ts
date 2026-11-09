@@ -110,4 +110,9 @@ export const ES_TEAM_MESSAGES: Readonly<Record<string, string>> = {
   "Messages don't need an answer.": "Los mensajes no necesitan respuesta.",
   "A skill request is installed or declined.": "Una solicitud de skill se instala o se rechaza.",
   "A card request is accepted or declined.": "Una solicitud de tarjeta se agrega o se rechaza.",
+  // Board tasks attached to a chat message, and the board's browser import
+  "Tasks that attach:": "Tareas que se adjuntan:",
+  "Board {name}": "Tablero {name}",
+  "Don't attach {name}": "No adjuntar {name}",
+  "Import browser boards into this project": "Traer tableros guardados en este navegador",
 };

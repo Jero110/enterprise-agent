@@ -203,6 +203,7 @@ import {
   ComposerQueuedAttachmentRow,
   ComposerRestingImagePreviews,
 } from "./ComposerAttachmentStrip";
+import { ComposerBoardTasks } from "../projects/ComposerBoardTasks";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
 import { ComposerDictationButton } from "./ComposerDictationButton";
@@ -3390,6 +3391,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               {composerAttachmentMediaRow}
 
               {composerAttachmentFileList}
+
+              {activePendingProgress === null ? (
+                <ComposerBoardTasks
+                  environmentId={environmentId}
+                  projectId={activeProjectId}
+                  draftKey={composerDraftTargetKey}
+                  prompt={prompt}
+                />
+              ) : null}
 
               <div className="relative">
                 {previewFile ? (
