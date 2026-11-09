@@ -230,6 +230,14 @@ describe("KnowledgeProposals", () => {
           "raw/a/../a.pdf",
         ].map((relativePath) => ({ ...valid, files: [{ ...valid.files[0]!, relativePath }] })),
         { ...valid, files: [{ ...valid.files[0]!, bytes: new Uint8Array(10_485_761) }] },
+        {
+          ...valid,
+          files: Array.from({ length: 4 }, (_, index) => ({
+            ...valid.files[0]!,
+            name: `${index}.pdf`,
+            bytes: new Uint8Array(9 * 1024 * 1024),
+          })),
+        },
       ]) {
         expect(yield* codeOf(proposals.upload(BRUNO, input))).not.toBe("ok");
       }

@@ -314,7 +314,7 @@ export const layer = Layer.effect(
         input.reason.length > 2_000 ||
         input.files.length < 1 ||
         input.files.length > 20 ||
-        input.files.reduce((size, file) => size + file.bytes.byteLength, 0) > 40 * 1024 * 1024 ||
+        input.files.reduce((size, file) => size + file.bytes.byteLength, 0) > 35 * 1024 * 1024 ||
         new Set(input.files.map((file) => file.relativePath ?? file.name)).size !==
           input.files.length ||
         input.files.some(
@@ -423,7 +423,7 @@ export const layer = Layer.effect(
         bytes: Uint8Array.from(Buffer.from(file.base64, "base64")),
       }));
       if (
-        files.reduce((total, file) => total + file.bytes.byteLength, 0) > 40 * 1024 * 1024 ||
+        files.reduce((total, file) => total + file.bytes.byteLength, 0) > 35 * 1024 * 1024 ||
         files.some(
           (file, i) => Buffer.from(file.bytes).toString("base64") !== input.files[i]!.base64,
         )
