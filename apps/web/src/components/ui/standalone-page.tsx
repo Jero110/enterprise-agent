@@ -23,7 +23,7 @@ export function StandalonePageHeader({
   return (
     <>
       <div className="flex items-baseline justify-between gap-3 text-muted-foreground">
-        <span className="flex items-baseline gap-1.5" role="img" aria-label="Sequoia AI">
+        <span className="flex items-baseline gap-1.5" role="img" aria-label="Norai">
           <T3Wordmark className="h-4 w-auto shrink-0 text-foreground" aria-hidden />
         </span>
         {context ? <span className="text-sm">{context}</span> : null}

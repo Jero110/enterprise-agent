@@ -21,10 +21,12 @@ export function ConnectedIngestTab({
   environmentId,
   modelSelection,
   onReview,
+  onOpenMap,
 }: {
   environmentId: EnvironmentId;
   modelSelection: ModelSelection;
   onReview: () => void;
+  onOpenMap: () => void;
 }) {
   const canStart = useAtomValue(enterpriseEnvironment.ingestStart.permissionAtom(environmentId));
   const { identity } = useEnterpriseStatus();
@@ -36,6 +38,7 @@ export function ConnectedIngestTab({
     <IngestTab
       environmentId={environmentId}
       onReview={onReview}
+      onOpenMap={onOpenMap}
       connectors={<ConnectorsSection environmentId={environmentId} />}
       ingestion={{
         canStart,

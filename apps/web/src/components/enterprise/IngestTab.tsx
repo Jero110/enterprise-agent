@@ -7,7 +7,7 @@ import type {
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { FolderOpenIcon, Link2Icon, FilesIcon, UploadCloudIcon } from "lucide-react";
 import {
@@ -21,6 +21,7 @@ import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { areaDestinations, ingestStartError } from "./ingestDestinations";
+import { noraiDemoSteps, proposeDemoFile, resetDemo, useDemoState } from "./noraiDemo";
 import { ingestSourceSelection, type IngestSourceMode } from "./ingestSourceSelection";
 import {
   droppedUploadFiles,
@@ -43,11 +44,13 @@ export function IngestTab({
   connectors,
   ingestion,
   onReview,
+  onOpenMap,
 }: {
   environmentId: EnvironmentId;
   connectors?: ReactNode;
   ingestion?: IncrementalIngestion;
   onReview?: () => void;
+  onOpenMap?: () => void;
 }) {
   const { identity } = useEnterpriseStatus();
   if (!identity) return null;
@@ -58,6 +61,7 @@ export function IngestTab({
         environmentId={environmentId}
         ingestion={ingestion}
         onReview={onReview}
+        onOpenMap={onOpenMap}
       />
       {identity.role === "admin" && (
         <>
@@ -101,10 +105,12 @@ function IngestionRun({
   environmentId,
   ingestion,
   onReview,
+  onOpenMap,
 }: {
   environmentId: EnvironmentId;
   ingestion: IncrementalIngestion | undefined;
   onReview: (() => void) | undefined;
+  onOpenMap: (() => void) | undefined;
 }) {
   const org = useEnvironmentQuery(enterpriseEnvironment.org({ environmentId, input: {} }));
   const { identity } = useEnterpriseStatus();
@@ -136,10 +142,22 @@ function IngestionRun({
   });
   const [stagedCount, setStagedCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [demoStep, setDemoStep] = useState<number | null>(null);
+  const demoBusy = demoStep !== null;
+  const { active: demoReady } = useDemoState(environmentId);
+  const demoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- cancel a pending demo timer when the tab unmounts
+  useEffect(
+    () => () => {
+      if (demoTimer.current) clearTimeout(demoTimer.current);
+    },
+    [],
+  );
   const runStatus = useEnvironmentQuery(
     run ? enterpriseEnvironment.ingestStatus({ environmentId, input: { runId: run.runId } }) : null,
   );
   const { sourceUrls, selectedFiles } = ingestSourceSelection(sourceMode, urls, files);
+  const canSelectFiles = Boolean(ingestion?.canStart) || import.meta.env.DEV;
   const start = async () => {
     if (!ingestion || busy) return;
     const fileError = uploadFileError(selectedFiles);
@@ -293,7 +311,7 @@ function IngestionRun({
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
-              if (busy || !ingestion?.canStart) return;
+              if (busy || !canSelectFiles) return;
               const dropped = droppedUploadFiles(event.dataTransfer);
               if (dropped === null) {
                 setFiles([]);
@@ -325,7 +343,7 @@ function IngestionRun({
             <Button
               size="sm"
               variant="outline"
-              disabled={busy || !ingestion?.canStart}
+              disabled={busy || !canSelectFiles}
               onClick={() => (sourceMode === "folder" ? folderInput : fileInput).current?.click()}
             >
               {sourceMode === "folder" ? t("Choose folder") : t("Choose files")}
@@ -339,7 +357,7 @@ function IngestionRun({
               multiple
               className="sr-only"
               aria-label={t("Choose folder")}
-              disabled={busy || !ingestion?.canStart}
+              disabled={busy || !canSelectFiles}
               onChange={(event) => {
                 const selected = droppedUploadFiles({ items: [], files: event.target.files ?? [] });
                 event.target.value = "";
@@ -357,7 +375,7 @@ function IngestionRun({
               multiple
               className="sr-only"
               aria-label={t("Choose files")}
-              disabled={busy || !ingestion?.canStart}
+              disabled={busy || !canSelectFiles}
               onChange={(event) => {
                 setFiles(Array.from(event.target.files ?? []));
                 event.target.value = "";
@@ -405,6 +423,61 @@ function IngestionRun({
           {t("Nothing is published until a reviewer approves it.")}
         </p>
       </div>
+      {import.meta.env.DEV && (
+        <div className="space-y-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4">
+          <p className="text-sm font-medium">{t("Norai knowledge map preview")}</p>
+          <p className="text-xs text-muted-foreground">
+            {t(
+              "Ask a mock agent to ingest one file. It files a proposal in Changes; approving it adds a single new node to the sample map. Files are not analyzed or uploaded.",
+            )}
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={demoBusy || !selectedFiles.length}
+              onClick={() => {
+                const fileName = selectedFiles[0]?.name;
+                if (!fileName) return;
+                const advance = (step: number) => {
+                  setDemoStep(step);
+                  demoTimer.current = setTimeout(() => {
+                    if (step + 1 < noraiDemoSteps.length) return advance(step + 1);
+                    proposeDemoFile(environmentId, fileName);
+                    setDemoStep(null);
+                    onReview?.();
+                  }, 700);
+                };
+                advance(0);
+              }}
+            >
+              {demoBusy ? t("Ingesting…") : t("Ingest selected file")}
+            </Button>
+            {demoReady && (
+              <>
+                <Button size="sm" variant="ghost" onClick={onOpenMap}>
+                  {t("Open knowledge map")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    resetDemo(environmentId);
+                    onOpenMap?.();
+                  }}
+                >
+                  {t("Return to live map")}
+                </Button>
+              </>
+            )}
+          </div>
+          {demoBusy && (
+            <p role="status" className="text-xs text-muted-foreground">
+              {t(noraiDemoSteps[demoStep ?? 0] ?? "Ingesting")}…
+            </p>
+          )}
+        </div>
+      )}
       {busy && (
         <p role="status" className="text-sm text-muted-foreground">
           {selectedFiles.length

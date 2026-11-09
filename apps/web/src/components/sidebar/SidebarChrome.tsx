@@ -21,6 +21,7 @@ import {
   useEnvironmentStageLabel,
 } from "../SidebarStageBackdrop";
 import { EnterpriseHeaderButton } from "../enterprise/EnterpriseHeaderButton";
+import { T3Wordmark } from "../T3Wordmark";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -175,7 +176,7 @@ function HistoryNavigationButton({
 function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <Link
-      aria-label={t("Sequoia AI home")}
+      aria-label={t("Norai home")}
       className={cn(
         "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
         onBackdrop ? "text-white" : "text-foreground",
@@ -191,12 +192,11 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 items-center gap-1.5 truncate font-serif text-sm tracking-tight",
+        "inline-flex min-w-0 items-center gap-1.5 truncate text-sm",
         onBackdrop ? "text-white" : "text-foreground",
       )}
     >
-      <img src="/enterprise-agent.svg" alt="" aria-hidden className="size-5 shrink-0" />
-      sequoia ai
+      <T3Wordmark aria-hidden className="h-4 w-auto shrink-0" />
     </span>
   );
 }

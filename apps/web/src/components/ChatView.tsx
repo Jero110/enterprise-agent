@@ -3268,10 +3268,7 @@ export default function ChatView(props: ChatViewProps) {
       showThreadPanelControl={!inlineRightPanelOwnsTitleBar}
       leadingControls={
         <>
-          <ProjectsBoardButton
-            environmentId={activeThread.environmentId}
-            projectId={activeThread.projectId}
-          />
+          <ProjectsBoardButton environmentId={activeThread.environmentId} />
           <EnterpriseHeaderControls
             threadId={activeThread.id}
             skills={timelineSkills}

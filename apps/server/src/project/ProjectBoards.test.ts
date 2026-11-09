@@ -1,13 +1,13 @@
 import { expect, it } from "@effect/vitest";
-import { ProjectId } from "@t3tools/contracts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 
-import Migration from "../persistence/Migrations/087_ProjectBoards.ts";
+import Legacy from "../persistence/Migrations/087_ProjectBoards.ts";
+import Migration from "../persistence/Migrations/093_UserBoards.ts";
 import * as ProjectBoards from "./ProjectBoards.ts";
 
-const projectId = ProjectId.make("project-a");
+const ana = "ana@x.test";
 const boards = [
   {
     id: "board",
@@ -28,47 +28,70 @@ const boards = [
 ];
 
 it.effect(
-  "persists project boards across service instances and refuses stale writes and invalid projects",
+  "keeps one board space per identity, migrates project boards to the shared space, and refuses stale writes",
   () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      yield* sql`CREATE TABLE projection_projects (project_id TEXT PRIMARY KEY, deleted_at TEXT)`;
-      yield* sql`INSERT INTO projection_projects VALUES ('project-a', NULL), ('project-b', NULL), ('deleted', 'now')`;
+      yield* Legacy;
+      yield* sql`INSERT INTO project_boards VALUES ('project-a', 3, ${JSON.stringify(boards)}), ('project-b', 1, ${JSON.stringify([{ id: "board-b", name: "Other", tasks: [] }])})`;
       yield* Migration;
       const first = yield* ProjectBoards.ProjectBoards.pipe(Effect.provide(ProjectBoards.layer));
-      expect(yield* first.get({ projectId })).toEqual({ revision: 0, boards: [] });
-      expect(yield* first.save({ projectId, revision: 0, boards })).toEqual({
-        revision: 1,
-        boards,
-      });
+      const shared = yield* first.get(null);
+      expect(shared.revision).toBe(4);
+      expect(shared.boards.map((board) => board.id)).toEqual(["board", "board-b"]);
+      // The first identified member claims the shared space once; nobody else gets a copy.
+      expect(yield* first.get(ana)).toEqual(shared);
+      expect(yield* first.get(null)).toEqual({ revision: 0, boards: [] });
+      expect(yield* first.get("BRUNO@x.test")).toEqual({ revision: 0, boards: [] });
+
+      expect(yield* first.save(ana, { revision: 4, boards })).toEqual({ revision: 5, boards });
       const reopened = yield* ProjectBoards.ProjectBoards.pipe(Effect.provide(ProjectBoards.layer));
-      expect(yield* reopened.get({ projectId })).toEqual({ revision: 1, boards });
-      expect(yield* reopened.get({ projectId: ProjectId.make("project-b") })).toEqual({
-        revision: 0,
-        boards: [],
-      });
+      expect(yield* reopened.get(" Ana@X.test ")).toEqual({ revision: 5, boards });
+
       expect(
-        yield* reopened.save({ projectId, revision: 0, boards: [] }).pipe(Effect.flip),
+        yield* reopened.save(ana, { revision: 0, boards: [] }).pipe(Effect.flip),
       ).toMatchObject({ code: "conflict" });
       expect(
         yield* reopened
-          .save({ projectId, revision: 1, boards: [...boards, ...boards] })
+          .save(ana, { revision: 5, boards: [...boards, ...boards] })
           .pipe(Effect.flip),
       ).toMatchObject({ code: "invalid" });
-      for (const id of ["missing", "deleted"]) {
-        expect(
-          yield* reopened.get({ projectId: ProjectId.make(id) }).pipe(Effect.flip),
-        ).toMatchObject({ code: "not_found" });
-        expect(
-          yield* reopened
-            .save({ projectId: ProjectId.make(id), revision: 0, boards })
-            .pipe(Effect.flip),
-        ).toMatchObject({ code: "not_found" });
-      }
-      expect(yield* reopened.get({ projectId })).toEqual({ revision: 1, boards });
-      expect(yield* reopened.save({ projectId, revision: 1, boards: [] })).toEqual({
-        revision: 2,
-        boards: [],
-      });
+      expect(yield* reopened.get(ana)).toEqual({ revision: 5, boards });
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect("moves a card between boards and columns for one owner only", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* Legacy;
+    yield* Migration;
+    const service = yield* ProjectBoards.ProjectBoards.pipe(Effect.provide(ProjectBoards.layer));
+    const target = { id: "done", name: "Done", tasks: [] };
+    yield* service.save(ana, { revision: 0, boards: [...boards, target] });
+    const moved = yield* service.moveCard(ana, {
+      cardId: "card",
+      toBoardId: "done",
+      status: "complete",
+    });
+    expect(moved.revision).toBe(2);
+    expect(moved.boards[0]?.tasks).toEqual([]);
+    expect(moved.boards[1]?.tasks).toMatchObject([{ id: "card", status: "complete" }]);
+    expect(yield* service.moveCard(ana, { cardId: "card", status: "blocked" })).toMatchObject({
+      revision: 3,
+    });
+    expect(yield* service.moveCard(ana, { cardId: "nope" }).pipe(Effect.flip)).toMatchObject({
+      code: "not_found",
+    });
+    expect(
+      yield* service.moveCard(ana, { cardId: "card", toBoardId: "missing" }).pipe(Effect.flip),
+    ).toMatchObject({ code: "not_found" });
+    expect(
+      yield* service
+        .moveCard("bruno@x.test", { cardId: "card", status: "backlog" })
+        .pipe(Effect.flip),
+    ).toMatchObject({ code: "not_found" });
+    expect(yield* sql`SELECT revision FROM user_boards WHERE owner = 'ana@x.test'`).toEqual([
+      { revision: 3 },
+    ]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );

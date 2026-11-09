@@ -1,6 +1,6 @@
 import type { EnvironmentId, KnowledgeProposal } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   enterpriseEnvironment,
   enterpriseFiles,
@@ -8,7 +8,6 @@ import {
   useEnterpriseStatus,
 } from "~/state/enterprise";
 import { getLocale, t } from "~/i18n";
-import { cn } from "~/lib/utils";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import {
@@ -18,13 +17,8 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { toastManager } from "../ui/toast";
-import {
-  SHOW_KNOWLEDGE_GRAPH,
-  pendingGraphNodes,
-  personName,
-  proposalAreaName,
-  proposalTitle,
-} from "./proposalGraph";
+import { pendingGraphNodes, personName, proposalAreaName, proposalTitle } from "./proposalGraph";
+import { decideDemoProposal, demoKnowledgeProposals, useDemoState } from "./noraiDemo";
 
 const STATUS_LABELS: Record<KnowledgeProposal["status"], string> = {
   pending: "Pending",
@@ -108,7 +102,20 @@ function ProposalDetails({
   });
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
+  const isDemo = proposal.id.startsWith("demo-");
   const resolve = async (action: "approve" | "reject" | "revert") => {
+    if (isDemo) {
+      if (action !== "revert")
+        decideDemoProposal(environmentId, proposal.id, action, reason.trim());
+      toastManager.add({
+        type: "success",
+        title:
+          action === "approve"
+            ? t("Saved to {area} knowledge", { area: areaName })
+            : t("Proposal rejected"),
+      });
+      return;
+    }
     setBusy(true);
     const result = await decide({
       environmentId,
@@ -258,7 +265,7 @@ function ProposalDetails({
             {t("Revert")}
           </Button>
         )}
-      {proposal.status === "pending" && proposal.canDecide === true && permission && (
+      {proposal.status === "pending" && proposal.canDecide === true && (permission || isDemo) && (
         <div className="flex flex-wrap items-center gap-2">
           <Button size="xs" disabled={busy} onClick={() => void resolve("approve")}>
             {t("Approve")}
@@ -326,13 +333,13 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
   );
   const org = useEnvironmentQuery(enterpriseEnvironment.org({ environmentId, input: {} }));
   const [selected, setSelected] = useState<string | null>(null);
-  const [graphReady, setGraphReady] = useState(false);
-  const frame = useRef<HTMLIFrameElement>(null);
-  const proposals = inbox.data?.proposals ?? [];
+  const demo = useDemoState(environmentId);
+  const demoProposals = demo.active ? demoKnowledgeProposals(demo.state) : [];
+  const proposals = [...demoProposals, ...(inbox.data?.proposals ?? [])];
   const pending = proposals.filter((proposal) => proposal.status === "pending");
-  const selectedProposal = proposals.find((proposal) => proposal.id === selected);
+  const selectedProposal = proposals.find((proposal) => proposal.id === selected) ?? pending[0];
   const teams = org.data?.teams ?? [];
-  const graphNodes = pendingGraphNodes(inbox.data?.proposals ?? [], teams);
+  const graphNodes = pendingGraphNodes(proposals, teams);
   // What the hub applied today, newest first: visible proof that the team's knowledge grew.
   const learnedToday = proposals
     .filter(
@@ -343,40 +350,8 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
   const graphGroups = [
     ...new Map(graphNodes.map((node) => [node.groupId, node.groupLabel])).entries(),
   ];
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- synchronize the sandboxed graph with hub-confirmed pending proposals
-  useEffect(() => {
-    if (graphReady)
-      frame.current?.contentWindow?.postMessage(
-        {
-          type: "knowledge-proposals",
-          nodes: pendingGraphNodes(inbox.data?.proposals ?? [], org.data?.teams ?? []),
-        },
-        "*",
-      );
-  }, [graphReady, inbox.data?.proposals, org.data?.teams]);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- receive node selection and readiness from the sandboxed graph
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.source !== frame.current?.contentWindow) return;
-      if (event.data?.type === "knowledge-graph-ready") setGraphReady(true);
-      if (
-        event.data?.type === "knowledge-proposal-selected" &&
-        inbox.data?.proposals.some(
-          (proposal) => proposal.status === "pending" && proposal.id === event.data.id,
-        )
-      )
-        setSelected(event.data.id);
-      if (event.data?.type === "knowledge-proposal-cleared") setSelected(null);
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [inbox.data?.proposals]);
   const selectProposal = (id: string) => {
     setSelected(id);
-    frame.current?.contentWindow?.postMessage(
-      { type: "knowledge-proposal-focus", id: `proposal:${id}` },
-      "*",
-    );
   };
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
@@ -441,27 +416,11 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
         aria-label={t("Pending context changes")}
         className="overflow-hidden rounded-xl border bg-background"
       >
-        <div className={cn(SHOW_KNOWLEDGE_GRAPH && "grid lg:grid-cols-[minmax(0,1fr)_230px]")}>
-          {SHOW_KNOWLEDGE_GRAPH && (
-            <iframe
-              ref={frame}
-              title={t("Interactive context changes graph")}
-              sandbox="allow-scripts"
-              src="/context-graph/index.html"
-              className="h-[470px] w-full border-0"
-            />
-          )}
-          <aside
-            aria-label={t("Pending proposals by scope")}
-            className={cn(
-              "space-y-3 p-4",
-              SHOW_KNOWLEDGE_GRAPH &&
-                "max-h-[470px] overflow-y-auto border-t lg:border-t-0 lg:border-l",
-            )}
-          >
+        <div>
+          <aside aria-label={t("Pending proposals by scope")} className="space-y-3 p-4">
             {graphGroups.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                {inbox.data ? t("No pending changes") : t("Loading proposals…")}
+                {inbox.data || demo.active ? t("No pending changes") : t("Loading proposals…")}
               </p>
             )}
             {graphGroups.map(([groupId, groupLabel]) => (
@@ -473,7 +432,7 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
                     <button
                       key={node.id}
                       type="button"
-                      aria-pressed={selected === node.proposalId}
+                      aria-pressed={selectedProposal?.id === node.proposalId}
                       className="block w-full rounded border px-2 py-1 text-left text-xs hover:bg-muted"
                       onClick={() => selectProposal(node.proposalId)}
                     >
@@ -495,9 +454,9 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
       )}
       <section aria-label={t("Context changes history")} className="space-y-2">
         <h2 className="font-medium">{t("Authored, assigned and history")}</h2>
-        {inbox.error ? (
+        {inbox.error && !demo.active ? (
           <p role="alert">{inbox.error}</p>
-        ) : !inbox.data ? (
+        ) : !inbox.data && proposals.length === 0 ? (
           <p role="status">{t("Loading proposals…")}</p>
         ) : proposals.length === 0 ? (
           <p>{t("No proposals yet.")}</p>

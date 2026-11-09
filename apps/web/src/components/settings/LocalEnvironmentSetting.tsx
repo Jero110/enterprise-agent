@@ -43,9 +43,7 @@ export function LocalEnvironmentSetting() {
         {...searchableSetting("local-environment")}
         description={
           enabled
-            ? t(
-                "Run agents on this computer. Turn off to use Sequoia AI only with remote environments.",
-              )
+            ? t("Run agents on this computer. Turn off to use Norai only with remote environments.")
             : t("Turned off. Agents only run in remote environments.")
         }
         control={
@@ -73,9 +71,9 @@ export function LocalEnvironmentSetting() {
             <AlertDialogDescription>
               {enabled
                 ? t(
-                    "Sequoia AI will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected.",
+                    "Norai will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected.",
                   )
-                : t("Sequoia AI will restart and start running a server on this computer again.")}
+                : t("Norai will restart and start running a server on this computer again.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="px-6 pb-4 text-sm text-destructive">{error}</p> : null}

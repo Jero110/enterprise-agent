@@ -3,7 +3,7 @@
 export const ES_SHELL: Readonly<Record<string, string>> = {
   // Sidebar header and brand
   "Toggle main sidebar": "Mostrar u ocultar la barra lateral",
-  "Sequoia AI home": "Inicio de Sequoia AI",
+  "Norai home": "Inicio de Norai",
   "Go back": "Atrás",
   "Go forward": "Adelante",
 

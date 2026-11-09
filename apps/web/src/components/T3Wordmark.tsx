@@ -1,19 +1,14 @@
 import type { SVGProps } from "react";
 
+const SYMBOL = "M45 72L100 7H203V74H271V170H345L278 238H203V74H118V238H45Z";
+const WORD =
+  "M294.8 94.4h39.2v9.8h-39.2zM285 104.2h19.6v9.8h-19.6zM324.2 104.2h19.6v9.8h-19.6zM285 114h19.6v9.8h-19.6zM324.2 114h19.6v9.8h-19.6zM285 123.8h19.6v9.8h-19.6zM324.2 123.8h19.6v9.8h-19.6zM285 133.6h19.6v9.8h-19.6zM324.2 133.6h19.6v9.8h-19.6zM285 143.4h19.6v9.8h-19.6zM324.2 143.4h19.6v9.8h-19.6zM294.8 153.2h39.2v9.8h-39.2zM349.8 94.4h19.6v9.8h-19.6zM379.2 94.4h29.4v9.8h-29.4zM359.6 104.2h29.4v9.8h-29.4zM398.8 104.2h9.8v9.8h-9.8zM359.6 114h19.6v9.8h-19.6zM359.6 123.8h19.6v9.8h-19.6zM359.6 133.6h19.6v9.8h-19.6zM359.6 143.4h19.6v9.8h-19.6zM349.8 153.2h49v9.8h-49zM434.2 65h19.6v9.8h-19.6zM424.4 74.8h39.2v9.8h-39.2zM424.4 84.6h39.2v9.8h-39.2zM414.6 94.4h19.6v9.8h-19.6zM453.8 94.4h19.6v9.8h-19.6zM414.6 104.2h19.6v9.8h-19.6zM453.8 104.2h19.6v9.8h-19.6zM414.6 114h58.8v9.8h-58.8zM414.6 123.8h58.8v9.8h-58.8zM414.6 133.6h19.6v9.8h-19.6zM453.8 133.6h19.6v9.8h-19.6zM414.6 143.4h19.6v9.8h-19.6zM453.8 143.4h19.6v9.8h-19.6zM414.6 153.2h19.6v9.8h-19.6zM453.8 153.2h19.6v9.8h-19.6zM489.2 65h29.4v9.8h-29.4zM489.2 74.8h29.4v9.8h-29.4zM479.4 94.4h39.2v9.8h-39.2zM489.2 104.2h29.4v9.8h-29.4zM489.2 114h29.4v9.8h-29.4zM489.2 123.8h29.4v9.8h-29.4zM489.2 133.6h29.4v9.8h-29.4zM489.2 143.4h29.4v9.8h-29.4zM479.4 153.2h49v9.8h-49z";
+
 export function T3Wordmark(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg {...props} viewBox="0 0 150 32" xmlns="http://www.w3.org/2000/svg">
-      <text
-        x="0"
-        y="25"
-        fill="currentColor"
-        fontFamily="Georgia, 'Times New Roman', serif"
-        fontSize="27"
-        fontWeight="400"
-        letterSpacing="-0.4"
-      >
-        sequoia ai
-      </text>
+    <svg {...props} viewBox="40 2 495 241" xmlns="http://www.w3.org/2000/svg">
+      <path d={SYMBOL} fill="currentColor" />
+      <path d={WORD} fill="currentColor" />
     </svg>
   );
 }

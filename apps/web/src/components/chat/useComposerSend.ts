@@ -897,12 +897,7 @@ export function useComposerSend(input: ComposerSendInput) {
     const projectBoardContext = projectBoardContextForMessage(
       messageTextForSend,
       AsyncResult.getOrElse(
-        appAtomRegistry.get(
-          enterpriseEnvironment.projectBoard({
-            environmentId,
-            input: { projectId: activeThread.projectId },
-          }),
-        ),
+        appAtomRegistry.get(enterpriseEnvironment.projectBoard({ environmentId, input: {} })),
         () => null,
       )?.boards ?? [],
     );

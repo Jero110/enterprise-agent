@@ -1,8 +1,8 @@
+import type * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import type * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import * as EnterpriseClient from "./EnterpriseClient.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";

@@ -31,6 +31,7 @@ import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { KnowledgeMap } from "../enterprise/KnowledgeMap";
 import { ContextChanges } from "../enterprise/ContextChanges";
+import { useDemoState } from "../enterprise/noraiDemo";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Radio, RadioGroup } from "../ui/radio-group";
 import { toastManager } from "../ui/toast";
@@ -136,7 +137,11 @@ function EnterpriseContextDialog(props: {
       input: { countOnly: true },
     }),
   );
-  const pendingCount = inbox.error ? 0 : (inbox.data?.pendingCount ?? 0);
+  const demo = useDemoState(props.environmentId);
+  const demoPending = demo.active
+    ? demo.state.proposals.filter((proposal) => proposal.status === "pending").length
+    : 0;
+  const pendingCount = (inbox.error ? 0 : (inbox.data?.pendingCount ?? 0)) + demoPending;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Tooltip>
@@ -189,7 +194,7 @@ function EnterpriseContextDialog(props: {
               value="context"
               render={<Button size="sm" variant={tab === "context" ? "secondary" : "ghost"} />}
             >
-              {t("Context")}
+              {t("Twin")}
             </Tabs.Tab>
             <Tabs.Tab
               value="changes"
@@ -227,6 +232,7 @@ function EnterpriseContextDialog(props: {
                   environmentId={props.environmentId}
                   modelSelection={props.modelSelection}
                   onReview={() => setTab("changes")}
+                  onOpenMap={() => setTab("context")}
                 />
               )}
             </Tabs.Panel>

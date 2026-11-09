@@ -1,6 +1,15 @@
 import html from "../../../public/context-graph/index.html?raw";
 import * as NodeVM from "node:vm";
 import { describe, expect, it, vi } from "vite-plus/test";
+import type { EnvironmentId } from "@t3tools/contracts";
+import {
+  addIngestedNode,
+  decideDemoProposal,
+  demoKnowledgeProposals,
+  loadDemoState,
+  noraiDemoGraph,
+  proposeDemoFile,
+} from "./noraiDemo";
 
 function graphHarness() {
   const script = html.slice(
@@ -18,9 +27,6 @@ function graphHarness() {
       classList: { add: () => void; remove: () => void };
       addEventListener: () => void;
       querySelectorAll: () => never[];
-      replaceChildren: () => void;
-      append: (child: unknown) => void;
-      hidden: boolean;
     }
   >();
   const element = (id: string) => {
@@ -32,9 +38,6 @@ function graphHarness() {
         classList: { add() {}, remove() {} },
         addEventListener() {},
         querySelectorAll: () => [],
-        replaceChildren() {},
-        append() {},
-        hidden: false,
       });
     return elements.get(id)!;
   };
@@ -57,17 +60,7 @@ function graphHarness() {
   );
   const context = {
     ForceGraph3D: () => () => graph,
-    document: {
-      getElementById: element,
-      querySelectorAll: () => [],
-      createElement: () => ({
-        type: "",
-        title: "",
-        textContent: "",
-        setAttribute() {},
-        onclick: () => {},
-      }),
-    },
+    document: { getElementById: element, querySelectorAll: () => [] },
     window: {
       parent,
       addEventListener: (_name: string, listener: (typeof receive)[number]) =>
@@ -87,113 +80,68 @@ function graphHarness() {
 }
 
 describe("embedded knowledge graph", () => {
-  it("starts empty and lays out real nodes in fixed area/layer clusters with only declared links", () => {
-    using _timers = (() => {
-      vi.useFakeTimers();
-      return { [Symbol.dispose]: () => vi.useRealTimers() };
-    })();
+  it("adds one NEW linked node without moving any existing node", () => {
+    const ids = new Set(noraiDemoGraph.nodes.map((node) => node.id));
+    expect(ids.size).toBe(noraiDemoGraph.nodes.length);
+    expect(noraiDemoGraph.nodes.every((node) => node.links.every((link) => ids.has(link)))).toBe(
+      true,
+    );
+    expect(addIngestedNode(noraiDemoGraph.nodes, "nota-promo-kavak.md").added.links).toEqual([
+      "sample:fdv-campaign",
+    ]);
+    expect(noraiDemoGraph.nodes.length).toBeGreaterThan(300);
+    expect(noraiDemoGraph.nodes.length).toBeLessThan(450);
+    const { nodes, added } = addIngestedNode(noraiDemoGraph.nodes, "Q3-revenue-kpis.pdf");
+    expect(nodes.slice(0, -1)).toEqual(noraiDemoGraph.nodes);
+    expect(nodes).toHaveLength(noraiDemoGraph.nodes.length + 1);
+    expect(added).toMatchObject({ isNew: true, layer: "metrics", links: ["sample:deliveries"] });
+    expect(addIngestedNode(nodes, "Q3-revenue-kpis.pdf").added.id).not.toBe(added.id);
+
     const graph = graphHarness();
-    expect(graph.inspect("nodes.length")).toBe(0);
-    expect(graph.inspect('document.getElementById("empty-stage").hidden')).toBe(false);
-    const nodes = Array.from({ length: 2000 }, (_, index) => ({
-      id: `area/ledger/${index}.md`,
-      title: `Real ${index}`,
-      areaId: index % 2 ? "risk" : "ledger",
-      layer: ["metrics", "business", "ai", "data"][index % 4],
-      links: index ? [`area/ledger/${index - 1}.md`] : [],
-      content: "Body must not enter the renderer",
-      accessible: false,
-    }));
+    graph.send({ type: "knowledge-nodes", nodes: noraiDemoGraph.nodes });
+    const before = graph.inspect("JSON.stringify(nodes.map(n => [n.id, n.x, n.z]))");
     graph.send({ type: "knowledge-nodes", nodes });
-    expect(graph.inspect("nodes.length")).toBe(2000);
-    expect(graph.inspect('document.getElementById("empty-stage").hidden')).toBe(true);
-    expect(graph.inspect("links.length")).toBe(1999);
-    expect(graph.inspect("nodes.filter(n => n.hub).length")).toBe(0);
-    expect(graph.inspect("nodes.every(n => Math.hypot(n.x, n.z) <= RAD)")).toBe(true);
     expect(
-      graph.inspect(
-        "LAYERS.every(layer => nodes.filter(n => n.layer === layer.id).some(n => Math.hypot(n.x, n.z) > 140))",
-      ),
+      graph.inspect(`JSON.stringify(nodes.filter(n => !n.isNew).map(n => [n.id, n.x, n.z]))`),
+    ).toBe(before);
+    expect(graph.inspect("nodes.filter(n => n.isNew).length")).toBe(1);
+    expect(graph.inspect("hubs.length")).toBeGreaterThan(20);
+    expect(graph.inspect("new Set(links.map(l => l.kind)).size")).toBe(3);
+    expect(
+      graph.inspect("links.some(l => l.source === 'sample:ingested-q3-revenue-kpis-pdf')"),
     ).toBe(true);
     expect(
-      graph.inspect("nodes.every(n => n.x === n.fx && n.z === n.fz && n.fy === LAYERS[n.li].y)"),
-    ).toBe(true);
-    expect(graph.inspect("nodes.every(n => !('content' in n))")).toBe(true);
-    vi.advanceTimersByTime(100);
-    expect(graph.pause).toHaveBeenCalled();
-    const resumes = graph.resume.mock.calls.length;
-    vi.advanceTimersByTime(60_000);
-    expect(graph.resume).toHaveBeenCalledTimes(resumes);
-    expect(vi.getTimerCount()).toBe(0);
-    graph.send({ type: "knowledge-nodes", nodes: [] });
-    expect(graph.inspect("nodes.length + links.length")).toBe(0);
-    expect(graph.inspect('document.getElementById("empty-stage").hidden')).toBe(false);
-    graph.send({
-      type: "knowledge-nodes",
-      nodes: Array.from({ length: 187 }, (_, index) => ({
-        id: `general/ai/${index}.md`,
-        title: `Accepted ${index}`,
-        areaId: "general",
-        layer: "ai",
-        links: [],
-      })),
-    });
-    expect(graph.inspect("Math.max(...nodes.map(n => Math.hypot(n.x, n.z)))")).toBeGreaterThan(140);
-    expect(graph.inspect("Math.min(...nodes.map(n => Math.hypot(n.x, n.z)))")).toBeLessThan(15);
-    expect(graph.inspect("nodes.every(n => Math.hypot(n.x, n.z) < RAD)")).toBe(true);
-    graph.send({
-      type: "knowledge-nodes",
-      nodes: ["cx", "ventas"].flatMap((areaId) =>
-        Array.from({ length: 100 }, (_, index) => ({
-          id: `${areaId}/business/${index}.md`,
-          title: `${areaId} ${index}`,
-          areaId,
-          layer: "business",
-          links: [],
-        })),
-      ),
-    });
-    expect(
       graph.inspect(
-        'Math.hypot(nodes.find(n => n.areaId === "cx").x - nodes.find(n => n.areaId === "ventas").x, nodes.find(n => n.areaId === "cx").z - nodes.find(n => n.areaId === "ventas").z)',
+        "(() => { const a = nodes.find(n => n.isNew); return nodes.every(b => b === a || Math.hypot(a.x - b.x, a.z - b.z) > 0.5); })()",
       ),
-    ).toBeGreaterThan(150);
-    expect(graph.inspect("nodes.every(n => Math.hypot(n.x, n.z) < RAD)")).toBe(true);
+    ).toBe(true);
   });
 
-  it("keeps accepted CX Business and private Ventas Data Markdown as real linked documents", () => {
-    const graph = graphHarness();
-    graph.send({
-      type: "knowledge-nodes",
-      nodes: [
-        {
-          id: "areas/cx/experience.md",
-          title: "CX",
-          areaId: "cx",
-          layer: "business",
-          links: ["areas/ventas/sales.md"],
-        },
-        {
-          id: "areas/ventas/sales.md",
-          title: "Ventas",
-          areaId: "ventas",
-          layer: "data",
-          links: [],
-        },
-      ],
+  it("keeps an ingested file pending in Changes until approved, and rejection never touches the graph", () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal("sessionStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+      removeItem: (key: string) => store.delete(key),
     });
-    expect(graph.inspect("nodes.map(n => [n.id, n.areaId, n.layer, describe(n).kind])")).toEqual([
-      ["areas/cx/experience.md", "cx", "business", "document"],
-      ["areas/ventas/sales.md", "ventas", "data", "document"],
-    ]);
-    expect(graph.inspect("links.map(l => [l.source, l.target])")).toEqual([
-      ["areas/cx/experience.md", "areas/ventas/sales.md"],
-    ]);
-    expect(graph.inspect("nodes.every(n => !('content' in n))")).toBe(true);
-    expect(graph.inspect("nodes.every(n => n.x === 0 && n.z === 0)")).toBe(true);
-    expect(graph.inspect('activeArea = "cx"; nodes.filter(vis).map(n => n.id)')).toEqual([
-      "areas/cx/experience.md",
-    ]);
-    expect(graph.inspect("activeArea = null; nodes.filter(vis).length")).toBe(2);
+    vi.stubGlobal("window", { dispatchEvent: () => true });
+    const env = "env" as EnvironmentId;
+    try {
+      const first = proposeDemoFile(env, "Q3-revenue-kpis.pdf");
+      const second = proposeDemoFile(env, "promo-export.csv");
+      expect(loadDemoState(env).added).toEqual([]);
+      expect(demoKnowledgeProposals(loadDemoState(env)).map((p) => p.status)).toEqual([
+        "pending",
+        "pending",
+      ]);
+      decideDemoProposal(env, first.id, "approve");
+      decideDemoProposal(env, second.id, "reject", "duplicate");
+      const state = loadDemoState(env);
+      expect(state.added.map((node) => node.id)).toEqual([first.node.id]);
+      expect(state.added[0]).toMatchObject({ isNew: true, links: ["sample:deliveries"] });
+      expect(state.proposals.map((p) => p.status)).toEqual(["applied", "rejected"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

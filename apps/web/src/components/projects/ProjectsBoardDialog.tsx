@@ -1,4 +1,4 @@
-import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
+import type { EnvironmentId } from "@t3tools/contracts";
 import { ProjectBoardProvider, useProjectBoards } from "./ProjectBoardProvider";
 import {
   CalendarIcon,
@@ -99,47 +99,82 @@ function Avatars({ initials }: { readonly initials: ReadonlyArray<string> }) {
   );
 }
 
-function TaskCard(props: { readonly task: ProjectTask; readonly onOpen: () => void }) {
+function TaskCard(props: {
+  readonly task: ProjectTask;
+  readonly onOpen: () => void;
+  readonly onMove: (to: { boardId: string; status: ProjectTaskStatus }) => void;
+}) {
   const { task } = props;
+  const boards = useProjectBoards((state) => state.boards);
+  const activeBoardId = useProjectBoards((state) => state.activeBoardId);
+  const current = boards.find((entry) => entry.id === activeBoardId) ?? boards[0];
   return (
-    <button
-      type="button"
-      draggable
-      onDragStart={(event) => event.dataTransfer.setData("text/plain", task.id)}
-      onClick={props.onOpen}
-      className="w-full cursor-pointer rounded-lg border border-border/70 bg-card p-3 text-left shadow-xs transition-colors hover:border-border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-    >
-      <p className="text-sm font-medium leading-snug text-foreground">{task.title}</p>
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        <Avatars initials={task.assignees} />
-        {task.dueDate !== null ? (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-md border border-border/70 px-1.5 py-0.5",
-              isOverdue(task) && "text-destructive",
-            )}
-          >
-            <CalendarIcon className="size-3" />
-            {formatDue(task.dueDate)}
-          </span>
-        ) : null}
-        {task.priority !== null ? (
-          <span className="inline-flex items-center gap-1 rounded-md border border-border/70 px-1.5 py-0.5">
-            <FlagIcon className={cn("size-3 fill-current", PRIORITY_COLOR[task.priority])} />
-            {t(PROJECT_TASK_PRIORITY_LABELS[task.priority], undefined, "priority")}
-          </span>
-        ) : null}
-        {task.tags.map((tag) => (
-          <Badge
-            key={tag}
-            variant="label"
-            style={{ "--label": paletteColor(tag) } as CSSProperties}
-          >
-            {tag}
-          </Badge>
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        draggable
+        onDragStart={(event) => {
+          event.dataTransfer.setData("text/plain", task.id);
+          event.dataTransfer.effectAllowed = "move";
+        }}
+        onClick={props.onOpen}
+        className="w-full cursor-pointer rounded-lg border border-border/70 bg-card p-3 text-left shadow-xs transition-colors hover:border-border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      >
+        <p className="text-sm font-medium leading-snug text-foreground">{task.title}</p>
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <Avatars initials={task.assignees} />
+          {task.dueDate !== null ? (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md border border-border/70 px-1.5 py-0.5",
+                isOverdue(task) && "text-destructive",
+              )}
+            >
+              <CalendarIcon className="size-3" />
+              {formatDue(task.dueDate)}
+            </span>
+          ) : null}
+          {task.priority !== null ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-border/70 px-1.5 py-0.5">
+              <FlagIcon className={cn("size-3 fill-current", PRIORITY_COLOR[task.priority])} />
+              {t(PROJECT_TASK_PRIORITY_LABELS[task.priority], undefined, "priority")}
+            </span>
+          ) : null}
+          {task.tags.map((tag) => (
+            <Badge
+              key={tag}
+              variant="label"
+              style={{ "--label": paletteColor(tag) } as CSSProperties}
+            >
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      </button>
+      <select
+        aria-label={t("Move to")}
+        className="h-6 rounded-md border border-input bg-background px-1 text-xs text-muted-foreground"
+        value=""
+        onChange={(event) => {
+          const [boardId, status] = event.target.value.split("|") as [string, ProjectTaskStatus];
+          if (boardId) props.onMove({ boardId, status });
+        }}
+      >
+        <option value="">{t("Move to…")}</option>
+        {PROJECT_TASK_STATUSES.filter((status) => status !== task.status).map((status) => (
+          <option key={status} value={`${current?.id}|${status}`}>
+            {t(PROJECT_TASK_STATUS_LABELS[status])}
+          </option>
         ))}
-      </div>
-    </button>
+        {boards
+          .filter((entry) => entry.id !== current?.id)
+          .map((entry) => (
+            <option key={entry.id} value={`${entry.id}|${task.status}`}>
+              {t("Board")}: {entry.name}
+            </option>
+          ))}
+      </select>
+    </div>
   );
 }
 
@@ -148,6 +183,10 @@ function BoardColumn(props: {
   readonly tasks: ReadonlyArray<ProjectTask>;
   readonly onOpenTask: (task: ProjectTask) => void;
   readonly onDropTask: (taskId: string) => void;
+  readonly onMoveTask: (
+    task: ProjectTask,
+    to: { boardId: string; status: ProjectTaskStatus },
+  ) => void;
   readonly onAddTask: (title: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -176,6 +215,7 @@ function BoardColumn(props: {
       )}
       onDragOver={(event) => {
         event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
         setDragOver(true);
       }}
       onDragLeave={() => setDragOver(false)}
@@ -189,7 +229,12 @@ function BoardColumn(props: {
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-0.5 pb-1">
         {props.tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onOpen={() => props.onOpenTask(task)} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            onOpen={() => props.onOpenTask(task)}
+            onMove={(to) => props.onMoveTask(task, to)}
+          />
         ))}
         {adding ? (
           <Input
@@ -347,6 +392,7 @@ function BoardView() {
   const deleteBoard = useProjectBoards((state) => state.deleteBoard);
   const addTask = useProjectBoards((state) => state.addTask);
   const updateTask = useProjectBoards((state) => state.updateTask);
+  const moveTask = useProjectBoards((state) => state.moveTask);
   const [query, setQuery] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [creatingBoard, setCreatingBoard] = useState(false);
@@ -434,6 +480,10 @@ function BoardView() {
               tasks={visibleTasks.filter((task) => task.status === status)}
               onOpenTask={(task) => setEditingTaskId(task.id)}
               onDropTask={(taskId) => updateTask(board.id, taskId, { status })}
+              onMoveTask={(task, to) => {
+                moveTask(board.id, task.id, to);
+                if (to.boardId !== board.id) selectBoard(to.boardId);
+              }}
               onAddTask={(title) =>
                 addTask(board.id, {
                   title,
@@ -466,13 +516,7 @@ function BoardView() {
 }
 
 /** Project boards the user keeps here; mentioning a board, task or tag in a message gives the agent that context. */
-export function ProjectsBoardButton({
-  environmentId,
-  projectId,
-}: {
-  readonly environmentId: EnvironmentId;
-  readonly projectId: ProjectId;
-}) {
+export function ProjectsBoardButton({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -500,16 +544,12 @@ export function ProjectsBoardButton({
           <DialogTitle>{t("Projects")}</DialogTitle>
           <p className="mt-1 text-xs text-muted-foreground">
             {t(
-              "Boards belong to this project on the connected server. Ask your agent to read the cards. Browser boards can be imported; the original browser copy is kept.",
+              "These are your boards on the connected server, the same in every project and private to your account. Ask your agent to read or move the cards. Browser boards can be imported; the original browser copy is kept.",
             )}
           </p>
         </div>
         {open && (
-          <ProjectBoardProvider
-            key={`${environmentId}:${projectId}`}
-            environmentId={environmentId}
-            projectId={projectId}
-          >
+          <ProjectBoardProvider key={environmentId} environmentId={environmentId}>
             <BoardView />
           </ProjectBoardProvider>
         )}

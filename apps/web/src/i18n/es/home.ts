@@ -2,7 +2,7 @@
 export const ES_HOME: Readonly<Record<string, string>> = {
   "Your day": "Tu día",
   // Time saved
-  "Sequoia saved you": "Sequoia te ahorró",
+  "Norai saved you": "Norai te ahorró",
   "{minutes} min": "{minutes} min",
   "{hours} h": "{hours} h",
   "{hours} h {minutes} min": "{hours} h {minutes} min",
@@ -10,8 +10,8 @@ export const ES_HOME: Readonly<Record<string, string>> = {
   "today: {time}": "hoy: {time}",
   "today: nothing yet": "hoy: todavía nada",
   "Your time saved will show up here": "Aquí verás el tiempo que te ahorras",
-  "Ask an agent for something and Sequoia will keep count.":
-    "Pídele algo a un agente y Sequoia llevará la cuenta.",
+  "Ask an agent for something and Norai will keep count.":
+    "Pídele algo a un agente y Norai llevará la cuenta.",
   "How is this estimated?": "¿Cómo se calcula?",
   "How we estimate this": "Cómo lo calculamos",
   "Each task an agent finishes counts as {multiplier} times the time the agent worked on it, between {min} and {max} min per task.":

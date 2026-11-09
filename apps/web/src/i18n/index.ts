@@ -1,6 +1,6 @@
 import { ES_DICTIONARY } from "./es";
 
-// Sequoia AI speaks Spanish by default. Strings are written in English in the code and
+// Norai speaks Spanish by default. Strings are written in English in the code and
 // passed through `t()`, which returns the Spanish text when the locale is "es".
 // Tests keep English so existing assertions on visible text stay valid.
 

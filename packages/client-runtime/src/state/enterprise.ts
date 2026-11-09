@@ -111,10 +111,8 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     saveProjectBoard: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:project-board-save",
       tag: WS_METHODS.projectBoardSave,
-      onSettled: ({ environmentId, input }, registry) =>
-        Effect.sync(() =>
-          registry.refresh(projectBoard({ environmentId, input: { projectId: input.projectId } })),
-        ),
+      onSettled: ({ environmentId }, registry) =>
+        Effect.sync(() => registry.refresh(projectBoard({ environmentId, input: {} }))),
     }),
     status,
     members,

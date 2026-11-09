@@ -16,6 +16,7 @@ import { useEnvironmentQuery } from "~/state/query";
 
 import { Checkbox } from "../ui/checkbox";
 import { SHOW_KNOWLEDGE_GRAPH } from "./proposalGraph";
+import { clearDemoNew, demoNodes, useDemoState } from "./noraiDemo";
 
 const LAYERS = ["metrics", "business", "ai", "data"] as const;
 type KnowledgeNode = KnowledgeGraph["nodes"][number] & {
@@ -101,6 +102,7 @@ export function KnowledgeMap(props: {
   const frame = useRef<HTMLIFrameElement>(null);
   const [individual, setIndividual] = useState(true);
   const [ready, setReady] = useState(false);
+  const { active: sampleMap, state: demoState } = useDemoState(props.environmentId);
   const graph = useEnvironmentQuery(
     enterpriseEnvironment.knowledgeGraph({ environmentId: props.environmentId, input: {} }),
   );
@@ -143,7 +145,11 @@ export function KnowledgeMap(props: {
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [frame]);
-  const nodes: KnowledgeNode[] = (graph.data?.nodes ?? []).map((node) => ({
+  // Dev builds always show the sample map beside the real nodes so every layer is populated.
+  const previewNodes = import.meta.env.DEV
+    ? [...(graph.data?.nodes ?? []), ...demoNodes(demoState)]
+    : (graph.data?.nodes ?? []);
+  const nodes: KnowledgeNode[] = previewNodes.map((node) => ({
     ...node,
     path: node.id,
     kind: "document",
@@ -151,23 +157,29 @@ export function KnowledgeMap(props: {
       node.areaId === "personal" ? "individual" : node.areaId === "general" ? "general" : "area",
   }));
   const selected = nodes.find((node) => node.id === selectedId);
+  const newIds = new Set(
+    sampleMap ? demoState.added.filter((node) => node.isNew).map((node) => node.id) : [],
+  );
+  const dismissNew = () => clearDemoNew(props.environmentId);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- send metadata only to the sandboxed graph
   useEffect(() => {
     if (ready)
       frame.current?.contentWindow?.postMessage(
         {
           type: "knowledge-nodes",
-          nodes: (graph.data?.nodes ?? []).map(({ id, title, areaId, layer, links }) => ({
+          nodes: previewNodes.map(({ id, title, areaId, layer, links, ...node }) => ({
             id,
             title,
             areaId,
             layer,
             links,
+            isNew: "isNew" in node && node.isNew === true,
+            hub: "hub" in node && node.hub === true,
           })),
         },
         "*",
       );
-  }, [ready, graph.data, frame]);
+  }, [ready, previewNodes, frame]);
   const org = useEnvironmentQuery(
     enterpriseEnvironment.org({ environmentId: props.environmentId, input: {} }),
   );
@@ -194,8 +206,9 @@ export function KnowledgeMap(props: {
               : scope === "area"
                 ? t("Area knowledge")
                 : t("Personal knowledge");
-          const count =
-            scope === "individual"
+          const count = sampleMap
+            ? nodes.filter((node) => node.scope === scope).length
+            : scope === "individual"
               ? personalNodes.length
               : (props.cards.find((card) => card.scope === scope)?.documents.length ?? 0);
           const countLabel =
@@ -249,13 +262,18 @@ export function KnowledgeMap(props: {
                   : scope === "area"
                     ? t("Owned by your teams")
                     : t("Your private skills and files")}{" "}
-                · {graph.data ? countLabel : graph.error ? t("Unavailable") : t("Loading…")}
+                ·{" "}
+                {sampleMap || graph.data
+                  ? countLabel
+                  : graph.error
+                    ? t("Unavailable")
+                    : t("Loading…")}
               </div>
             </button>
           );
         })}
       </div>
-      {graph.data && personalNodes.length === 0 && (
+      {graph.data && !sampleMap && personalNodes.length === 0 && (
         <p className="mb-4 text-xs text-muted-foreground">
           {status.data?.identity
             ? t("No personal items for {email} yet. Add a skill or file in Ingest.", {
@@ -297,8 +315,23 @@ export function KnowledgeMap(props: {
           <span className="text-xs text-muted-foreground">{t("Current context")}</span>
         </div>
       )}
-      {graph.error && <p role="alert">{graph.error}</p>}
-      {graph.data?.nodes.length === 0 && (
+      {graph.error && !sampleMap && <p role="alert">{graph.error}</p>}
+      {sampleMap && (
+        <p className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          {t("Sample map · the uploaded files have not been analyzed")}
+          {newIds.size > 0 && (
+            <>
+              <span className="rounded-full bg-warning/16 px-2 py-0.5 font-medium text-warning-foreground">
+                {t("{count} new", { count: String(newIds.size) })}
+              </span>
+              <button type="button" className="underline" onClick={dismissNew}>
+                {t("Dismiss")}
+              </button>
+            </>
+          )}
+        </p>
+      )}
+      {graph.data?.nodes.length === 0 && !sampleMap && (
         <p className="py-4 text-sm text-muted-foreground">
           {t("No knowledge yet. Ask an admin to load a bucket in Ingest.")}
         </p>
@@ -307,12 +340,12 @@ export function KnowledgeMap(props: {
         className={cn(
           "overflow-hidden rounded-xl border border-border/70",
           SHOW_KNOWLEDGE_GRAPH
-            ? "grid min-h-[min(72vh,720px)] flex-1 bg-zinc-25 lg:grid-cols-[minmax(0,1fr)_250px]"
+            ? "grid min-h-[470px] flex-1 bg-zinc-25 lg:grid-cols-[minmax(0,1fr)_230px]"
             : "bg-background",
         )}
       >
         {SHOW_KNOWLEDGE_GRAPH && (
-          <div className="relative min-h-[min(72vh,720px)] overflow-hidden">
+          <div className="relative min-h-[470px] overflow-hidden">
             {!ready && (
               <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
                 {t("Loading knowledge map…")}
@@ -323,7 +356,7 @@ export function KnowledgeMap(props: {
               title={t("Interactive 3D knowledge map")}
               sandbox="allow-scripts"
               src="/context-graph/index.html"
-              className="relative size-full min-h-[min(72vh,720px)] border-0"
+              className="relative size-full min-h-[470px] border-0"
               onLoad={() => {
                 setReady(true);
                 sync(scopes);
@@ -336,13 +369,21 @@ export function KnowledgeMap(props: {
                     <p className="text-3xs text-muted-foreground uppercase">
                       {layerLabel(selected.layer)} · {t("document")}
                     </p>
-                    <p className="text-xs font-medium">{selected.title}</p>
+                    <p className="text-xs font-medium">
+                      {selected.title}
+                      {newIds.has(selected.id) && (
+                        <span className="ml-2 rounded-full bg-warning/16 px-1.5 py-0.5 text-3xs font-medium text-warning-foreground">
+                          {t("New")}
+                        </span>
+                      )}
+                    </p>
                   </div>
                   <button
                     type="button"
                     className="text-xs text-muted-foreground"
                     onClick={() => {
                       setSelectedId(null);
+                      if (newIds.has(selected.id)) dismissNew();
                       frame.current?.contentWindow?.postMessage(
                         { type: "knowledge-clear-selection" },
                         "*",
@@ -352,14 +393,20 @@ export function KnowledgeMap(props: {
                     {t("Close")}
                   </button>
                 </div>
-                <KnowledgeDocument
-                  key={selected.id}
-                  node={selected}
-                  environmentId={props.environmentId}
-                  areaName={areaName(selected.areaId)}
-                  refresh={graph.refresh}
-                />
-                {selected.accessible && (
+                {sampleMap ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {selected.description} · {areaName(selected.areaId)} · {t("Sample map")}
+                  </p>
+                ) : (
+                  <KnowledgeDocument
+                    key={selected.id}
+                    node={selected}
+                    environmentId={props.environmentId}
+                    areaName={areaName(selected.areaId)}
+                    refresh={graph.refresh}
+                  />
+                )}
+                {selected.accessible && !sampleMap && (
                   <button
                     type="button"
                     className="mt-3 rounded-md border px-2 py-1 text-xs"
@@ -376,7 +423,7 @@ export function KnowledgeMap(props: {
           className={cn(
             "flex flex-col bg-background",
             SHOW_KNOWLEDGE_GRAPH &&
-              "max-h-[min(72vh,720px)] border-t border-border/70 lg:border-t-0 lg:border-l",
+              "max-h-[530px] border-t border-border/70 lg:border-t-0 lg:border-l",
           )}
           aria-label={t("Knowledge by source and layer")}
         >

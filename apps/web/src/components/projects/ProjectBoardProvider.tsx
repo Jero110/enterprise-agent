@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentId, ProjectId, ProjectBoard, ProjectTask } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectBoard, ProjectTask } from "@t3tools/contracts";
 import { createContext, useContext, useState, type ReactNode } from "react";
 
 import { t } from "~/i18n";
@@ -20,6 +20,11 @@ interface BoardActions {
   addTask: (boardId: string, draft: Draft) => void;
   updateTask: (boardId: string, id: string, patch: Partial<Draft>) => void;
   deleteTask: (boardId: string, id: string) => void;
+  moveTask: (
+    boardId: string,
+    id: string,
+    to: { boardId: string; status: ProjectTask["status"] },
+  ) => void;
 }
 const BoardContext = createContext<BoardActions | null>(null);
 export function useProjectBoards<A>(select: (state: BoardActions) => A) {
@@ -30,15 +35,13 @@ export function useProjectBoards<A>(select: (state: BoardActions) => A) {
 
 export function ProjectBoardProvider({
   environmentId,
-  projectId,
   children,
 }: {
   readonly environmentId: EnvironmentId;
-  readonly projectId: ProjectId;
   readonly children: ReactNode;
 }) {
   const query = useEnvironmentQuery(
-    enterpriseEnvironment.projectBoard({ environmentId, input: { projectId } }),
+    enterpriseEnvironment.projectBoard({ environmentId, input: {} }),
   );
   const save = useAtomCommand(enterpriseEnvironment.saveProjectBoard);
   const allowed = useAtomValue(
@@ -58,7 +61,7 @@ export function ProjectBoardProvider({
     try {
       const result = await save({
         environmentId,
-        input: { projectId, revision: query.data.revision, boards: next },
+        input: { revision: query.data.revision, boards: next },
       });
       if (result._tag === "Success") {
         saved = true;
@@ -98,6 +101,29 @@ export function ProjectBoardProvider({
         ...board,
         tasks: board.tasks.map((task) => (task.id === id ? { ...task, ...patch } : task)),
       })),
+    moveTask: (boardId, id, to) => {
+      const task = boards
+        .find((board) => board.id === boardId)
+        ?.tasks.find((entry) => entry.id === id);
+      if (task === undefined) return;
+      void replace(
+        boards.map((board) => {
+          const rest = board.tasks.filter((entry) => entry.id !== id);
+          if (board.id === to.boardId) {
+            return {
+              ...board,
+              tasks:
+                board.id === boardId
+                  ? board.tasks.map((entry) =>
+                      entry.id === id ? { ...entry, status: to.status } : entry,
+                    )
+                  : [...rest, { ...task, status: to.status }],
+            };
+          }
+          return board.id === boardId ? { ...board, tasks: rest } : board;
+        }),
+      );
+    },
     deleteTask: (boardId, id) =>
       updateBoard(boardId, (board) => ({
         ...board,
@@ -114,7 +140,7 @@ export function ProjectBoardProvider({
               ? t("Saving…")
               : query.data === null
                 ? t("Loading…")
-                : t("Saved on this environment · Current project"))}
+                : t("Saved on this environment · Your boards"))}
         </span>
         <Button variant="ghost" size="xs" onClick={query.refresh}>
           {t("Refresh")}
@@ -135,7 +161,7 @@ export function ProjectBoardProvider({
               });
             }}
           >
-            {t("Import browser boards into this project")}
+            {t("Import browser boards into your boards")}
           </Button>
         ) : null}
       </div>

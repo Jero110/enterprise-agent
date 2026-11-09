@@ -83,4 +83,19 @@ The CLI creates a read-only local MCP session and revokes it on normal exit. Thi
 
 In a new thread, ask “Lee las tarjetas del proyecto” or “¿Qué está haciendo Alex en Cowork?”. The agent can list and read cards for its current project, and published Cowork conversations available to this environment’s signed-in member. Unpublished conversations remain unavailable.
 
-Project boards are saved on the connected server, so browsers connected to that server use the same project data. In Proyectos, import existing browser boards into the selected project; the original browser copy is kept. Boards do not sync between separate environments or through the Enterprise hub. The native mobile app has no board editor yet.
+Boards are one space per signed-in member, saved on the connected server: you see and manage only your own boards, the same ones in every project, from any browser connected to that server. Without an enterprise identity they fall back to a shared space. Agents you run read and move cards on your boards only (`project_board_get`, `project_board_save`, `project_board_move_card`). Boards from before this change were kept in the shared space. In Proyectos, import existing browser boards; the original browser copy is kept. Boards do not sync between separate environments or through the Enterprise hub. The native mobile app has no board editor yet.
+
+On the server host, use `t3 board` to manage boards. `--base-dir <directory>` selects another running local server. For example:
+
+```sh
+t3 board list
+t3 board add "Sprint"
+t3 board card add <board-id> "Review ledger" --status in_progress --assignees "AB,CD"
+t3 board card edit <board-id> <card-id> --title "Review totals" --due-date 2026-12-01
+t3 board card remove <board-id> <card-id>
+t3 board card move <card-id> --board <board-id> --status complete
+t3 board rename <board-id> "Next sprint"
+t3 board remove <board-id>
+```
+
+The CLI acts as the server host and requires a running server; it does **not** sign in as a person, so it edits the shared space unless the server host session is enrolled as a member. Cards also accept `--description`, `--priority`, `--tags` and `--due-date`; use comma-separated assignees or tags, and `none` to clear a priority or due date. Changes use the current revision and reject concurrent edits rather than overwriting them.

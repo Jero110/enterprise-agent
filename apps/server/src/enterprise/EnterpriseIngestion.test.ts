@@ -467,7 +467,7 @@ describe("EnterpriseIngestion", () => {
             path: plan,
             title: "Plan de promoción Kavak",
             links: [action],
-            body: "Decisión (02:05): preparar el diseño, sin autorizar ni lanzar la campaña. María es responsable del plan. Francisco revisa la solicitud por Sequoia esta tarde (00:52).",
+            body: "Decisión (02:05): preparar el diseño, sin autorizar ni lanzar la campaña. María es responsable del plan. Francisco revisa la solicitud por Norai esta tarde (00:52).",
           },
           {
             path: action,

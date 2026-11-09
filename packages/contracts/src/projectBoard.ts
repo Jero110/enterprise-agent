@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import { ProjectId, NonNegativeInt } from "./baseSchemas.ts";
+import { NonNegativeInt } from "./baseSchemas.ts";
 
 const Id = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100));
 const Label = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(300));
@@ -25,12 +25,17 @@ export const ProjectBoardSnapshot = Schema.Struct({
   boards: Schema.Array(ProjectBoard).check(Schema.isMaxLength(30)),
 });
 export type ProjectBoardSnapshot = typeof ProjectBoardSnapshot.Type;
-export const ProjectBoardInput = Schema.Struct({ projectId: ProjectId });
-export const ProjectBoardSaveInput = Schema.Struct({
-  ...ProjectBoardInput.fields,
-  ...ProjectBoardSnapshot.fields,
-});
+/** Boards belong to the caller's identity, never to an argument: the server resolves the owner. */
+export const ProjectBoardInput = Schema.Struct({});
+export const ProjectBoardSaveInput = ProjectBoardSnapshot;
 export type ProjectBoardSaveInput = typeof ProjectBoardSaveInput.Type;
+/** Moves a card to another board and/or column; omitted fields stay as they are. */
+export const ProjectBoardMoveCardInput = Schema.Struct({
+  cardId: Id,
+  toBoardId: Schema.optionalKey(Id),
+  status: Schema.optionalKey(ProjectTask.fields.status),
+});
+export type ProjectBoardMoveCardInput = typeof ProjectBoardMoveCardInput.Type;
 export class ProjectBoardError extends Schema.TaggedError<ProjectBoardError>()(
   "ProjectBoardError",
   {
@@ -40,13 +45,13 @@ export class ProjectBoardError extends Schema.TaggedError<ProjectBoardError>()(
   override get message(): string {
     switch (this.code) {
       case "not_found":
-        return "The project or card was not found.";
+        return "The board or card was not found.";
       case "conflict":
         return "The board changed in another window. Refresh and try again.";
       case "invalid":
         return "The board exceeds its limits or contains duplicate identifiers.";
       case "storage":
-        return "The project board could not be stored or read.";
+        return "The board could not be stored or read.";
     }
   }
 }

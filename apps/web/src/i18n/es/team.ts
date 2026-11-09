@@ -140,8 +140,8 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   History: "Historial",
   "File upload": "Archivo subido",
   Projects: "Proyectos",
-  "Boards belong to this project on the connected server. Ask your agent to read the cards. Browser boards can be imported; the original browser copy is kept.":
-    "Tus tableros de tareas para este proyecto. Menciona una tarea en el chat y tu asistente la toma en cuenta.",
+  "These are your boards on the connected server, the same in every project and private to your account. Ask your agent to read or move the cards. Browser boards can be imported; the original browser copy is kept.":
+    "Tus tableros en el servidor, iguales en todos los proyectos y privados de tu cuenta. Pídele a tu asistente que lea o mueva las tarjetas.",
   Backlog: "Por hacer",
   "In progress": "En curso",
   Blocked: "Atorada",
@@ -179,14 +179,14 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "Could not reach the server. Refresh and try again.":
     "No hay conexión con el servidor. Actualiza e intenta otra vez.",
   "Saving…": "Guardando…",
-  "Saved on this environment · Current project": "Guardado · Proyecto actual",
-  "Import browser boards into this project": "Traer tableros guardados en este navegador",
+  "Saved on this environment · Your boards": "Guardado · Tus tableros",
+  "Import browser boards into your boards": "Traer tableros guardados en este navegador",
   "Could not read settings": "No se pudo leer tu configuración",
   "Still connecting": "Conectando…",
   "Your saved settings could not be loaded.": "No se pudo cargar tu configuración guardada.",
   Retry: "Reintentar",
   Reload: "Recargar",
-  "Set up Sequoia AI": "Configura Sequoia AI",
+  "Set up Norai": "Configura Norai",
   Connect: "Conectar",
   "onboarding::Agents": "Asistente",
   "1 thread": "1 chat",
