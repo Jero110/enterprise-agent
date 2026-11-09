@@ -16,7 +16,7 @@ import { useEnvironmentQuery } from "~/state/query";
 
 import { Checkbox } from "../ui/checkbox";
 import { SHOW_KNOWLEDGE_GRAPH } from "./proposalGraph";
-import { clearDemoNew, demoNodes, useDemoState } from "./noraiDemo";
+import { clearDemoNew, demoNodes, useDemoState, type DemoState } from "./noraiDemo";
 
 const LAYERS = ["metrics", "business", "ai", "data"] as const;
 type KnowledgeNode = KnowledgeGraph["nodes"][number] & {
@@ -92,6 +92,10 @@ function KnowledgeDocument({
 
 type Scope = ThreadKnowledgeScope | "individual";
 
+// Dev builds always show the sample map beside the real nodes so every layer is populated.
+const withSampleNodes = (real: KnowledgeGraph["nodes"] = [], demo: DemoState) =>
+  import.meta.env.DEV ? [...real, ...demoNodes(demo)] : real;
+
 export function KnowledgeMap(props: {
   readonly cards: ReadonlyArray<ThreadContextCard>;
   readonly environmentId: EnvironmentId;
@@ -145,10 +149,8 @@ export function KnowledgeMap(props: {
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [frame]);
-  // Dev builds always show the sample map beside the real nodes so every layer is populated.
-  const previewNodes = import.meta.env.DEV
-    ? [...(graph.data?.nodes ?? []), ...demoNodes(demoState)]
-    : (graph.data?.nodes ?? []);
+  const realNodes = graph.data?.nodes;
+  const previewNodes = withSampleNodes(realNodes, demoState);
   const nodes: KnowledgeNode[] = previewNodes.map((node) => ({
     ...node,
     path: node.id,
@@ -167,19 +169,21 @@ export function KnowledgeMap(props: {
       frame.current?.contentWindow?.postMessage(
         {
           type: "knowledge-nodes",
-          nodes: previewNodes.map(({ id, title, areaId, layer, links, ...node }) => ({
-            id,
-            title,
-            areaId,
-            layer,
-            links,
-            isNew: "isNew" in node && node.isNew === true,
-            hub: "hub" in node && node.hub === true,
-          })),
+          nodes: withSampleNodes(realNodes, demoState).map(
+            ({ id, title, areaId, layer, links, ...node }) => ({
+              id,
+              title,
+              areaId,
+              layer,
+              links,
+              isNew: "isNew" in node && node.isNew === true,
+              hub: "hub" in node && node.hub === true,
+            }),
+          ),
         },
         "*",
       );
-  }, [ready, previewNodes, frame]);
+  }, [ready, realNodes, demoState, frame]);
   const org = useEnvironmentQuery(
     enterpriseEnvironment.org({ environmentId: props.environmentId, input: {} }),
   );
