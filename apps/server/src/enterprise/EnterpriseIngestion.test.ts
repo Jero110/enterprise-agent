@@ -69,6 +69,7 @@ const layerFor = (commands: OrchestrationV2ServerCommand[], responseStatus = 200
             commands.push(command);
             return {} as never;
           }),
+        getThreadRecords: () => Effect.succeed({ runs: [{ status: "running" }] }),
       } as unknown as ThreadManagement.ThreadManagementService["Service"]),
     ),
     Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-ingestion-" })),
@@ -197,6 +198,15 @@ describe("EnterpriseIngestion", () => {
           destination: "personal",
           modelSelection,
         });
+        expect(yield* ingestion.status("ana", { runId: run.runId })).toMatchObject({
+          runId: run.runId,
+          threadId: run.threadId,
+          status: "running",
+          agentStatus: "running",
+          sourceCount: 0,
+          proposedCount: 0,
+          pendingCount: 0,
+        });
         const owner = teamMemberKey("ent.test.ana@gmail.com");
         const proposal = {
           kind: "create",
@@ -216,6 +226,10 @@ describe("EnterpriseIngestion", () => {
           expect(Result.isFailure(denied) && denied.failure.code).toBe("access_denied");
         }
         const accepted = yield* hub.ingestionPropose(run.threadId, proposal);
+        expect(yield* ingestion.status("ana", { runId: run.runId })).toMatchObject({
+          proposedCount: 1,
+          pendingCount: 1,
+        });
         expect(accepted).toMatchObject({
           scope: "personal",
           recipient: "ent.test.ana@gmail.com",
@@ -225,6 +239,10 @@ describe("EnterpriseIngestion", () => {
         expect(
           (yield* hub.proposalInbox("admin", {})).proposals.some((p) => p.id === accepted.id),
         ).toBe(false);
+        const otherStatus = yield* Effect.result(ingestion.status("admin", { runId: run.runId }));
+        expect(Result.isFailure(otherStatus) && otherStatus.failure.code).toBe("access_denied");
+        const missing = yield* Effect.result(ingestion.status("ana", { runId: "unknown" }));
+        expect(Result.isFailure(missing) && missing.failure.code).toBe("access_denied");
         const otherDecision = yield* Effect.result(
           hub.proposalDecide("admin", { id: accepted.id, action: "approve" }),
         );
@@ -233,6 +251,16 @@ describe("EnterpriseIngestion", () => {
         );
         const approved = yield* hub.proposalDecide("ana", { id: accepted.id, action: "approve" });
         expect(approved.status).toBe("applied");
+        expect(yield* ingestion.status("ana", { runId: run.runId })).toMatchObject({
+          proposedCount: 1,
+          pendingCount: 0,
+        });
+        yield* ingestion.finish(run.threadId, "completed");
+        expect(yield* ingestion.status("ana", { runId: run.runId })).toMatchObject({
+          status: "completed",
+          proposedCount: 1,
+          pendingCount: 0,
+        });
       }).pipe(Effect.provide(layerFor(commands)));
     },
   );
@@ -255,6 +283,11 @@ describe("EnterpriseIngestion", () => {
         });
         const input = { uploadProposalIds: [upload.id], modelSelection };
         const first = yield* ingestion.start("admin", input);
+        expect(yield* ingestion.status("admin", { runId: first.runId })).toMatchObject({
+          sourceCount: 1,
+          status: "running",
+          proposedCount: 0,
+        });
         const firstMessage = commands.find((command) => command.type === "message.dispatch");
         const source = /Selected sources \(data\): (.+)/.exec(firstMessage!.text)!;
         const sourcePath = (JSON.parse(source[1]!) as string[])[0]!;

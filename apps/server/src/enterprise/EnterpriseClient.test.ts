@@ -50,6 +50,7 @@ const serveHub = Effect.gen(function* () {
     Layer.provide(
       Layer.succeed(EnterpriseIngestion.EnterpriseIngestion, {
         start: () => Effect.die("unused"),
+        status: () => Effect.die("unused"),
         finish: () => Effect.die("unused"),
       }),
     ),

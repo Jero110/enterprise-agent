@@ -9,6 +9,8 @@ import {
   EnterpriseHubIdentity,
   EnterpriseIngestStartInput,
   EnterpriseIngestStartResult,
+  EnterpriseIngestStatusInput,
+  EnterpriseIngestStatusResult,
   EnterpriseMembers,
   EnterpriseOrg,
   EnterpriseOrgFiles,
@@ -135,6 +137,15 @@ const IngestStartTool = Tool.make("enterprise_ingest_start", {
   success: hubResult(EnterpriseIngestStartResult),
 });
 
+const IngestStatusTool = Tool.make("enterprise_ingest_status", {
+  ...shared,
+  dependencies: [McpInvocationContext.McpInvocationContext, EnterpriseIngestion],
+  description:
+    "Read your ingestion run's persisted status, agent run state and actual proposal count by runId.",
+  parameters: EnterpriseIngestStatusInput,
+  success: hubResult(EnterpriseIngestStatusResult),
+}).annotate(Tool.Readonly, true);
+
 const teamShared = {
   ...shared,
   dependencies: [McpInvocationContext.McpInvocationContext, TeamPublication],
@@ -189,6 +200,7 @@ export const EnterpriseToolkit = Toolkit.make(
   RunReportTool,
   RunsQueryTool,
   IngestStartTool,
+  IngestStatusTool,
   TeamReportTool,
   TeamListTool,
   TeamGetTool,
@@ -251,6 +263,9 @@ export const layer = McpToolAccess.toLayer(
       ),
       enterprise_ingest_start: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => ingestion.start(id, input))),
+      ),
+      enterprise_ingest_status: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(sessionId, (id) => ingestion.status(id, input))),
       ),
       enterprise_team_report: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => team.report(id, input))),

@@ -102,6 +102,13 @@ export class EnterpriseStore extends Context.Service<
     /** Inserts what is missing; never overwrites what an admin changed. */
     readonly saveIngestionRun: (run: IngestionRun) => Effect.Effect<void>;
     readonly getIngestionRun: (threadId: string) => Effect.Effect<IngestionRun | null>;
+    readonly getIngestionRunById: (
+      runId: string,
+    ) => Effect.Effect<(IngestionRun & { readonly sourceCount: number }) | null>;
+    readonly ingestionProposalCounts: (
+      runId: string,
+      email: string,
+    ) => Effect.Effect<{ readonly proposedCount: number; readonly pendingCount: number }>;
     readonly ingestedHashes: Effect.Effect<ReadonlySet<string>>;
     readonly runningIngestions: Effect.Effect<ReadonlyArray<{ readonly threadId: string }>>;
     readonly listProposals: Effect.Effect<ReadonlyArray<KnowledgeProposal>>;
@@ -600,6 +607,52 @@ const make = Effect.gen(function* () {
       Effect.orDie,
     );
 
+  const getIngestionRunById: EnterpriseStore["Service"]["getIngestionRunById"] = (runId) =>
+    sql<{
+      id: string;
+      thread_id: string;
+      admin_email: string;
+      folder: string;
+      destination: string;
+      status: IngestionRun["status"];
+      source_count: number;
+    }>`SELECT r.*, (SELECT COUNT(*) FROM enterprise_ingestion_sources s WHERE s.run_id = r.id) AS source_count
+      FROM enterprise_ingestion_runs r WHERE r.id = ${runId}`.pipe(
+      Effect.map((rows) => {
+        const row = rows[0];
+        return row === undefined
+          ? null
+          : {
+              id: row.id,
+              threadId: row.thread_id,
+              adminEmail: row.admin_email,
+              folder: row.folder,
+              destination: row.destination,
+              status: row.status,
+              sourceCount: row.source_count,
+            };
+      }),
+      Effect.orDie,
+    );
+
+  const ingestionProposalCounts: EnterpriseStore["Service"]["ingestionProposalCounts"] = (
+    runId,
+    email,
+  ) =>
+    sql<{ proposedCount: number; pendingCount: number | null }>`
+    SELECT COUNT(*) AS proposedCount,
+      SUM(CASE WHEN json_extract(payload, '$.status') = 'pending' THEN 1 ELSE 0 END) AS pendingCount
+    FROM enterprise_knowledge_proposals
+    WHERE json_extract(payload, '$.proposedBy') = ${normalizeEmail(email)}
+      AND EXISTS (SELECT 1 FROM json_each(payload, '$.evidence') WHERE value = ${`ingestion:${runId}`})
+  `.pipe(
+      Effect.map((rows) => ({
+        proposedCount: rows[0]?.proposedCount ?? 0,
+        pendingCount: rows[0]?.pendingCount ?? 0,
+      })),
+      Effect.orDie,
+    );
+
   const listProposals = sql<{
     payload: string;
   }>`SELECT payload FROM enterprise_knowledge_proposals ORDER BY rowid DESC`.pipe(
@@ -614,6 +667,8 @@ const make = Effect.gen(function* () {
   return EnterpriseStore.of({
     saveIngestionRun,
     getIngestionRun,
+    getIngestionRunById,
+    ingestionProposalCounts,
     ingestedHashes,
     runningIngestions,
     listProposals,

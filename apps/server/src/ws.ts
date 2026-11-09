@@ -2694,6 +2694,7 @@ export const layerWsRpc = (
         [WS_METHODS.enterpriseKnowledgeGet]: (input) => enterprise.knowledgeGet(input),
         [WS_METHODS.enterpriseKnowledgePropose]: (input) => enterprise.knowledgePropose(input),
         [WS_METHODS.enterpriseIngestStart]: (input) => enterprise.ingestStart(input),
+        [WS_METHODS.enterpriseIngestStatus]: (input) => enterprise.ingestStatus(input),
         [WS_METHODS.enterpriseOrg]: () => enterprise.org,
         [WS_METHODS.enterpriseOrgTemplate]: () => Effect.succeed(OrgImport.template),
         [WS_METHODS.enterpriseConnector]: (input) => enterprise.connector(input),

@@ -4,6 +4,8 @@ import {
   EnterpriseConnectorResult,
   type EnterpriseIngestStartInput,
   EnterpriseIngestStartResult,
+  type EnterpriseIngestStatusInput,
+  EnterpriseIngestStatusResult,
   type KnowledgeProposeInput,
   KnowledgeProposal,
   KnowledgeProposalInbox,
@@ -83,6 +85,9 @@ export class EnterpriseClient extends Context.Service<
     readonly ingestStart: (
       input: EnterpriseIngestStartInput,
     ) => Effect.Effect<EnterpriseIngestStartResult, EnterpriseError>;
+    readonly ingestStatus: (
+      input: EnterpriseIngestStatusInput,
+    ) => Effect.Effect<EnterpriseIngestStatusResult, EnterpriseError>;
     readonly knowledgePropose: (
       input: KnowledgeProposeInput,
     ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
@@ -390,6 +395,11 @@ const make = Effect.gen(function* () {
     ingestStart: Effect.fn("EnterpriseClient.ingestStart")((input) =>
       withConnection((hub) =>
         callResult(hub, "enterprise_ingest_start", input, EnterpriseIngestStartResult),
+      ),
+    ),
+    ingestStatus: Effect.fn("EnterpriseClient.ingestStatus")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "enterprise_ingest_status", input, EnterpriseIngestStatusResult),
       ),
     ),
     knowledgePropose: Effect.fn("EnterpriseClient.knowledgePropose")((input) =>

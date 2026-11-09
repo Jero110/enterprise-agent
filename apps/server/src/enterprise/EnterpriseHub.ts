@@ -478,7 +478,12 @@ const make = Effect.gen(function* () {
         {
           ...input,
           ...(input.scope === "personal" ? { recipient: member.email } : {}),
-          evidence: [...new Set([...input.evidence, `ingestion:${run.id}`])],
+          evidence: [
+            ...new Set([
+              ...input.evidence.filter((e) => !e.startsWith("ingestion:")),
+              `ingestion:${run.id}`,
+            ]),
+          ],
         },
         true,
       );
