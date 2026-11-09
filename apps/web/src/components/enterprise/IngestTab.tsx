@@ -117,7 +117,9 @@ function IngestionRun({
   const runKey = `t3:enterprise-ingest:${environmentId}:${identity?.email ?? ""}`;
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
-  const [sourceMode, setSourceMode] = useState<IngestSourceMode>("url");
+  const [sourceMode, setSourceMode] = useState<IngestSourceMode>(
+    import.meta.env.DEV ? "files" : "url",
+  );
   const [destination, setDestination] = useState("personal");
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState("");
@@ -158,6 +160,21 @@ function IngestionRun({
   );
   const { sourceUrls, selectedFiles } = ingestSourceSelection(sourceMode, urls, files);
   const canSelectFiles = Boolean(ingestion?.canStart) || import.meta.env.DEV;
+  // Dev builds: dropping or choosing a file files the mock proposal straight away.
+  const runDemo = (fileName: string | undefined) => {
+    if (!fileName || demoBusy) return;
+    const advance = (step: number) => {
+      setDemoStep(step);
+      demoTimer.current = setTimeout(() => {
+        if (step + 1 < noraiDemoSteps.length) return advance(step + 1);
+        proposeDemoFile(environmentId, fileName);
+        setDemoStep(null);
+        setFiles([]);
+        onReview?.();
+      }, 700);
+    };
+    advance(0);
+  };
   const start = async () => {
     if (!ingestion || busy) return;
     const fileError = uploadFileError(selectedFiles);
@@ -323,6 +340,7 @@ function IngestionRun({
               setSourceMode("files");
               setError(null);
               setFiles(dropped);
+              if (import.meta.env.DEV) runDemo(dropped[0]?.name);
             }}
           >
             <div className="flex items-start gap-3">
@@ -377,8 +395,10 @@ function IngestionRun({
               aria-label={t("Choose files")}
               disabled={busy || !canSelectFiles}
               onChange={(event) => {
-                setFiles(Array.from(event.target.files ?? []));
+                const chosen = Array.from(event.target.files ?? []);
+                setFiles(chosen);
                 event.target.value = "";
+                if (import.meta.env.DEV) runDemo(chosen[0]?.name);
                 setError(null);
               }}
             />
@@ -436,20 +456,7 @@ function IngestionRun({
               size="sm"
               variant="outline"
               disabled={demoBusy || !selectedFiles.length}
-              onClick={() => {
-                const fileName = selectedFiles[0]?.name;
-                if (!fileName) return;
-                const advance = (step: number) => {
-                  setDemoStep(step);
-                  demoTimer.current = setTimeout(() => {
-                    if (step + 1 < noraiDemoSteps.length) return advance(step + 1);
-                    proposeDemoFile(environmentId, fileName);
-                    setDemoStep(null);
-                    onReview?.();
-                  }, 700);
-                };
-                advance(0);
-              }}
+              onClick={() => runDemo(selectedFiles[0]?.name)}
             >
               {demoBusy ? t("Ingesting…") : t("Ingest selected file")}
             </Button>
