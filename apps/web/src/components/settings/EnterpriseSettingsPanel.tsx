@@ -100,7 +100,7 @@ function IdentityRows({
     <>
       {identity ? (
         <SettingsRow
-          title={`${identity.displayName} · ${identity.role}`}
+          title={`${identity.displayName} · ${t(identity.role, undefined, "role")}`}
           description={`${identity.email} · ${identity.teamName ?? t("No team")}`}
           control={
             <Button
@@ -304,12 +304,12 @@ function TeamRoleControls({
         }}
       >
         <SelectTrigger size="xs" aria-label={t("Role")}>
-          <SelectValue>{t(role)}</SelectValue>
+          <SelectValue>{t(role, undefined, "role")}</SelectValue>
         </SelectTrigger>
         <SelectPopup alignItemWithTrigger={false}>
           {TeamMemberRole.literals.map((option) => (
             <SelectItem key={option} value={option} hideIndicator>
-              {t(option)}
+              {t(option, undefined, "role")}
             </SelectItem>
           ))}
         </SelectPopup>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { KnowledgeProposal } from "@t3tools/contracts";
-import { pendingGraphNodes } from "./proposalGraph";
+import { pendingGraphNodes, personName, proposalTitle } from "./proposalGraph";
 
 const proposal = (
   id: string,
@@ -47,14 +47,36 @@ describe("pending proposal graph identity", () => {
       {
         id: "proposal:c",
         groupId: "personal:ana@example.com",
-        groupLabel: "Personal · ana@example.com",
+        groupLabel: "Personal · Ana",
       },
       {
         id: "proposal:d",
         groupId: "personal:bruno@example.com",
-        groupLabel: "Personal · bruno@example.com",
+        groupLabel: "Personal · Bruno",
       },
       { id: "proposal:e", groupId: "global", groupLabel: "Company" },
     ]);
+  });
+});
+
+describe("plain proposal names", () => {
+  it("turns an email into a readable name", () => {
+    expect(personName("ana.garcia@example.com")).toBe("Ana Garcia");
+    expect(personName("luis_perez-lopez@example.com")).toBe("Luis Perez Lopez");
+    expect(personName(undefined)).toBe("");
+  });
+
+  it("titles access requests by team name and documents by file name", () => {
+    const teams = [{ id: "sales", name: "Ventas" }];
+    expect(proposalTitle({ ...proposal("x", "sales"), kind: "area-access" }, teams)).toBe(
+      "Access to Ventas",
+    );
+    expect(
+      proposalTitle(
+        { ...proposal("y", "sales"), kind: "create", path: "sales/pricing-policy.md" },
+        teams,
+      ),
+    ).toBe("Pricing policy");
+    expect(proposalTitle(proposal("z", "global"), teams)).toBe("z.pdf");
   });
 });

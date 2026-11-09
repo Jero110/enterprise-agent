@@ -11,6 +11,7 @@ import { ChevronRightIcon, RefreshCwIcon, UsersIcon } from "lucide-react";
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
 import { useState } from "react";
 
+import { t } from "~/i18n";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { resolveProjectDefaultProviderModelSelection } from "../providerInstances";
 import { environmentServerConfigsAtom } from "../state/server";
@@ -30,7 +31,6 @@ import {
   DialogPopup,
   DialogTitle,
 } from "./ui/dialog";
-import { ScrollArea } from "./ui/scroll-area";
 import { toastManager } from "./ui/toast";
 
 export function TeamAgentsSection() {
@@ -49,17 +49,22 @@ export function TeamAgentsSection() {
     return null;
   }
 
-  const summaries = summariesQuery.isSuccess ? (summariesQuery.data ?? []) : [];
+  // Polls refresh every 10 s; keep the last list (a failure keeps its previous success) instead of
+  // flashing "Loading" or an error while a refresh is in flight.
+  const summaries = summariesQuery.data ?? [];
   const team = rosterQuery.data?.teams.find((team) => team.id === identity?.teamId);
   const groups = groupTeamThreads(summaries, team?.members ?? [], identity?.email ?? null);
-  const error = summariesQuery.error ?? rosterQuery.error;
+  const hasSummaries = summariesQuery.data !== null;
+  const error = hasSummaries ? null : (summariesQuery.error ?? rosterQuery.error);
+  const loading =
+    !hasSummaries && (summariesQuery.isPending || rosterQuery.isPending || enterpriseStatusPending);
   return (
     <div className="border-b border-sidebar-border px-2 py-2">
       <div className="flex items-center gap-2 px-2 pb-1 text-xs font-medium text-muted-foreground">
         <UsersIcon className="size-3.5" aria-hidden />
-        <span className="flex-1">CoWork Agents</span>
+        <span className="flex-1">{t("CoWork Agents")}</span>
         <Button
-          aria-label="Reload CoWork Agents"
+          aria-label={t("Reload CoWork Agents")}
           size="icon-xs"
           variant="ghost-muted"
           onClick={() => {
@@ -71,11 +76,13 @@ export function TeamAgentsSection() {
         </Button>
       </div>
       {error !== null ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{error}</p>
-      ) : summariesQuery.isPending || rosterQuery.isPending || enterpriseStatusPending ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">Loading team threads…</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(error)}</p>
+      ) : loading ? (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("Loading team threads…")}</p>
       ) : groups.length === 0 ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">No shared conversations yet.</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">
+          {t("No shared conversations yet.")}
+        </p>
       ) : null}
       {groups.map((owner) => (
         <Collapsible key={owner.key} className="mt-1">
@@ -86,9 +93,9 @@ export function TeamAgentsSection() {
             />
             <span className="min-w-0 flex-1 truncate">
               {owner.displayName}
-              {owner.isMe ? " (you)" : ""}
+              {owner.isMe ? ` ${t("(you)")}` : ""}
             </span>
-            <span>{owner.threads.length} shared</span>
+            <span>{t("{count} shared", { count: owner.threads.length })}</span>
           </CollapsibleTrigger>
           <CollapsiblePanel animate={false}>
             {owner.threads.map((summary) => (
@@ -102,7 +109,9 @@ export function TeamAgentsSection() {
                 type="button"
               >
                 <span className="min-w-0 flex-1 truncate">{summary.title}</span>
-                <span className="text-3xs text-muted-foreground">{summary.status}</span>
+                <span className="text-3xs text-muted-foreground">
+                  {t(summary.status, undefined, "teamThread")}
+                </span>
               </button>
             ))}
           </CollapsiblePanel>
@@ -181,7 +190,7 @@ function TeamThreadReadOnlyDialog(props: {
         });
       }
     } catch {
-      setContinueError("Could not open the continuation thread.");
+      setContinueError(t("Could not open the continuation thread."));
     }
     setContinuing(false);
   };
@@ -197,7 +206,7 @@ function TeamThreadReadOnlyDialog(props: {
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add({
         type: "error",
-        title: "Could not stop sharing",
+        title: t("Could not stop sharing"),
         description: enterpriseFailureMessage(squashAtomCommandFailure(result)),
       });
     }
@@ -212,13 +221,26 @@ function TeamThreadReadOnlyDialog(props: {
   );
   // Failed queries retain their previous success; only show the current authorized result.
   const snapshot = query.isSuccess && !query.isPending ? query.data : null;
+  // The boss reads the agent's latest answer first; the full transcript stays one click away.
+  const lastAssistantMessage =
+    snapshot === null
+      ? undefined
+      : [...snapshot.messages].reverse().find((message) => message.role === "assistant");
+  const roleLabel = (role: "user" | "assistant" | "system") =>
+    role === "user"
+      ? (props.summary?.ownerDisplayName ?? t("User", undefined, "teamThread"))
+      : role === "assistant"
+        ? t("Assistant", undefined, "teamThread")
+        : t("System", undefined, "teamThread");
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogPopup className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{props.summary?.title ?? "Team thread"}</DialogTitle>
+          <DialogTitle>{props.summary?.title ?? t("Team thread")}</DialogTitle>
           <DialogDescription>
-            Read-only transcript from {props.summary?.ownerDisplayName}.
+            {t("Read-only transcript from {name}.", {
+              name: props.summary?.ownerDisplayName ?? "",
+            })}
           </DialogDescription>
           {props.summary?.ownerEmail === props.ownEmail && props.ownEmail !== null ? (
             <div>
@@ -228,23 +250,55 @@ function TeamThreadReadOnlyDialog(props: {
                 disabled={!canPublish || publishing}
                 onClick={() => void stopSharing()}
               >
-                {publishing ? "Stopping sharing…" : "Stop sharing"}
+                {publishing ? t("Stopping sharing…") : t("Stop sharing")}
               </Button>
             </div>
           ) : null}
         </DialogHeader>
         <DialogPanel>
-          <div className="mb-3 space-y-2">
-            <p className="text-xs text-muted-foreground">
-              Copy this published transcript as text into a new chat. It does not transfer files or
-              provider session state.
-            </p>
+          {query.error !== null ? (
+            <p className="text-sm text-muted-foreground">{t(query.error)}</p>
+          ) : snapshot === null || query.isPending ? (
+            <p className="text-sm text-muted-foreground">{t("Loading transcript…")}</p>
+          ) : (
+            <>
+              <section className="rounded-lg border bg-card p-4">
+                <h3 className="mb-2 text-sm font-medium">
+                  {t("Summary", undefined, "teamThread")}
+                </h3>
+                <p className="whitespace-pre-wrap text-sm">
+                  {lastAssistantMessage?.text ?? t("The assistant has not replied yet.")}
+                </p>
+              </section>
+              <details>
+                <summary className="cursor-pointer text-sm text-muted-foreground">
+                  {t("See full conversation")}
+                </summary>
+                <div className="mt-3 space-y-3">
+                  {snapshot.messages.map((message) => (
+                    <article
+                      className="rounded-md border border-border/60 p-3"
+                      key={`${message.createdAt}-${message.role}-${message.text.slice(0, 24)}`}
+                    >
+                      <div className="mb-1 text-xs font-medium text-muted-foreground">
+                        {roleLabel(message.role)}
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm">{message.text}</p>
+                    </article>
+                  ))}
+                </div>
+              </details>
+            </>
+          )}
+          <div className="space-y-2">
             <Button
               size="sm"
               disabled={!canContinue || snapshot === null || continuing}
               onClick={() => void continueInMyThread()}
             >
-              {continuing ? "Starting…" : "Continue in my thread"}
+              {continuing
+                ? t("Starting…", undefined, "teamThread")
+                : t("Take to my chat to summarize")}
             </Button>
             {continueError !== null ? (
               <p role="alert" className="text-sm text-destructive">
@@ -252,29 +306,6 @@ function TeamThreadReadOnlyDialog(props: {
               </p>
             ) : null}
           </div>
-          <ScrollArea className="max-h-[60dvh]">
-            {query.error !== null ? (
-              <p className="p-4 text-sm text-muted-foreground">
-                {query.error ?? "This transcript is no longer available."}
-              </p>
-            ) : snapshot === null || query.isPending ? (
-              <p className="p-4 text-sm text-muted-foreground">Loading transcript…</p>
-            ) : (
-              <div className="space-y-3 p-1">
-                {snapshot.messages.map((message) => (
-                  <article
-                    className="rounded-md border border-border/60 p-3"
-                    key={`${message.createdAt}-${message.role}-${message.text.slice(0, 24)}`}
-                  >
-                    <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">
-                      {message.role}
-                    </div>
-                    <p className="whitespace-pre-wrap text-sm">{message.text}</p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
         </DialogPanel>
       </DialogPopup>
     </Dialog>

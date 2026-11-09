@@ -15,7 +15,7 @@ export function EnterpriseHeaderButton() {
   if (environmentId === null) return null;
   // The sidebar header is narrow: show just your name, with team and role in the tooltip.
   const summary = identity
-    ? `${identity.displayName} · ${identity.teamName ?? t("No team")} · ${identity.role}`
+    ? `${identity.displayName} · ${identity.teamName ?? t("No team")} · ${t(identity.role, undefined, "role")}`
     : t("Join your team");
   return (
     <>

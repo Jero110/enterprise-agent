@@ -7,6 +7,7 @@ import { enterpriseEnvironment } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 
 import { Checkbox } from "../ui/checkbox";
+import { SHOW_KNOWLEDGE_GRAPH } from "./proposalGraph";
 
 const LAYERS = ["metrics", "business", "arch", "data"] as const;
 type KnowledgeNode = {
@@ -136,7 +137,14 @@ export function KnowledgeMap(props: {
             : "data",
     })),
   );
-  const nodes = [...previewNodes, ...documents];
+  // Without the 3D map only real documents are listed; the map's sample nodes stay out.
+  const nodes = SHOW_KNOWLEDGE_GRAPH ? [...previewNodes, ...documents] : documents;
+  const org = useEnvironmentQuery(
+    enterpriseEnvironment.org({ environmentId: props.environmentId, input: {} }),
+  );
+  const areaName = (areaId: string) =>
+    org.data?.teams.find((team) => team.id === areaId)?.name ?? areaId;
+  const enabledSkills = props.skills.filter((skill) => skill.enabled);
   const areaDocuments = props.cards.find((card) => card.scope === "area")?.documents ?? [];
   const areas = [...new Map(areaDocuments.map((doc) => [doc.areaId, doc])).values()];
   const nodeEnabled = (node: KnowledgeNode) =>
@@ -159,8 +167,14 @@ export function KnowledgeMap(props: {
                 : t("Personal knowledge");
           const count =
             scope === "individual"
-              ? props.skills.filter((skill) => skill.enabled).length
+              ? enabledSkills.length
               : (props.cards.find((card) => card.scope === scope)?.documents.length ?? 0);
+          const countLabel =
+            scope === "individual"
+              ? t("{count} skills", { count })
+              : count === 1
+                ? t("{count} document", { count })
+                : t("{count} documents", { count });
           return (
             <button
               key={scope}
@@ -204,7 +218,7 @@ export function KnowledgeMap(props: {
                   : scope === "area"
                     ? t("Owned by your teams")
                     : t("Your skills and tools")}{" "}
-                · {t("{count} available", { count })}
+                · {countLabel}
               </div>
             </button>
           );
@@ -225,114 +239,159 @@ export function KnowledgeMap(props: {
                 disabled={area.enabled === undefined}
                 onCheckedChange={(checked) => props.onToggle("area", checked === true, area.areaId)}
               />
-              {area.areaId}
+              {areaName(area.areaId)}
             </label>
           ))}
         </fieldset>
       )}
-      <div className="flex items-center justify-between border-t border-border/60 py-3">
-        <div>
-          <h3 className="text-sm font-medium">{t("Knowledge map")}</h3>
-          <p className="text-xs text-muted-foreground">
-            {t("Drag to orbit · scroll to zoom · select a node")}
-          </p>
+      {SHOW_KNOWLEDGE_GRAPH && (
+        <div className="flex items-center justify-between border-t border-border/60 py-3">
+          <div>
+            <h3 className="text-sm font-medium">{t("Knowledge map")}</h3>
+            <p className="text-xs text-muted-foreground">
+              {t("Drag to orbit · scroll to zoom · select a node")}
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {t("Current context · preview nodes")}
+          </span>
         </div>
-        <span className="text-xs text-muted-foreground">
-          {t("Current context · preview nodes")}
-        </span>
-      </div>
-      <div className="grid min-h-[470px] flex-1 overflow-hidden rounded-xl border border-border/70 bg-zinc-25 lg:grid-cols-[minmax(0,1fr)_230px]">
-        <div className="relative min-h-[470px] overflow-hidden">
-          {!ready && (
-            <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
-              {t("Loading knowledge map…")}
-            </div>
-          )}
-          <iframe
-            ref={frame}
-            title={t("Interactive 3D knowledge map")}
-            sandbox="allow-scripts"
-            src="/context-graph/index.html"
-            className="relative size-full min-h-[470px] border-0"
-            onLoad={() => {
-              setReady(true);
-              sync(scopes);
-            }}
-          />
-          {selected && nodeEnabled(selected) && !hiddenLayers.includes(selected.layer) && (
-            <div className="absolute right-4 top-14 z-10 max-h-[min(350px,65%)] w-[min(260px,90%)] overflow-auto rounded-xl border border-border bg-background/95 p-4 shadow-lg">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-3xs text-muted-foreground uppercase">
-                    {layerLabel(selected.layer)} ·{" "}
-                    {selected.kind === "source" ? t("source") : t("document")}
-                  </p>
-                  <p className="text-xs font-medium">{selected.title}</p>
-                </div>
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground"
-                  onClick={() => {
-                    setSelected(null);
-                    frame.current?.contentWindow?.postMessage(
-                      { type: "knowledge-clear-selection" },
-                      "*",
-                    );
-                  }}
-                >
-                  {t("Close")}
-                </button>
+      )}
+      <div
+        className={cn(
+          "overflow-hidden rounded-xl border border-border/70",
+          SHOW_KNOWLEDGE_GRAPH
+            ? "grid min-h-[470px] flex-1 bg-zinc-25 lg:grid-cols-[minmax(0,1fr)_230px]"
+            : "bg-background",
+        )}
+      >
+        {SHOW_KNOWLEDGE_GRAPH && (
+          <div className="relative min-h-[470px] overflow-hidden">
+            {!ready && (
+              <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
+                {t("Loading knowledge map…")}
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {selected.kind === "source"
-                  ? t("Source owned by {owner}.", { owner: selected.owner ?? t("your team") })
-                  : selected.path
-                    ? t("Knowledge document in your current context.")
-                    : t("Preview document linked to this source.")}
-              </p>
-              {selected.connections && selected.connections.length > 0 && (
-                <details className="mt-2 text-xs text-muted-foreground">
-                  <summary className="cursor-pointer">
-                    {t("Connections")} · {selected.connections.length}
-                  </summary>
-                  <ul className="mt-1 max-h-24 overflow-auto pl-3">
-                    {[...new Set(selected.connections)].map((name) => (
-                      <li key={name} className="truncate py-0.5">
-                        {name}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-              {selected.kind === "document" && selected.path && (
-                <button
-                  type="button"
-                  className="mt-3 rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
-                  onClick={() => setDocumentOpen(true)}
-                >
-                  {t("Open document ↗")}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+            )}
+            <iframe
+              ref={frame}
+              title={t("Interactive 3D knowledge map")}
+              sandbox="allow-scripts"
+              src="/context-graph/index.html"
+              className="relative size-full min-h-[470px] border-0"
+              onLoad={() => {
+                setReady(true);
+                sync(scopes);
+              }}
+            />
+            {selected && nodeEnabled(selected) && !hiddenLayers.includes(selected.layer) && (
+              <div className="absolute right-4 top-14 z-10 max-h-[min(350px,65%)] w-[min(260px,90%)] overflow-auto rounded-xl border border-border bg-background/95 p-4 shadow-lg">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-3xs text-muted-foreground uppercase">
+                      {layerLabel(selected.layer)} ·{" "}
+                      {selected.kind === "source" ? t("source") : t("document")}
+                    </p>
+                    <p className="text-xs font-medium">{selected.title}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground"
+                    onClick={() => {
+                      setSelected(null);
+                      frame.current?.contentWindow?.postMessage(
+                        { type: "knowledge-clear-selection" },
+                        "*",
+                      );
+                    }}
+                  >
+                    {t("Close")}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {selected.kind === "source"
+                    ? t("Source owned by {owner}.", { owner: selected.owner ?? t("your team") })
+                    : selected.path
+                      ? t("Knowledge document in your current context.")
+                      : t("Preview document linked to this source.")}
+                </p>
+                {selected.connections && selected.connections.length > 0 && (
+                  <details className="mt-2 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">
+                      {t("Connections")} · {selected.connections.length}
+                    </summary>
+                    <ul className="mt-1 max-h-24 overflow-auto pl-3">
+                      {[...new Set(selected.connections)].map((name) => (
+                        <li key={name} className="truncate py-0.5">
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {selected.kind === "document" && selected.path && (
+                  <button
+                    type="button"
+                    className="mt-3 rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+                    onClick={() => setDocumentOpen(true)}
+                  >
+                    {t("Open document ↗")}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <aside
-          className="flex max-h-[530px] flex-col border-t border-border/70 bg-background lg:border-t-0 lg:border-l"
+          className={cn(
+            "flex flex-col bg-background",
+            SHOW_KNOWLEDGE_GRAPH &&
+              "max-h-[530px] border-t border-border/70 lg:border-t-0 lg:border-l",
+          )}
           aria-label={t("Knowledge by source and layer")}
         >
-          <div className="border-b border-border/70 px-4 py-3 text-xs font-medium">
-            {t("Knowledge")}
+          <div
+            className={cn(
+              "border-b border-border/70 px-4 py-3 font-medium",
+              SHOW_KNOWLEDGE_GRAPH ? "text-xs" : "text-sm",
+            )}
+          >
+            {SHOW_KNOWLEDGE_GRAPH ? t("Knowledge") : t("What your assistant knows")}
           </div>
           <div className="min-h-0 flex-1 overflow-auto px-3 py-2">
             {(["general", "area", "individual"] as const).map((scope) => (
-              <details key={scope} className={cn("py-2", !enabled(scope) && "opacity-40")}>
-                <summary className="cursor-pointer px-2 text-3xs font-semibold tracking-widest text-muted-foreground uppercase">
+              <details
+                key={scope}
+                // Personal lists the device's skill ids; keep it folded so the list stays about company knowledge.
+                open={!SHOW_KNOWLEDGE_GRAPH && scope !== "individual"}
+                className={cn("py-2", !enabled(scope) && "opacity-40")}
+              >
+                <summary
+                  className={cn(
+                    "cursor-pointer px-2 font-semibold tracking-widest text-muted-foreground uppercase",
+                    SHOW_KNOWLEDGE_GRAPH ? "text-3xs" : "text-xs",
+                  )}
+                >
                   {scope === "general"
                     ? t("Company")
                     : scope === "area"
                       ? t("Your areas")
                       : t("Personal")}
                 </summary>
+                {!SHOW_KNOWLEDGE_GRAPH &&
+                  scope === "individual" &&
+                  enabledSkills.map((skill) => (
+                    <p key={skill.name} className="truncate px-4 py-1 text-xs">
+                      {skill.name}
+                    </p>
+                  ))}
+                {!SHOW_KNOWLEDGE_GRAPH &&
+                  (scope === "individual"
+                    ? enabledSkills.length === 0
+                    : !nodes.some((node) => node.scope === scope)) && (
+                    <p className="px-4 py-1 text-xs text-muted-foreground">
+                      {t("Nothing here yet")}
+                    </p>
+                  )}
                 {LAYERS.map((layer) => {
                   const entries = nodes.filter(
                     (node) =>
@@ -340,8 +399,13 @@ export function KnowledgeMap(props: {
                   );
                   return (
                     entries.length > 0 && (
-                      <details key={layer} className="mt-2 pl-2">
-                        <summary className="cursor-pointer px-2 text-3xs text-muted-foreground">
+                      <details key={layer} open={!SHOW_KNOWLEDGE_GRAPH} className="mt-2 pl-2">
+                        <summary
+                          className={cn(
+                            "cursor-pointer px-2 text-muted-foreground",
+                            SHOW_KNOWLEDGE_GRAPH ? "text-3xs" : "text-xs",
+                          )}
+                        >
                           {layerLabel(layer)}
                         </summary>
                         {entries.map((node) => (
@@ -355,6 +419,8 @@ export function KnowledgeMap(props: {
                             )}
                             onClick={() => {
                               setSelected(node);
+                              // With no map to show the node's card, a document opens straight away.
+                              if (!SHOW_KNOWLEDGE_GRAPH && node.path) setDocumentOpen(true);
                               if (!node.path)
                                 frame.current?.contentWindow?.postMessage(
                                   { type: "knowledge-focus", id: node.id },
@@ -392,7 +458,7 @@ export function KnowledgeMap(props: {
                 className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
                 onClick={() => setDocumentOpen(false)}
               >
-                {t("Back to map")}
+                {SHOW_KNOWLEDGE_GRAPH ? t("Back to map") : t("Back")}
               </button>
             </div>
             <KnowledgeDocument environmentId={props.environmentId} node={selected} expanded />

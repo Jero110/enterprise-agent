@@ -287,7 +287,7 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
     <CompactingLabel createdAt={row.createdAt} />
   ) : row.createdAt ? (
     <>
-      Working for <WorkingTimer createdAt={row.createdAt} />
+      {t("Working for")} <WorkingTimer createdAt={row.createdAt} />
     </>
   ) : (
     "Working..."

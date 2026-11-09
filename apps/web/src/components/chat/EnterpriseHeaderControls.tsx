@@ -80,7 +80,7 @@ function OrgTeam({ team }: { readonly team: EnterpriseOrgTeam }) {
     >
       <div className="flex items-center gap-2">
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium">{team.name}</h3>
-        {label ? <Badge variant="info">{t(label)}</Badge> : null}
+        {label ? <Badge variant="default">{t(label)}</Badge> : null}
       </div>
       <ul className="mt-2 space-y-1">
         {team.members.map((member) => (
@@ -95,7 +95,7 @@ function OrgTeam({ team }: { readonly team: EnterpriseOrgTeam }) {
               {member.displayName}
               {member.isMe ? ` ${t("(you)")}` : ""}
             </span>
-            <span>{member.role}</span>
+            <span>{t(member.role, undefined, "role")}</span>
           </li>
         ))}
       </ul>
@@ -180,24 +180,40 @@ function EnterpriseContextDialog(props: {
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("context");
+  // Proposals this user can approve; the header shows a labeled pill and opens on that tab.
+  const inbox = useEnvironmentQuery(
+    enterpriseEnvironment.proposalInbox({
+      environmentId: props.environmentId,
+      input: { countOnly: true },
+    }),
+  );
+  const pendingCount = inbox.error ? 0 : (inbox.data?.pendingCount ?? 0);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
-              size="icon"
+              size={pendingCount > 0 ? "sm" : "icon"}
               variant="ghost"
               aria-label={t("Conversation context and changes")}
               aria-haspopup="dialog"
               aria-expanded={open}
               data-pressed={open ? "" : undefined}
-              className="[-webkit-app-region:no-drag]"
-              onClick={() => setOpen(true)}
+              className="shrink-0 [-webkit-app-region:no-drag]"
+              onClick={() => {
+                setTab(pendingCount > 0 ? "changes" : "context");
+                setOpen(true);
+              }}
             />
           }
         >
-          <BrainCircuitIcon className="size-5" />
+          <BrainCircuitIcon className="size-4" />
+          {pendingCount > 0 ? (
+            <span className="whitespace-nowrap rounded-full bg-primary px-1.5 text-2xs font-medium text-primary-foreground">
+              {t("To approve · {count}", { count: pendingCount })}
+            </span>
+          ) : null}
         </TooltipTrigger>
         <TooltipPopup side="bottom">{t("Conversation context and changes")}</TooltipPopup>
       </Tooltip>
@@ -230,7 +246,9 @@ function EnterpriseContextDialog(props: {
               value="changes"
               render={<Button size="sm" variant={tab === "changes" ? "secondary" : "ghost"} />}
             >
-              {t("Changes", undefined, "knowledge")}
+              {pendingCount > 0
+                ? t("To approve ({count})", { count: pendingCount })
+                : t("Changes", undefined, "knowledge")}
             </Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="context" className="flex min-h-0 flex-1 flex-col">

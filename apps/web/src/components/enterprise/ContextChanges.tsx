@@ -8,6 +8,7 @@ import {
   useEnterpriseStatus,
 } from "~/state/enterprise";
 import { getLocale, t } from "~/i18n";
+import { cn } from "~/lib/utils";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import {
@@ -17,7 +18,13 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { toastManager } from "../ui/toast";
-import { pendingGraphNodes } from "./proposalGraph";
+import {
+  SHOW_KNOWLEDGE_GRAPH,
+  pendingGraphNodes,
+  personName,
+  proposalAreaName,
+  proposalTitle,
+} from "./proposalGraph";
 
 const MAX_FILES = 20;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -28,7 +35,7 @@ const STATUS_LABELS: Record<KnowledgeProposal["status"], string> = {
   applied: "Applied",
   rejected: "Rejected",
   reverted: "Reverted",
-  "approved-awaiting-processing": "Approved, awaiting processing (not in current context)",
+  "approved-awaiting-processing": "Received",
 };
 
 function formatResolvedAt(value: string | undefined): string {
@@ -43,7 +50,24 @@ function formatResolvedAt(value: string | undefined): string {
 }
 
 function statusLabel(status: KnowledgeProposal["status"]): string {
-  return t(STATUS_LABELS[status]);
+  return t(STATUS_LABELS[status], undefined, "proposal");
+}
+
+function formatTime(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleTimeString(getLocale() === "es" ? "es-MX" : "en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+}
+
+function isToday(value: string | undefined): boolean {
+  if (!value) return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.toDateString() === new Date().toDateString();
 }
 
 function fileBase64(file: File): Promise<string> {
@@ -84,8 +108,8 @@ function ProposalDetails({
   const { identity } = useEnterpriseStatus();
   // Access requests are shown in plain words: who asks for which area, by its team name.
   const org = useEnvironmentQuery(enterpriseEnvironment.org({ environmentId, input: {} }));
-  const areaName =
-    org.data?.teams.find((team) => team.id === proposal.scope)?.name ?? proposal.scope;
+  const teams = org.data?.teams ?? [];
+  const areaName = proposalAreaName(proposal, teams);
   const isAccessRequest = proposal.kind === "area-access";
   const decide = useAtomCommand(enterpriseEnvironment.proposalDecide, {
     label: "resolve proposal",
@@ -104,8 +128,23 @@ function ProposalDetails({
       input: { id: proposal.id, action, ...(action === "reject" ? { reason: reason.trim() } : {}) },
     });
     setBusy(false);
-    if (result._tag === "Success") refresh();
-    else if (!isAtomCommandInterrupted(result))
+    if (result._tag === "Success") {
+      refresh();
+      toastManager.add({
+        type: "success",
+        title:
+          action === "approve"
+            ? isAccessRequest
+              ? t("{who} can now see {area}", {
+                  who: personName(proposal.proposedBy),
+                  area: areaName,
+                })
+              : t("Saved to {area} knowledge", { area: areaName })
+            : action === "reject"
+              ? t("Proposal rejected")
+              : t("Change undone"),
+      });
+    } else if (!isAtomCommandInterrupted(result))
       toastManager.add({
         type: "error",
         title: t("Could not resolve proposal"),
@@ -149,26 +188,31 @@ function ProposalDetails({
     >
       <h3 className="font-medium">
         {isAccessRequest
-          ? t("{who} asks for access to {area}", { who: proposal.proposedBy, area: areaName })
-          : proposal.kind === "upload"
-            ? proposal.files?.map((file) => file.name).join(", ")
-            : proposal.path || proposal.kind}
+          ? t("{who} asks for access to {area}", {
+              who: personName(proposal.proposedBy),
+              area: areaName,
+            })
+          : proposalTitle(proposal, teams)}
       </h3>
       <p>
         {proposal.scope === "global"
           ? t("Company")
           : proposal.scope === "personal"
-            ? t("Personal · {who}", { who: proposal.recipient ?? proposal.proposedBy })
+            ? t("Personal · {who}", { who: personName(proposal.recipient ?? proposal.proposedBy) })
             : t("Area · {area}", { area: areaName })}
       </p>
       <p>
-        {t("Authored by {who}", { who: proposal.proposedBy })} · {statusLabel(proposal.status)}
+        {t("Authored by {who}", { who: personName(proposal.proposedBy) })} ·{" "}
+        {statusLabel(proposal.status)}
       </p>
       {!isAccessRequest && (
         <p>
           {t("Reviewers:")}{" "}
           {proposal.reviewers
-            ?.map((reviewer) => `${reviewer.email} (${reviewer.role})`)
+            ?.map(
+              (reviewer) =>
+                `${personName(reviewer.email)} (${t(reviewer.role, undefined, "role")})`,
+            )
             .join(", ") || t("Not assigned")}
         </p>
       )}
@@ -211,7 +255,7 @@ function ProposalDetails({
       )}
       {proposal.resolvedBy && (
         <p>
-          {t("Resolved by {who}", { who: proposal.resolvedBy })} ·{" "}
+          {t("Resolved by {who}", { who: personName(proposal.resolvedBy) })} ·{" "}
           {formatResolvedAt(proposal.resolvedAt)}
         </p>
       )}
@@ -257,11 +301,13 @@ function ProposalDetails({
 function ProposalList({
   title,
   proposals,
+  teams,
   selected,
   onSelect,
 }: {
   readonly title: string;
   readonly proposals: ReadonlyArray<KnowledgeProposal>;
+  readonly teams: ReadonlyArray<{ readonly id: string; readonly name: string }>;
   readonly selected: string | null;
   readonly onSelect: (id: string) => void;
 }) {
@@ -278,10 +324,8 @@ function ProposalList({
           aria-pressed={selected === proposal.id}
           onClick={() => onSelect(proposal.id)}
         >
-          {proposal.kind === "upload"
-            ? proposal.files?.map((file) => file.name).join(", ")
-            : proposal.path || proposal.kind}{" "}
-          · {statusLabel(proposal.status)} · {proposal.proposedBy}
+          {proposalTitle(proposal, teams)} · {statusLabel(proposal.status)} ·{" "}
+          {personName(proposal.proposedBy)}
         </button>
       ))}
     </div>
@@ -311,7 +355,15 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
   const proposals = inbox.data?.proposals ?? [];
   const pending = proposals.filter((proposal) => proposal.status === "pending");
   const selectedProposal = proposals.find((proposal) => proposal.id === selected);
-  const graphNodes = pendingGraphNodes(inbox.data?.proposals ?? [], org.data?.teams ?? []);
+  const teams = org.data?.teams ?? [];
+  const graphNodes = pendingGraphNodes(inbox.data?.proposals ?? [], teams);
+  // What the hub applied today, newest first: visible proof that the team's knowledge grew.
+  const learnedToday = proposals
+    .filter(
+      (proposal) =>
+        proposal.status === "applied" && proposal.kind !== "upload" && isToday(proposal.resolvedAt),
+    )
+    .toSorted((a, b) => (b.resolvedAt ?? "").localeCompare(a.resolvedAt ?? ""));
   const graphGroups = [
     ...new Map(graphNodes.map((node) => [node.groupId, node.groupLabel])).entries(),
   ];
@@ -420,21 +472,84 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
   };
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
+      <div className="flex justify-end">
+        <Button size="xs" variant="outline" onClick={inbox.refresh}>
+          {t("Refresh")}
+        </Button>
+      </div>
+      {learnedToday.length > 0 && (
+        <section
+          aria-label={t("What the team learned today")}
+          className="space-y-3 rounded-xl border bg-background p-4"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium">{t("What the team learned today")}</h2>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
+              {t("+{n} today", { n: learnedToday.length })}
+            </span>
+          </div>
+          <ul className="space-y-1">
+            {learnedToday.map((proposal) => (
+              <li key={proposal.id}>
+                <button
+                  type="button"
+                  aria-pressed={selected === proposal.id}
+                  className="flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left hover:bg-muted"
+                  onClick={() => selectProposal(proposal.id)}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">
+                      {proposal.kind === "area-access"
+                        ? t("Access to {area} granted to {who}", {
+                            area: proposalAreaName(proposal, teams),
+                            who: personName(proposal.proposedBy),
+                          })
+                        : proposalTitle(proposal, teams)}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {t("proposed by {proposer} · approved by {approver} · {time}", {
+                        proposer: personName(proposal.proposedBy),
+                        approver: personName(proposal.resolvedBy),
+                        time: formatTime(proposal.resolvedAt),
+                      })}
+                    </span>
+                    {proposal.evidence[0] && (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {proposal.evidence[0]}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section
         aria-label={t("Pending context changes")}
         className="overflow-hidden rounded-xl border bg-background"
       >
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_230px]">
-          <iframe
-            ref={frame}
-            title={t("Interactive context changes graph")}
-            sandbox="allow-scripts"
-            src="/context-graph/index.html"
-            className="h-[470px] w-full border-0"
-          />
+        <div className={cn(SHOW_KNOWLEDGE_GRAPH && "grid lg:grid-cols-[minmax(0,1fr)_230px]")}>
+          {SHOW_KNOWLEDGE_GRAPH && (
+            <iframe
+              ref={frame}
+              title={t("Interactive context changes graph")}
+              sandbox="allow-scripts"
+              src="/context-graph/index.html"
+              className="h-[470px] w-full border-0"
+            />
+          )}
           <aside
             aria-label={t("Pending proposals by scope")}
-            className="max-h-[470px] space-y-3 overflow-y-auto border-t p-4 lg:border-t-0 lg:border-l"
+            className={cn(
+              "space-y-3 p-4",
+              SHOW_KNOWLEDGE_GRAPH &&
+                "max-h-[470px] overflow-y-auto border-t lg:border-t-0 lg:border-l",
+            )}
           >
             {graphGroups.length === 0 && (
               <p className="text-xs text-muted-foreground">
@@ -470,8 +585,44 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           refresh={inbox.refresh}
         />
       )}
-      <section aria-label={t("Ingest files")} className="space-y-3 rounded-xl border p-4">
-        <h2 className="font-medium">{t("Ingest files")}</h2>
+      <section aria-label={t("Context changes history")} className="space-y-2">
+        <h2 className="font-medium">{t("Authored, assigned and history")}</h2>
+        {inbox.error ? (
+          <p role="alert">{inbox.error}</p>
+        ) : !inbox.data ? (
+          <p role="status">{t("Loading proposals…")}</p>
+        ) : proposals.length === 0 ? (
+          <p>{t("No proposals yet.")}</p>
+        ) : (
+          <div className="space-y-4">
+            <ProposalList
+              title={t("Assigned to you")}
+              proposals={pending.filter((proposal) =>
+                proposal.reviewers?.some((reviewer) => reviewer.email === identity?.email),
+              )}
+              teams={teams}
+              selected={selected}
+              onSelect={selectProposal}
+            />
+            <ProposalList
+              title={t("Authored by you")}
+              proposals={pending.filter((proposal) => proposal.proposedBy === identity?.email)}
+              teams={teams}
+              selected={selected}
+              onSelect={selectProposal}
+            />
+            <ProposalList
+              title={t("History")}
+              proposals={proposals.filter((proposal) => proposal.status !== "pending")}
+              teams={teams}
+              selected={selected}
+              onSelect={selectProposal}
+            />
+          </div>
+        )}
+      </section>
+      <details aria-label={t("Ingest files")} className="space-y-3 rounded-xl border p-4">
+        <summary className="cursor-pointer font-medium">{t("Upload files (preview)")}</summary>
         <p className="text-xs text-muted-foreground">
           {t(
             "Stage files from this device for review. Approved files await future processing and are not added to current context.",
@@ -532,45 +683,7 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
         <Button size="xs" disabled={busy || files.length === 0} onClick={() => void submit()}>
           {busy ? t("Uploading…") : t("Stage for review")}
         </Button>
-      </section>
-      <section aria-label={t("Context changes history")} className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="font-medium">{t("Authored, assigned and history")}</h2>
-          <Button size="xs" variant="outline" onClick={inbox.refresh}>
-            {t("Refresh")}
-          </Button>
-        </div>
-        {inbox.error ? (
-          <p role="alert">{inbox.error}</p>
-        ) : !inbox.data ? (
-          <p role="status">{t("Loading proposals…")}</p>
-        ) : proposals.length === 0 ? (
-          <p>{t("No proposals yet.")}</p>
-        ) : (
-          <div className="space-y-4">
-            <ProposalList
-              title={t("Assigned to you")}
-              proposals={pending.filter((proposal) =>
-                proposal.reviewers?.some((reviewer) => reviewer.email === identity?.email),
-              )}
-              selected={selected}
-              onSelect={selectProposal}
-            />
-            <ProposalList
-              title={t("Authored by you")}
-              proposals={pending.filter((proposal) => proposal.proposedBy === identity?.email)}
-              selected={selected}
-              onSelect={selectProposal}
-            />
-            <ProposalList
-              title={t("History")}
-              proposals={proposals.filter((proposal) => proposal.status !== "pending")}
-              selected={selected}
-              onSelect={selectProposal}
-            />
-          </div>
-        )}
-      </section>
+      </details>
     </div>
   );
 }

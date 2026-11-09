@@ -140,9 +140,9 @@ export function ProjectBoardProvider({
         ) : null}
       </div>
       <fieldset
-        disabled={
-          !allowed || saving || query.isPending || query.data === null || query.error !== null
-        }
+        // Not query.isPending: the board polls every 10 s, and disabling on each refresh dimmed it
+        // and dropped focus mid-typing. data === null still covers the first load.
+        disabled={!allowed || saving || query.data === null || query.error !== null}
         className="flex min-h-0 flex-1 flex-col disabled:opacity-60"
       >
         {children}

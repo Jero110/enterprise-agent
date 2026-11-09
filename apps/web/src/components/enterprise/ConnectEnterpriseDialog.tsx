@@ -121,7 +121,9 @@ export function ConnectEnterpriseDialog({
       toastManager.add({
         type: "success",
         title: t("Connected as {name}", { name: result.value.displayName }),
-        description: [result.value.teamName, result.value.role].filter(Boolean).join(" · "),
+        description: [result.value.teamName, t(result.value.role, undefined, "role")]
+          .filter(Boolean)
+          .join(" · "),
       });
       handleOpenChange(false);
     } else {

@@ -2,6 +2,9 @@ import { ES_BRAND } from "./brand";
 import { ES_CHAT } from "./chat";
 import { ES_DICTATION } from "./dictation";
 import { ES_HOME } from "./home";
+import { ES_HUB_HEADER } from "./hubHeader";
+import { ES_HUB_KNOWLEDGE } from "./hubKnowledge";
+import { ES_HUB_TEAM } from "./hubTeam";
 import { ES_SETTINGS } from "./settings";
 import { ES_SETTINGS_ADVANCED } from "./settingsAdvanced";
 import { ES_SHELL } from "./shell";
@@ -18,4 +21,7 @@ export const ES_DICTIONARY: Readonly<Record<string, string>> = {
   ...ES_HOME,
   ...ES_WIKI_SOURCES,
   ...ES_DICTATION,
+  ...ES_HUB_KNOWLEDGE,
+  ...ES_HUB_HEADER,
+  ...ES_HUB_TEAM,
 };
