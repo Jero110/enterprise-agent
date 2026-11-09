@@ -1,74 +1,91 @@
-import type { EnvironmentId, ThreadContextCard, ThreadKnowledgeScope } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  KnowledgeGraph,
+  ThreadContextCard,
+  ThreadKnowledgeScope,
+} from "@t3tools/contracts";
 import { Building2Icon, Layers3Icon, UserRoundIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import { enterpriseEnvironment } from "~/state/enterprise";
+import { useAtomValue } from "@effect/atom-react";
+import { useAtomCommand } from "~/state/use-atom-command";
+import { Button } from "../ui/button";
 import { useEnvironmentQuery } from "~/state/query";
 
 import { Checkbox } from "../ui/checkbox";
 import { SHOW_KNOWLEDGE_GRAPH } from "./proposalGraph";
 
-const LAYERS = ["metrics", "business", "arch", "data"] as const;
-type KnowledgeNode = {
-  id: string;
-  title: string;
-  layer: string;
+const LAYERS = ["metrics", "business", "ai", "data"] as const;
+type KnowledgeNode = KnowledgeGraph["nodes"][number] & {
   scope: Scope;
-  path?: string;
-  kind?: "source" | "document";
-  owner?: string;
-  connections?: string[];
+  path: string;
+  kind: "document";
 };
 
 function layerLabel(layer: string): string {
-  if (layer === "arch") return t("AI architecture");
-  return t(layer[0]?.toUpperCase() + layer.slice(1));
+  return layer === "ai" ? "AI" : t(layer[0]?.toUpperCase() + layer.slice(1));
 }
 
 function KnowledgeDocument({
-  environmentId,
   node,
-  expanded = false,
-}: {
-  environmentId: EnvironmentId;
-  node: KnowledgeNode;
-  expanded?: boolean;
-}) {
-  const path = node.path;
-  if (!path)
-    return (
-      <pre
-        className={cn(
-          "mt-3 overflow-auto whitespace-pre-wrap rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground",
-          expanded ? "flex-1" : "max-h-52",
-        )}
-      >{`# ${node.title}\n\n> ${t("Preview document. No knowledge source is attached to this node yet.")}\n\n## ${layerLabel(node.layer)}\n\n${t("This is where the knowledge for {title} will appear.", { title: node.title })}`}</pre>
-    );
-  return <ActualKnowledgeDocument environmentId={environmentId} path={path} expanded={expanded} />;
-}
-
-function ActualKnowledgeDocument({
   environmentId,
-  path,
-  expanded,
+  areaName,
+  refresh,
 }: {
+  node: KnowledgeNode;
   environmentId: EnvironmentId;
-  path: string;
-  expanded: boolean;
+  areaName: string;
+  refresh: () => void;
 }) {
-  const document = useEnvironmentQuery(
-    enterpriseEnvironment.knowledgeGet({ environmentId, input: { path } }),
+  const request = useAtomCommand(enterpriseEnvironment.knowledgeRequestAccess, {
+    label: "request knowledge access",
+  });
+  const permitted = useAtomValue(
+    enterpriseEnvironment.knowledgeRequestAccess.permissionAtom(environmentId),
   );
+  const [busy, setBusy] = useState(false);
+  const [requested, setRequested] = useState(false);
   return (
-    <pre
-      className={cn(
-        "mt-3 overflow-auto whitespace-pre-wrap rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground",
-        expanded ? "flex-1" : "max-h-52",
+    <div className="min-h-0 overflow-auto">
+      <p className="mt-3 text-sm">{node.description}</p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {areaName} · {!node.accessible || node.private ? t("Private") : t("Shared")}
+      </p>
+      {node.accessible ? (
+        <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-muted/40 p-3 text-xs">
+          {node.content ?? t("No content")}
+        </pre>
+      ) : (
+        <div className="mt-3 space-y-3">
+          <p>{t("This document is private to its area.")}</p>
+          <Button
+            size="sm"
+            disabled={!permitted || busy || requested}
+            onClick={async () => {
+              if (!environmentId) return;
+              setBusy(true);
+              const result = await request({ environmentId, input: { path: node.id } });
+              setBusy(false);
+              if (result._tag === "Success") setRequested(true);
+            }}
+          >
+            {requested ? t("Access requested") : t("Request access")}
+          </Button>
+          {requested && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                {t("Waiting for the area lead. This document opens here after approval.")}
+              </p>
+              <Button size="xs" variant="outline" onClick={refresh}>
+                {t("Check access")}
+              </Button>
+            </div>
+          )}
+        </div>
       )}
-    >
-      {document.error ?? document.data?.content ?? t("Loading document…")}
-    </pre>
+    </div>
   );
 }
 
@@ -84,9 +101,11 @@ export function KnowledgeMap(props: {
   const frame = useRef<HTMLIFrameElement>(null);
   const [individual, setIndividual] = useState(true);
   const [ready, setReady] = useState(false);
-  const [previewNodes, setPreviewNodes] = useState<KnowledgeNode[]>([]);
+  const graph = useEnvironmentQuery(
+    enterpriseEnvironment.knowledgeGraph({ environmentId: props.environmentId, input: {} }),
+  );
   const [hiddenLayers, setHiddenLayers] = useState<string[]>([]);
-  const [selected, setSelected] = useState<KnowledgeNode | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [documentOpen, setDocumentOpen] = useState(false);
   const enabled = (scope: Scope) =>
     scope === "individual"
@@ -110,35 +129,41 @@ export function KnowledgeMap(props: {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow) return;
-      if (event.data?.type === "knowledge-graph-ready") setPreviewNodes(event.data.nodes);
+      if (event.data?.type === "knowledge-graph-ready") setReady(true);
       if (event.data?.type === "knowledge-layers") setHiddenLayers(event.data.hidden);
-      if (event.data?.type === "knowledge-node-selected") setSelected(event.data.node);
+      if (event.data?.type === "knowledge-node-selected") setSelectedId(event.data.node.id);
       if (event.data?.type === "knowledge-selection-cleared") {
-        setSelected(null);
+        setSelectedId(null);
         setDocumentOpen(false);
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [frame]);
-  const documents: KnowledgeNode[] = props.cards.flatMap((card) =>
-    card.documents.map((doc) => ({
-      id: `${card.scope}:${doc.path}`,
-      title: doc.title,
-      scope: card.scope,
-      path: doc.path,
-      kind: "document",
-      layer: /metric|kpi|report/i.test(doc.path)
-        ? "metrics"
-        : /business|policy|customer/i.test(doc.path)
-          ? "business"
-          : /skill|agent|cli|mcp|architect/i.test(doc.path)
-            ? "arch"
-            : "data",
-    })),
-  );
-  // Without the 3D map only real documents are listed; the map's sample nodes stay out.
-  const nodes = SHOW_KNOWLEDGE_GRAPH ? [...previewNodes, ...documents] : documents;
+  const nodes: KnowledgeNode[] = (graph.data?.nodes ?? []).map((node) => ({
+    ...node,
+    path: node.id,
+    kind: "document",
+    scope: node.areaId === "general" ? "general" : "area",
+  }));
+  const selected = nodes.find((node) => node.id === selectedId);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- send metadata only to the sandboxed graph
+  useEffect(() => {
+    if (ready)
+      frame.current?.contentWindow?.postMessage(
+        {
+          type: "knowledge-nodes",
+          nodes: (graph.data?.nodes ?? []).map(({ id, title, areaId, layer, links }) => ({
+            id,
+            title,
+            areaId,
+            layer,
+            links,
+          })),
+        },
+        "*",
+      );
+  }, [ready, graph.data, frame]);
   const org = useEnvironmentQuery(
     enterpriseEnvironment.org({ environmentId: props.environmentId, input: {} }),
   );
@@ -252,10 +277,14 @@ export function KnowledgeMap(props: {
               {t("Drag to orbit · scroll to zoom · select a node")}
             </p>
           </div>
-          <span className="text-xs text-muted-foreground">
-            {t("Current context · preview nodes")}
-          </span>
+          <span className="text-xs text-muted-foreground">{t("Current context")}</span>
         </div>
+      )}
+      {graph.error && <p role="alert">{graph.error}</p>}
+      {graph.data?.nodes.length === 0 && (
+        <p className="py-4 text-sm text-muted-foreground">
+          {t("No knowledge yet. Ask an admin to load a bucket in Ingest.")}
+        </p>
       )}
       <div
         className={cn(
@@ -288,8 +317,7 @@ export function KnowledgeMap(props: {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-3xs text-muted-foreground uppercase">
-                      {layerLabel(selected.layer)} ·{" "}
-                      {selected.kind === "source" ? t("source") : t("document")}
+                      {layerLabel(selected.layer)} · {t("document")}
                     </p>
                     <p className="text-xs font-medium">{selected.title}</p>
                   </div>
@@ -297,7 +325,7 @@ export function KnowledgeMap(props: {
                     type="button"
                     className="text-xs text-muted-foreground"
                     onClick={() => {
-                      setSelected(null);
+                      setSelectedId(null);
                       frame.current?.contentWindow?.postMessage(
                         { type: "knowledge-clear-selection" },
                         "*",
@@ -307,31 +335,17 @@ export function KnowledgeMap(props: {
                     {t("Close")}
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {selected.kind === "source"
-                    ? t("Source owned by {owner}.", { owner: selected.owner ?? t("your team") })
-                    : selected.path
-                      ? t("Knowledge document in your current context.")
-                      : t("Preview document linked to this source.")}
-                </p>
-                {selected.connections && selected.connections.length > 0 && (
-                  <details className="mt-2 text-xs text-muted-foreground">
-                    <summary className="cursor-pointer">
-                      {t("Connections")} · {selected.connections.length}
-                    </summary>
-                    <ul className="mt-1 max-h-24 overflow-auto pl-3">
-                      {[...new Set(selected.connections)].map((name) => (
-                        <li key={name} className="truncate py-0.5">
-                          {name}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-                {selected.kind === "document" && selected.path && (
+                <KnowledgeDocument
+                  key={selected.id}
+                  node={selected}
+                  environmentId={props.environmentId}
+                  areaName={areaName(selected.areaId)}
+                  refresh={graph.refresh}
+                />
+                {selected.accessible && (
                   <button
                     type="button"
-                    className="mt-3 rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+                    className="mt-3 rounded-md border px-2 py-1 text-xs"
                     onClick={() => setDocumentOpen(true)}
                   >
                     {t("Open document ↗")}
@@ -418,10 +432,10 @@ export function KnowledgeMap(props: {
                               selected?.id === node.id && "bg-muted font-medium",
                             )}
                             onClick={() => {
-                              setSelected(node);
+                              setSelectedId(node.id);
                               // With no map to show the node's card, a document opens straight away.
-                              if (!SHOW_KNOWLEDGE_GRAPH && node.path) setDocumentOpen(true);
-                              if (!node.path)
+                              if (!SHOW_KNOWLEDGE_GRAPH) setDocumentOpen(true);
+                              if (SHOW_KNOWLEDGE_GRAPH)
                                 frame.current?.contentWindow?.postMessage(
                                   { type: "knowledge-focus", id: node.id },
                                   "*",
@@ -461,7 +475,13 @@ export function KnowledgeMap(props: {
                 {SHOW_KNOWLEDGE_GRAPH ? t("Back to map") : t("Back")}
               </button>
             </div>
-            <KnowledgeDocument environmentId={props.environmentId} node={selected} expanded />
+            <KnowledgeDocument
+              key={selected.id}
+              node={selected}
+              environmentId={props.environmentId}
+              areaName={areaName(selected.areaId)}
+              refresh={graph.refresh}
+            />
           </div>
         )}
     </div>

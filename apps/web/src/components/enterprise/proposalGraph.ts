@@ -3,11 +3,7 @@ import { t } from "~/i18n";
 
 type Team = { readonly id: string; readonly name: string };
 
-/**
- * Demo flag shared by KnowledgeMap and ContextChanges. The 3D map shows sample nodes only, so it
- * stays hidden and both tabs show the real lists. Set to true to bring the old map view back.
- */
-export const SHOW_KNOWLEDGE_GRAPH: boolean = false;
+export const SHOW_KNOWLEDGE_GRAPH: boolean = true;
 
 /** Readable name from an email: "ana.garcia@x.com" becomes "Ana Garcia". Org members have no other name field. */
 export function personName(email: string | undefined): string {

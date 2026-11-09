@@ -20,6 +20,36 @@ To continue a published teammate conversation, open its transcript in **CoWork A
 
 Admins can assign additional areas under **Settings → Enterprise → Members**. These grants supplement the member's team area; they do not move the member to another team or grant lead review permissions. In **Conversation context**, choose any combination of your available areas. Conversation choices only narrow the access your admin granted and also apply to a new conversation before its first message.
 
+## Find knowledge and request access
+
+On web and desktop, open **Conversation context → Context** to browse company knowledge across Metrics, Business, AI and Data, grouped by area. Use **Find a node** to search node titles. An empty graph means no knowledge has been loaded yet; an admin can start from **Ingest**.
+
+You can see an area's node previews even without access to its documents. A locked node shows its title, description, area and private status, never its body. Treat preview titles and descriptions as visible to all Enterprise members; keep sensitive facts in the body.
+
+Select a locked node and choose **Request access**. The area's lead or an admin reviews the request in **Changes**. Asking does not grant access. After approval, the selected node reveals its body without reopening the conversation; choose **Check access** if you want to check immediately. Revoking access makes the body unavailable again. Direct document reads and content search remain limited to knowledge you can access.
+
+## Load organization and knowledge
+
+Admins use **Conversation context → Ingest** on web or desktop. Members do not see this tab. Files selected on your device are uploaded to the connected hub; a hub folder path refers to the hub's filesystem, not your browser's computer.
+
+Start by downloading the `organization.yaml` and `areas.yaml` templates. Fill in people, their area, role and `reportsTo`, and the area IDs and names. Give each area at most one lead; that lead reviews access requests for the area. Select both files, preview the added, changed and removed people and areas, then confirm the import. Check removals carefully: removing a person revokes their access. Open **Organization** to see area leads, reporting relationships and your own areas.
+
+To load knowledge, stage a bucket of files or provide a hub folder, then start ingestion. The agent uses the organization's areas to propose knowledge nodes; review the proposals in **Changes** before they become current knowledge. Ingestion uses the admin's selected agent model and subscription. Upload staging alone does not add knowledge or approve a proposal.
+
+Return to **Ingest** for later uploads or another folder. You can also enter a note such as “We're missing the current Sales campaign policy” and start a run without new files. A note guides another ingestion run; it is not itself an approved change or a promise that the missing information exists.
+
+### Import database schemas
+
+In **Ingest → Connectors**, choose Postgres or Supabase, select the destination area and supply a database connection URL. Use a database account with only the permissions needed to read schema metadata. Connecting proposes Data-layer nodes describing tables and columns for review; it never imports table rows. A promotions table schema, for example, does not reveal the campaign's actual discount.
+
+Connection URLs stay in the hub's secret store. Use **Refresh schema** to propose updated schemas. **Disconnect** removes the saved connection URL but keeps accepted knowledge nodes. Snowflake, BigQuery, MySQL, Google Sheets and Google Drive are not available yet.
+
+## Share personal knowledge
+
+Open **Conversation context → Sharing** and choose a specific member or area. To share a local skill or node for the first time, enter its title and description, choose its kind and layer, then paste its content or select a Markdown/text file and choose **Publish copy and share**. You can also grant access to an already published personal item. These are copies you choose to publish, not an automatic upload of your private local wiki, personal transcripts or files. For example, Francisco can share his published RAG skill with María without sharing the rest of his personal knowledge.
+
+Use **Shared by me** to review recipients and revoke an individual grant. Stop sharing an item with everyone to unpublish it. **Shared with me** lists items others have shared with you. Area documents are not shared through this tab; their access is managed through area membership and requests. Personal knowledge sharing is separate from publishing a conversation with **Share with team**.
+
 ## Read Enterprise from the CLI
 
 This is an owner/script interface. The CLI uses the IDE owner’s saved Enterprise identity. It does not carry a provider thread identity or enforce that conversation’s knowledge toggles, so it is not a scoped interface for provider agents. Use the existing Knowledge MCP tools when those conversation restrictions must apply.

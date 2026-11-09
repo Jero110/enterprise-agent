@@ -210,7 +210,7 @@
     <div id="g"></div>
     <div class="bar">
       <h1>
-        Current context <span>&middot; 4 layers &middot; <span id="n"></span> preview nodes</span>
+        Current context <span>&middot; 4 layers &middot; <span id="n"></span> nodes</span>
       </h1>
       <div class="tools">
         <div class="find">
@@ -226,78 +226,16 @@
       ><span><i style="width: 3px; height: 3px; background: #9aa1a8"></i>Document</span>
     </div>
 
-    <script>
-      window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
-      window.cancelAnimationFrame = (id) => clearTimeout(id);
-    </script>
     <script src="/context-graph/3d-force-graph.min.js"></script>
     <script>
-      function rng(a) {
-        return () => {
-          a |= 0;
-          a = (a + 0x6d2b79f5) | 0;
-          let t = Math.imul(a ^ (a >>> 15), 1 | a);
-          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-        };
-      }
-      const R = rng(9);
       const RAD = 170,
         GAP = 124;
       const LAYERS = [
-        {
-          id: "metrics",
-          name: "Metrics",
-          y: GAP * 1.5,
-          src: [
-            { t: "Agent adoption", o: "Platform", n: 16 },
-            { t: "Cost and tokens", o: "Platform", n: 20 },
-            { t: "Delivery speed", o: "Ledger", n: 14 },
-            { t: "Risk indicators", o: "Risk", n: 12 },
-            { t: "Support load", o: "Accounts", n: 10 },
-          ],
-        },
-        {
-          id: "business",
-          name: "Business",
-          y: GAP * 0.5,
-          src: [
-            { t: "Payment lifecycle", o: "Ledger", n: 22 },
-            { t: "Fee policy", o: "Accounts", n: 14 },
-            { t: "Fraud rules", o: "Risk", n: 16 },
-            { t: "Onboarding", o: "Accounts", n: 12 },
-            { t: "Settlement", o: "Ledger", n: 18 },
-          ],
-        },
-        {
-          id: "arch",
-          name: "AI",
-          y: -GAP * 0.5,
-          src: [
-            { t: "ingest CLI", o: "Platform", n: 12 },
-            { t: "knowledge MCP", o: "Platform", n: 14 },
-            { t: "Ledger services", o: "Ledger", n: 20 },
-            { t: "Frontend gateway", o: "Frontend", n: 12 },
-            { t: "Skills", o: "Platform", n: 16 },
-            { t: "postgres MCP", o: "Platform", n: 8 },
-          ],
-        },
-        {
-          id: "data",
-          name: "Data",
-          y: -GAP * 1.5,
-          src: [
-            { t: "ledger-db", o: "Ledger", n: 34 },
-            { t: "users-db", o: "Accounts", n: 22 },
-            { t: "event-log", o: "Platform", n: 28 },
-            { t: "warehouse", o: "Platform", n: 24 },
-            { t: "fraud-labels", o: "Risk", n: 16 },
-            { t: "price-feed", o: "Ledger", n: 12 },
-            { t: "ui-telemetry", o: "Frontend", n: 14 },
-          ],
-        },
+        { id: "metrics", name: "Metrics", y: GAP * 1.5 },
+        { id: "business", name: "Business", y: GAP * 0.5 },
+        { id: "ai", name: "AI", y: -GAP * 0.5 },
+        { id: "data", name: "Data", y: -GAP * 1.5 },
       ];
-      const MY = new Set(["Ledger"]);
       const hx = (h) => [
         parseInt(h.slice(1, 3), 16),
         parseInt(h.slice(3, 5), 16),
@@ -315,97 +253,11 @@
           ).join("")
         );
       };
-      const LC = { data: "#5f9e9c", arch: "#53659f", business: "#9a88c7", metrics: "#c68399" };
+      const LC = { data: "#5f9e9c", ai: "#53659f", business: "#9a88c7", metrics: "#c68399" };
       const nodes = [],
         links = [],
-        hubs = [];
-      LAYERS.forEach((L, li) => {
-        L.src.forEach((s, i) => {
-          const ang = (i / L.src.length) * Math.PI * 2 + li * 0.5,
-            rr = RAD * 0.5;
-          const hub = {
-            id: `h${li}_${i}`,
-            hub: true,
-            layer: L.id,
-            li,
-            t: s.t,
-            owner: s.o,
-            mine: MY.has(s.o),
-            deg: s.n,
-            x: Math.cos(ang) * rr,
-            z: Math.sin(ang) * rr,
-            fy: L.y,
-          };
-          nodes.push(hub);
-          hubs.push(hub);
-          for (let k = 0; k < s.n; k++) {
-            const d = {
-              id: `d${li}_${i}_${k}`,
-              t: `${s.t} / doc ${k + 1}`,
-              layer: L.id,
-              li,
-              owner: s.o,
-              mine: hub.mine,
-              src: s.t,
-              x: hub.x + (R() - 0.5) * 60,
-              z: hub.z + (R() - 0.5) * 60,
-              fy: L.y,
-            };
-            nodes.push(d);
-            links.push({ source: hub.id, target: d.id, kind: "leaf", d: 16 + R() * R() * 60 });
-          }
-        });
-        // sources inside a layer reference each other
-        for (let a = 0; a < L.src.length; a++)
-          links.push({
-            source: `h${li}_${a}`,
-            target: `h${li}_${(a + 1) % L.src.length}`,
-            kind: "hub",
-          });
-      });
-      // links between layers: sources reach the layer below, and a few documents reach across
-      hubs.forEach((h) => {
-        if (h.li < 3) {
-          const below = hubs.filter((o) => o.li === h.li + 1);
-          for (let c = 0; c < 2; c++) {
-            const t = below[Math.floor(R() * below.length)];
-            links.push({ source: h.id, target: t.id, kind: "cross" });
-          }
-        }
-      });
-      const docs = nodes.filter((n) => !n.hub);
-      for (let c = 0; c < 80; c++) {
-        const a = docs[Math.floor(R() * docs.length)];
-        const lower = docs.filter((n) => n.li === Math.min(3, a.li + 1 + Math.floor(R() * 2)));
-        const b = lower[Math.floor(R() * lower.length)];
-        if (b && b.li !== a.li) links.push({ source: a.id, target: b.id, kind: "cross" });
-      }
-      for (let li = 0; li < 4; li++) {
-        const ld = docs.filter((n) => n.li === li);
-        for (let c = 0; c < 38; c++) {
-          const a = ld[Math.floor(R() * ld.length)],
-            b = ld[Math.floor(R() * ld.length)];
-          if (a !== b && a.src !== b.src) links.push({ source: a.id, target: b.id, kind: "ref" });
-        }
-      }
-      // faint ring of dots marks each layer's edge, no extra geometry needed
-      LAYERS.forEach((L, li) => {
-        for (let k = 0; k < 110; k++) {
-          const a = (k / 110) * Math.PI * 2;
-          nodes.push({
-            id: `r${li}_${k}`,
-            ring: true,
-            layer: L.id,
-            li,
-            fx: Math.cos(a) * (RAD + 10),
-            fz: Math.sin(a) * (RAD + 10),
-            fy: L.y,
-            x: Math.cos(a) * (RAD + 10),
-            z: Math.sin(a) * (RAD + 10),
-          });
-        }
-      });
-      document.getElementById("n").textContent = docs.length;
+        docs = [];
+      document.getElementById("n").textContent = "0";
 
       const byId = new Map(nodes.map((n) => [n.id, n]));
       const ob = (x) => (typeof x === "object" ? x : byId.get(x));
@@ -424,8 +276,7 @@
           /[&<>"']/g,
           (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
         );
-      const scopeOf = (n) =>
-        n.owner === "Platform" ? "general" : n.owner === "Frontend" ? "individual" : "area";
+      const scopeOf = (n) => (n.areaId === "general" ? "general" : "area");
       const scopeActive = (n) => n.ring || n.proposal || n.proposalGroup || scopes[scopeOf(n)];
       const describe = (n) => ({
         id: n.id,
@@ -516,8 +367,8 @@
         .linkWidth((l) => (l.kind === "cross" ? 0.3 : l.kind === "hub" ? 0.8 : 0.18))
         .linkCurvature((l) => (l.kind === "cross" ? 0.12 : 0))
         .enableNodeDrag(false)
-        .warmupTicks(80)
-        .cooldownTicks(220)
+        .warmupTicks(0)
+        .cooldownTicks(0)
         .d3VelocityDecay(0.3)
         .onNodeHover((n) => {
           hover = n && !n.ring && (!proposalMode || n.proposal || n.proposalGroup) ? n : null;
@@ -576,7 +427,7 @@
       }
       function useShapes() {
         const pm = nodes.find((n) => n.__threeObj)?.__threeObj;
-        if (!pm) return setTimeout(useShapes, 150);
+        if (!pm) return;
         Mesh = pm.constructor;
         Mat = pm.material.constructor;
         SG = pm.geometry;
@@ -605,7 +456,7 @@
         ringMat = new Mat({ color: "#dcdee2" });
         G.nodeThreeObject(mk);
       }
-      setTimeout(useShapes, 300);
+
       // each layer is a closed disc: nodes never leave their level, links are the only thing that cross
       function disc() {
         let ns = [];
@@ -650,6 +501,7 @@
           }
         });
         G.linkColor(linkColor);
+        redraw();
       }
       function renderChips() {
         document.getElementById("layers").innerHTML = LAYERS.map(
@@ -669,6 +521,7 @@
               G.nodeVisibility((n) => vis(n)).linkVisibility((l) => vis(l.source) && vis(l.target));
               renderChips();
               window.parent.postMessage({ type: "knowledge-layers", hidden: [...hidden] }, "*");
+              redraw();
             }),
         );
       }
@@ -720,7 +573,7 @@
         G.cameraPosition(
           { x: n.x + 145, y: n.fy + 100, z: n.z + 290 },
           { x: n.x, y: n.fy, z: n.z },
-          900,
+          0,
         );
       }
       q.addEventListener("input", showRes);
@@ -736,7 +589,64 @@
           res.querySelectorAll("[data-i]").forEach((d, i) => d.classList.toggle("on", i === cur));
         }
       });
-      document.getElementById("reset").onclick = resetView;
+      document.getElementById("reset").onclick = () => {
+        resetView();
+        redraw();
+      };
+      function showNodes(previews) {
+        proposalMode = false;
+        nodes.length = 0;
+        links.length = 0;
+        docs.length = 0;
+        byId.clear();
+        nb.clear();
+        const areas = [...new Set(previews.map((n) => n.areaId))].sort();
+        const counts = new Map();
+        for (const p of previews) {
+          const li = LAYERS.findIndex((l) => l.id === p.layer);
+          if (li < 0) continue;
+          const key = p.areaId + ":" + p.layer;
+          const index = counts.get(key) || 0;
+          counts.set(key, index + 1);
+          const angle = (areas.indexOf(p.areaId) / Math.max(areas.length, 1)) * Math.PI * 2;
+          const radius = 5 * Math.sqrt(index);
+          const x = Math.cos(angle) * RAD * 0.65 + Math.cos(index * 2.4) * radius;
+          const z = Math.sin(angle) * RAD * 0.65 + Math.sin(index * 2.4) * radius;
+          const node = {
+            id: p.id,
+            t: p.title,
+            areaId: p.areaId,
+            layer: p.layer,
+            owner: p.areaId,
+            li,
+            x,
+            z,
+            fx: x,
+            fz: z,
+            fy: LAYERS[li].y,
+          };
+          nodes.push(node);
+          docs.push(node);
+          byId.set(node.id, node);
+          nb.set(node.id, new Set([node.id]));
+        }
+        for (const p of previews) {
+          for (const target of p.links || []) {
+            if (!byId.has(p.id) || !byId.has(target)) continue;
+            links.push({ source: p.id, target, kind: "ref" });
+            nb.get(p.id).add(target);
+            nb.get(target).add(p.id);
+          }
+        }
+        sel = sel ? byId.get(sel.id) || null : null;
+        hover = null;
+        document.getElementById("n").textContent = nodes.length;
+        G.graphData({ nodes, links });
+        setTimeout(useShapes, 50);
+        renderChips();
+        refresh();
+        showRes();
+      }
       function showProposals(proposals) {
         proposalMode = true;
         for (let i = nodes.length - 1; i >= 0; i--) {
@@ -813,12 +723,17 @@
         });
         document.querySelector(".bar h1").textContent = `Context changes · ${valid.length} pending`;
         G.graphData({ nodes, links });
+        setTimeout(useShapes, 50);
         G.nodeVisibility((n) => vis(n)).linkVisibility((l) => vis(l.source) && vis(l.target));
         refresh();
         showRes();
       }
       window.addEventListener("message", (event) => {
         if (event.source !== window.parent) return;
+        if (event.data?.type === "knowledge-nodes" && Array.isArray(event.data.nodes)) {
+          showNodes(event.data.nodes);
+          return;
+        }
         if (event.data?.type === "knowledge-proposals") {
           showProposals(event.data.nodes);
           return;
@@ -850,8 +765,23 @@
         refresh();
         showRes();
       });
-      window.parent.postMessage({ type: "knowledge-graph-ready", nodes: hubs.map(describe) }, "*");
-      addEventListener("resize", () => G.width(innerWidth).height(innerHeight));
+      window.parent.postMessage({ type: "knowledge-graph-ready", nodes: [] }, "*");
+      let idleTimer;
+      function redraw() {
+        G.resumeAnimation();
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => G.pauseAnimation(), 100);
+      }
+      G.controls().enableDamping = false;
+      G.controls().addEventListener("change", redraw);
+      for (const event of ["pointermove", "pointerdown", "pointerleave"]) {
+        document.getElementById("g").addEventListener(event, redraw);
+      }
+      redraw();
+      addEventListener("resize", () => {
+        G.width(innerWidth).height(innerHeight);
+        redraw();
+      });
     </script>
   </body>
 </html>
