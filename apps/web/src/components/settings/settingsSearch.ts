@@ -1184,6 +1184,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     secretsFeatureOnly: true,
   },
   {
+    id: "cite-wiki-sources",
+    title: "Cite team wiki sources",
+    to: "/settings/enterprise",
+    scope: "environment-defaults",
+    searchTerms: ["fuentes sources citations references knowledge pages answers enterprise"],
+  },
+  {
     id: "archive",
     title: "Archived threads",
     to: "/settings/archived",

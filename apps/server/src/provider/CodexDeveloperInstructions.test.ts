@@ -1,6 +1,9 @@
 import * as NodeAssert from "node:assert/strict";
 
-import { T3_CODE_DEVICE_TOOL_INSTRUCTIONS } from "@t3tools/provider-core/server/orchestrationInstructions";
+import {
+  T3_CODE_DEVICE_TOOL_INSTRUCTIONS,
+  T3_CODE_WIKI_SOURCES_INSTRUCTIONS,
+} from "@t3tools/provider-core/server/orchestrationInstructions";
 import { describe, it } from "vite-plus/test";
 
 import {
@@ -89,6 +92,17 @@ describe("Codex device context", () => {
     NodeAssert.ok(tools(true).includes(T3_CODE_DEVICE_TOOL_INSTRUCTIONS));
     NodeAssert.ok(!tools(true).includes("ToolSearch"));
     NodeAssert.ok(!tools(false).includes("## T3 Code devices"));
+  });
+});
+
+describe("Codex team wiki sources context", () => {
+  it("asks for a sources list unless the user turned wiki citations off", () => {
+    const wikiSources = (cite: boolean) =>
+      buildCodexAdditionalContext({ model: "gpt-6.1-sol" }, true, cite).t3_code_wiki_sources?.value;
+
+    NodeAssert.equal(wikiSources(true), T3_CODE_WIKI_SOURCES_INSTRUCTIONS);
+    NodeAssert.ok(T3_CODE_WIKI_SOURCES_INSTRUCTIONS.includes('"Fuentes" in Spanish'));
+    NodeAssert.equal(wikiSources(false), undefined);
   });
 });
 

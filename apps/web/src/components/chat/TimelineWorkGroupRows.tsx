@@ -1,3 +1,4 @@
+import { t } from "~/i18n";
 import { TimelinePendingApprovalRow } from "./TimelinePendingApprovalRow";
 import { WorkLogButton, WorkLogList, WorkLogRow } from "./WorkLog";
 import type { WorktreeSetupSnapshot } from "@t3tools/contracts";
@@ -365,7 +366,12 @@ export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind:
   // A failed group keeps this disclosure while an approval waits, but nothing is thinking then.
   const live = ctx.pendingApprovals.size === 0;
   const activity = (
-    <LiveActivityRow label="Thinking" iconName="brain" active={live} shimmer={live} />
+    <LiveActivityRow
+      label={t("Thinking", undefined, "timeline")}
+      iconName="brain"
+      active={live}
+      shimmer={live}
+    />
   );
   const { groupId } = row;
   if (groupId === undefined) return activity;
@@ -549,9 +555,9 @@ export function LiveWorkEntryTimelineRow({
         label={
           thoughtIsStatus ? (
             row.active ? (
-              "Thinking"
+              t("Thinking", undefined, "timeline")
             ) : (
-              "Thought"
+              t("Thought", undefined, "timeline")
             )
           ) : row.entry.itemType === "reasoning" ? (
             <ChatMarkdown

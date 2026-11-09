@@ -15,9 +15,10 @@ export const ES_CHAT: Readonly<Record<string, string>> = {
 
   // Starter suggestions
   Suggestions: "Sugerencias",
-  "Explain this project to me": "Explícame este proyecto",
-  "Find bugs in the code": "Busca errores en el código",
-  "Summarize what changed today": "Resume lo que cambió hoy",
+  "What was the discount on our last promo?":
+    "¿De cuánto fue el descuento de nuestra última promo?",
+  "Summarize today's meeting and tell me what's mine": "Resume la junta de hoy y dime qué me toca",
+  "Request access to the Sales area": "Pide acceso al área de Ventas",
   "What does my team's wiki know about…?": "¿Qué sabe la wiki de mi equipo sobre…?",
   "What does my team's wiki know about ": "¿Qué sabe la wiki de mi equipo sobre ",
 
@@ -91,7 +92,7 @@ export const ES_CHAT: Readonly<Record<string, string>> = {
   Auto: "Automático",
   "Supported providers approve routine actions; others still ask.":
     "El agente aprueba solo lo rutinario; para lo demás te pregunta.",
-  "Full access": "Puede editar archivos",
+  "Full access": "Acceso total (edita y corre comandos)",
   "Allow commands and edits without prompts.":
     "El agente puede editar archivos y ejecutar comandos sin pedirte permiso. Úsalo solo en proyectos de confianza.",
   "Plan mode. Click to return to normal build mode":
@@ -206,4 +207,10 @@ export const ES_CHAT: Readonly<Record<string, string>> = {
   "Review your usage settings in ChatGPT.": "Revisa tu uso en ChatGPT.",
   "Copy request for admin": "Copiar solicitud para el administrador",
   "Dismiss error": "Cerrar aviso",
+  "What should we work on?": "¿En qué te ayudo hoy?",
+  "Add a project to start your first thread.": "Agrega un proyecto para empezar tu primer chat.",
+  "Add a project, or start without one.": "Agrega un proyecto o empieza sin uno.",
+  "Start without a project": "Empezar sin proyecto",
+  "timeline::Thinking": "Pensando",
+  "timeline::Thought": "Pensó",
 };

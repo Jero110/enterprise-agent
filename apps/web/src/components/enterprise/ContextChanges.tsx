@@ -7,7 +7,7 @@ import {
   enterpriseFailureMessage,
   useEnterpriseStatus,
 } from "~/state/enterprise";
-import { t } from "~/i18n";
+import { getLocale, t } from "~/i18n";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import {
@@ -30,6 +30,17 @@ const STATUS_LABELS: Record<KnowledgeProposal["status"], string> = {
   reverted: "Reverted",
   "approved-awaiting-processing": "Approved, awaiting processing (not in current context)",
 };
+
+function formatResolvedAt(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(getLocale() === "es" ? "es-MX" : "en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+}
 
 function statusLabel(status: KnowledgeProposal["status"]): string {
   return t(STATUS_LABELS[status]);
@@ -71,6 +82,11 @@ function ProposalDetails({
     enterpriseEnvironment.proposalDecide.permissionAtom(environmentId),
   );
   const { identity } = useEnterpriseStatus();
+  // Access requests are shown in plain words: who asks for which area, by its team name.
+  const org = useEnvironmentQuery(enterpriseEnvironment.org({ environmentId, input: {} }));
+  const areaName =
+    org.data?.teams.find((team) => team.id === proposal.scope)?.name ?? proposal.scope;
+  const isAccessRequest = proposal.kind === "area-access";
   const decide = useAtomCommand(enterpriseEnvironment.proposalDecide, {
     label: "resolve proposal",
     reportFailure: false,
@@ -132,27 +148,32 @@ function ProposalDetails({
       className="space-y-3 rounded-lg border p-4 text-sm"
     >
       <h3 className="font-medium">
-        {proposal.kind === "upload"
-          ? proposal.files?.map((file) => file.name).join(", ")
-          : proposal.path || proposal.kind}
+        {isAccessRequest
+          ? t("{who} asks for access to {area}", { who: proposal.proposedBy, area: areaName })
+          : proposal.kind === "upload"
+            ? proposal.files?.map((file) => file.name).join(", ")
+            : proposal.path || proposal.kind}
       </h3>
       <p>
         {proposal.scope === "global"
           ? t("Company")
           : proposal.scope === "personal"
             ? t("Personal · {who}", { who: proposal.recipient ?? proposal.proposedBy })
-            : t("Area · {area}", { area: proposal.scope })}
+            : t("Area · {area}", { area: areaName })}
       </p>
       <p>
         {t("Authored by {who}", { who: proposal.proposedBy })} · {statusLabel(proposal.status)}
       </p>
-      <p>
-        {t("Reviewers:")}{" "}
-        {proposal.reviewers?.map((reviewer) => `${reviewer.email} (${reviewer.role})`).join(", ") ||
-          t("Not assigned")}
-      </p>
-      <p>{proposal.reason}</p>
-      {proposal.evidence.length > 0 && (
+      {!isAccessRequest && (
+        <p>
+          {t("Reviewers:")}{" "}
+          {proposal.reviewers
+            ?.map((reviewer) => `${reviewer.email} (${reviewer.role})`)
+            .join(", ") || t("Not assigned")}
+        </p>
+      )}
+      <p>{isAccessRequest ? t(proposal.reason) : proposal.reason}</p>
+      {!isAccessRequest && proposal.evidence.length > 0 && (
         <p>
           {t("Evidence:")} {proposal.evidence.join(", ")}
         </p>
@@ -190,7 +211,8 @@ function ProposalDetails({
       )}
       {proposal.resolvedBy && (
         <p>
-          {t("Resolved by {who}", { who: proposal.resolvedBy })} · {proposal.resolvedAt}
+          {t("Resolved by {who}", { who: proposal.resolvedBy })} ·{" "}
+          {formatResolvedAt(proposal.resolvedAt)}
         </p>
       )}
       {proposal.status === "applied" &&

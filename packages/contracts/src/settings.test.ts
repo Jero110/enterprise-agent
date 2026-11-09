@@ -346,6 +346,16 @@ describe("provider enabled defaults", () => {
   });
 });
 
+describe("ServerSettings team wiki sources", () => {
+  it("cites wiki sources by default and keeps a stored opt-out", () => {
+    expect(DEFAULT_SERVER_SETTINGS.citeWikiSources).toBe(true);
+    expect(decodeServerSettings({ citeWikiSources: false }).citeWikiSources).toBe(false);
+    expect(decodeServerSettingsPatch({ citeWikiSources: false })).toEqual({
+      citeWikiSources: false,
+    });
+  });
+});
+
 describe("ServerSettings worktree defaults", () => {
   it("defaults the thread env mode to inherit and keeps stored values", () => {
     expect(decodeServerSettings({}).defaultThreadEnvMode).toBeNull();

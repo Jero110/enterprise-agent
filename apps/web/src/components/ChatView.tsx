@@ -262,6 +262,7 @@ import { useEnvironmentShellHasSnapshot } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { DraftStarterSuggestions } from "./chat/DraftStarterSuggestions";
+import { TodayPanel } from "./home/TodayPanel";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import {
   BranchRestoreConfirmHost,
@@ -3835,11 +3836,12 @@ export default function ChatView(props: ChatViewProps) {
                           <ComposerBannerStack items={composerBannerItems} detached />
                         </div>
                       ) : isDraftHeroState && !(isLocalDraftThread && activeProject === null) ? (
-                        <div className="absolute inset-x-0 top-full pt-4">
+                        <div className="absolute inset-x-0 top-full flex flex-col gap-4 pt-4">
                           <DraftStarterSuggestions
                             draftTarget={composerDraftTarget}
                             onPick={insertStarterSuggestionStable}
                           />
+                          <TodayPanel />
                         </div>
                       ) : null}
                     </ComposerSurface.Shell>

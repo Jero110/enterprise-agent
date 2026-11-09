@@ -83,14 +83,14 @@ it("a starter suggestion fills the empty draft without sending, then the chips h
     // AppRoot brings its own router.
     router: false,
   });
-  const suggestion = page.getByRole("button", { name: "Explain this project to me" });
+  const suggestion = page.getByRole("button", { name: "What was the discount on our last promo?" });
   await suggestion.click();
 
   await expect
     .element(page.getByTestId("composer-editor"))
-    .toHaveTextContent("Explain this project to me");
+    .toHaveTextContent("What was the discount on our last promo?");
   await expect.element(suggestion).not.toBeInTheDocument();
   expect(useComposerDraftStore.getState().getComposerDraft(draftId)?.prompt).toBe(
-    "Explain this project to me",
+    "What was the discount on our last promo?",
   );
 });

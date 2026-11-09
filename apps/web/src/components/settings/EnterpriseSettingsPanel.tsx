@@ -27,7 +27,10 @@ import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
+import { ScopedSwitch } from "./ScopedSwitch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
+import { searchableSetting } from "./settingsSearch";
+import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
 const NO_TEAM = "none";
 
@@ -42,10 +45,34 @@ export function EnterpriseSettingsPanel() {
           <IdentityRows environmentId={environmentId} identity={identity} error={error} />
         )}
       </SettingsSection>
+      <TeamWikiSection />
       {environmentId !== null && identity?.role === "admin" ? (
         <MembersSection environmentId={environmentId} />
       ) : null}
     </SettingsPageContainer>
+  );
+}
+
+function TeamWikiSection() {
+  const citeWikiSources = useScopedSettings((settings) => settings.citeWikiSources);
+  const updateSettings = useUpdateScopedSettings();
+  return (
+    <SettingsSection title="Team wiki">
+      <SettingsRow
+        serverScoped
+        settingKeys={["citeWikiSources"]}
+        {...searchableSetting("cite-wiki-sources")}
+        description="When an agent answers with information from the team wiki, it ends with a short Sources list of the pages it used, so you can check where the answer came from. Applies to new conversations."
+        control={
+          <ScopedSwitch
+            settingKeys={["citeWikiSources"]}
+            checked={citeWikiSources}
+            onCheckedChange={(checked) => updateSettings({ citeWikiSources: Boolean(checked) })}
+            aria-label={t("Cite team wiki sources")}
+          />
+        }
+      />
+    </SettingsSection>
   );
 }
 

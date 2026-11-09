@@ -274,4 +274,6 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "1 folder": "1 carpeta",
   "{count} folders": "{count} carpetas",
   now: "ahora",
+  "{who} asks for access to {area}": "{who} pide acceso a {area}",
+  "Request area knowledge access": "Pide acceso al conocimiento del área",
 };

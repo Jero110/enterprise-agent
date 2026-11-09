@@ -82,7 +82,10 @@ import { attachmentRelativePath } from "../../attachmentStore.ts";
 import { WorkflowAgentTranscriptReadObserver } from "../workflowAgentTranscript.ts";
 import * as ServerConfig from "../../config.ts";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
-import { T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH } from "@t3tools/provider-core/server/orchestrationInstructions";
+import {
+  T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH,
+  T3_CODE_WIKI_SOURCES_INSTRUCTIONS,
+} from "@t3tools/provider-core/server/orchestrationInstructions";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import { PreviewControlsToolkit } from "../../mcp/toolkits/previewControls/tools.ts";
 import { HtmlToolkit } from "../../mcp/toolkits/html/tools.ts";
@@ -728,6 +731,36 @@ describe("ClaudeAdapterV2 device instructions", () => {
     ]);
     assert.deepEqual(await subagentContext({ mcp: true, deviceToolsAvailable: false }), []);
     assert.deepEqual(await subagentContext({ mcp: false, deviceToolsAvailable: true }), []);
+  });
+});
+
+describe("ClaudeAdapterV2 team wiki sources", () => {
+  const append = (input: { readonly mcp: boolean; readonly citeWikiSources?: boolean }) =>
+    (
+      ClaudeAdapterV2.makeClaudeQueryOptions({
+        modelSelection: {
+          instanceId: ProviderInstanceId.make("claudeAgent"),
+          model: "claude-opus-5-5",
+        },
+        nativeThreadId: "native-thread-claude-wiki-sources",
+        resume: false,
+        cwd: "/workspace",
+        ...(input.mcp
+          ? { mcpServers: { "t3-code": { type: "http" as const, url: "http://127.0.0.1/mcp" } } }
+          : {}),
+        ...(input.citeWikiSources === undefined ? {} : { citeWikiSources: input.citeWikiSources }),
+        environment: {},
+      }).systemPrompt as { readonly append?: string }
+    ).append ?? "";
+
+  it("asks for a sources list by default and when the setting is on", () => {
+    assert.include(append({ mcp: true }), T3_CODE_WIKI_SOURCES_INSTRUCTIONS);
+    assert.include(append({ mcp: true, citeWikiSources: true }), T3_CODE_WIKI_SOURCES_INSTRUCTIONS);
+  });
+
+  it("leaves the rule out when the setting is off or the wiki tools are absent", () => {
+    assert.notInclude(append({ mcp: true, citeWikiSources: false }), "## Team wiki sources");
+    assert.notInclude(append({ mcp: false, citeWikiSources: true }), "## Team wiki sources");
   });
 });
 

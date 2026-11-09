@@ -82,6 +82,7 @@ import {
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   ClaudeSettings,
   TrimmedNonEmptyString,
+  DEFAULT_SERVER_SETTINGS,
   defaultInstanceIdForDriver,
   isCompactionCommandMessage,
   type ModelSelection,
@@ -189,6 +190,7 @@ import type { ManagedServerProvider } from "@t3tools/provider-core/server/snapsh
 import {
   T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH,
   T3_CODE_ORCHESTRATION_INSTRUCTIONS,
+  T3_CODE_WIKI_SOURCES_INSTRUCTIONS,
 } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import {
@@ -1532,6 +1534,8 @@ export function makeClaudeQueryOptions(input: {
   readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
   /** The thread's T3 MCP session holds the `device` capability. */
   readonly deviceToolsAvailable?: boolean;
+  /** Off when the user turned wiki citations off; read when the query opens. */
+  readonly citeWikiSources?: boolean;
   readonly tools?: ClaudeAgentSdkQueryTools;
   readonly allowedTools?: ReadonlyArray<string>;
   readonly disallowedTools?: ReadonlyArray<string>;
@@ -1659,7 +1663,8 @@ export function makeClaudeQueryOptions(input: {
               CLAUDE_BACKGROUND_WAIT_INSTRUCTIONS +
               (deviceInstructions
                 ? `\n${T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH}\n`
-                : "")),
+                : "") +
+              (input.citeWikiSources === false ? "" : `\n${T3_CODE_WIKI_SOURCES_INSTRUCTIONS}\n`)),
         ...launchAppendSystemPrompt,
       ].join("\n\n"),
     },
@@ -10505,6 +10510,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             turnInput.runtimePolicy.cwd,
             launchArgSettings,
           );
+          const citeWikiSources = Option.isSome(serverSettings)
+            ? yield* serverSettings.value.getSettings.pipe(
+                Effect.map((settings) => settings.citeWikiSources),
+                Effect.orElseSucceed(() => DEFAULT_SERVER_SETTINGS.citeWikiSources),
+              )
+            : DEFAULT_SERVER_SETTINGS.citeWikiSources;
           const queryOptions = makeClaudeQueryOptions({
             modelSelection: turnInput.modelSelection,
             nativeThreadId,
@@ -10532,6 +10543,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ? {}
               : { mcpServers: mcpOverrides.mcpServers }),
             deviceToolsAvailable: mcpSession?.capabilities?.has("device") === true,
+            citeWikiSources,
             permissionMode: queryPolicy.permissionMode,
             ...(queryPolicy.allowDangerouslySkipPermissions === undefined
               ? {}

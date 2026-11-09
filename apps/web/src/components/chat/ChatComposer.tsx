@@ -205,6 +205,7 @@ import {
 } from "./ComposerAttachmentStrip";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
+import { ComposerDictationButton } from "./ComposerDictationButton";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
 import { ComposerPlanFollowUpBanner } from "./ComposerPlanFollowUpBanner";
 import { resolveComposerMenuActiveItemId } from "./composerMenuHighlight";
@@ -1224,6 +1225,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     scheduleComposerFocus();
   };
   const editPromptFromTraitsStable = useStableCallback(editPromptFromTraits);
+  const focusComposerEditorAtEnd = useStableCallback(() => composerEditorRef.current?.focusAtEnd());
   const promptUltrathink = readPromptUltrathink(prompt);
 
   const [inlineRestingControlsHost, setInlineRestingControlsHost] = useState<HTMLDivElement | null>(
@@ -3138,6 +3140,19 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       focusComposer={focusComposer}
     />
   ) : null;
+  const composerDictationButton = (
+    <ComposerDictationButton
+      disabled={
+        !canOperateThread ||
+        isSendBusy ||
+        projectSelectionRequired ||
+        isChoiceOnlyPendingQuestion ||
+        activePendingIsResponding
+      }
+      focusEditor={focusComposerEditorAtEnd}
+      editPrompt={editPromptFromTraitsStable}
+    />
+  );
   return (
     <form
       ref={composerFormRef}
@@ -3494,7 +3509,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   showMobilePendingAnswerActions && "hidden sm:flex",
                 )}
               >
-                {composerAttachButton ? <div className="me-2">{composerAttachButton}</div> : null}
+                <div className="me-2 flex items-center empty:hidden">
+                  {composerAttachButton}
+                  {composerDictationButton}
+                </div>
                 <div
                   data-chat-composer-actions="right"
                   data-chat-composer-transition-actions="true"

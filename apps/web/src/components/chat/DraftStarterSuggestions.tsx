@@ -4,9 +4,15 @@ import { Button } from "../ui/button";
 
 // `prompt` is what lands in the composer; a trailing space leaves room to finish the sentence.
 const STARTER_SUGGESTIONS = [
-  { label: "Explain this project to me", prompt: "Explain this project to me" },
-  { label: "Find bugs in the code", prompt: "Find bugs in the code" },
-  { label: "Summarize what changed today", prompt: "Summarize what changed today" },
+  {
+    label: "What was the discount on our last promo?",
+    prompt: "What was the discount on our last promo?",
+  },
+  {
+    label: "Summarize today's meeting and tell me what's mine",
+    prompt: "Summarize today's meeting and tell me what's mine",
+  },
+  { label: "Request access to the Sales area", prompt: "Request access to the Sales area" },
   {
     label: "What does my team's wiki know about…?",
     prompt: "What does my team's wiki know about ",
