@@ -478,7 +478,7 @@ export function ProjectsBoardButton({
   const { identity } = useEnterpriseStatus();
   if (identity === null) return null;
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
       <Tooltip>
         <TooltipTrigger
           render={
@@ -495,6 +495,29 @@ export function ProjectsBoardButton({
         </TooltipTrigger>
         <TooltipPopup side="bottom">{t("Projects")}</TooltipPopup>
       </Tooltip>
+      <ProjectsBoardDialog
+        environmentId={environmentId}
+        projectId={projectId}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
+  );
+}
+
+export function ProjectsBoardDialog({
+  environmentId,
+  projectId,
+  open,
+  onOpenChange,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPopup
         className="flex h-[min(860px,92dvh)] w-[min(1280px,96vw)] max-w-none flex-col overflow-hidden"
         bottomStickOnMobile={false}
