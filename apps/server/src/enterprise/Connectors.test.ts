@@ -21,6 +21,7 @@ import { layerKnowledge } from "../knowledge/KnowledgeRepo.testkit.ts";
 import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as Connectors from "./Connectors.ts";
 import * as KnowledgeProposals from "./KnowledgeProposals.ts";
+import * as EnterpriseStore from "./EnterpriseStore.ts";
 
 const layer = Connectors.layer.pipe(
   Layer.provideMerge(ServerSecretStore.layer),
@@ -96,11 +97,16 @@ it.live(
       try {
         yield* Effect.gen(function* () {
           const sql = yield* PgClient.PgClient;
-          yield* sql`CREATE TABLE public.accounts (id integer PRIMARY KEY, private_value text)`;
-          yield* sql`INSERT INTO public.accounts VALUES (1, 'ROW_DATA_MUST_NOT_APPEAR')`;
+          const demoSql = NodeFS.readFileSync(
+            new URL("./fixtures/kavak-promotions.sql", import.meta.url),
+            "utf8",
+          );
+          for (const statement of demoSql.split(";").filter((statement) => statement.trim())) {
+            yield* sql.unsafe(statement);
+          }
           yield* sql`CREATE ROLE catalog_reader LOGIN`;
-          yield* sql`GRANT USAGE ON SCHEMA public TO catalog_reader`;
-          yield* sql`GRANT REFERENCES ON public.accounts TO catalog_reader`;
+          yield* sql`GRANT USAGE ON SCHEMA sales TO catalog_reader`;
+          yield* sql`GRANT REFERENCES ON sales.promotions TO catalog_reader`;
         }).pipe(
           Effect.provide(
             PgClient.layer({
@@ -108,10 +114,16 @@ it.live(
             }),
           ),
         );
+        const store = yield* EnterpriseStore.EnterpriseStore;
+        yield* store.createTeam({
+          id: "sales",
+          name: "Sales",
+          createdBy: "jeronimo.deli@gmail.com",
+        });
         const connector = yield* Connectors.Connectors;
         const input = {
           provider: "postgres" as const,
-          area: "ledger",
+          area: "sales",
           connectionString: `postgres://catalog_reader:SECRET_SENTINEL@127.0.0.1:${fixture.port}/postgres`,
         };
         expect(
@@ -125,10 +137,15 @@ it.live(
         expect(JSON.stringify(connected)).not.toContain("SECRET_SENTINEL");
         const proposals = yield* KnowledgeProposals.KnowledgeProposals;
         const inbox = yield* proposals.inbox("jeronimo.deli@gmail.com");
-        const node = inbox.proposals.find((p) => p.content?.includes("accounts"));
+        const node = inbox.proposals.find((p) => p.content?.includes("sales.promotions"));
+        expect(node?.path).toMatch(/^areas\/sales\/data\//);
         expect(node?.content).toContain('layer: "Data"');
-        expect(node?.content).toContain("private_value");
-        expect(node?.content).not.toContain("ROW_DATA_MUST_NOT_APPEAR");
+        expect(node?.content).toContain('area: "sales"');
+        expect(node?.content).toContain("private: true");
+        expect(node?.content).toContain("discount_percent");
+        expect(node?.content).toContain("ended_on");
+        expect(node?.content).not.toContain("Past Kavak campaign");
+        expect(node?.content).not.toMatch(/\b5(?:\.00)?%?\b/);
         expect(node?.content).not.toContain("SECRET_SENTINEL");
         if (!node) throw new Error("Expected table proposal");
         yield* proposals.decide("jeronimo.deli@gmail.com", { id: node.id, action: "approve" });
@@ -174,7 +191,7 @@ it.live(
         expect(statements).toContain("SET LOCAL statement_timeout");
         expect(statements).not.toContain("SECRET_SENTINEL");
         expect(statements).toContain("information_schema.columns");
-        expect(statements).not.toMatch(/select[^;\n]*from\s+(?:public\.)?accounts/i);
+        expect(statements).not.toMatch(/select[^;]*from\s+(?:sales\.)?promotions\b/i);
       } finally {
         yield* Effect.promise(fixture.stop);
       }
