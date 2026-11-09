@@ -168,7 +168,7 @@ function HistoryNavigationButton({
 function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <Link
-      aria-label="Enterprise Agent home"
+      aria-label="Sequoia AI home"
       className={cn(
         "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
         onBackdrop ? "text-white" : "text-foreground",
@@ -184,11 +184,12 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 items-baseline truncate text-sm font-semibold tracking-tight",
+        "inline-flex min-w-0 items-center gap-1.5 truncate font-serif text-sm tracking-tight",
         onBackdrop ? "text-white" : "text-foreground",
       )}
     >
-      Enterprise Agent
+      <img src="/enterprise-agent.svg" alt="" aria-hidden className="size-5 shrink-0" />
+      sequoia ai
     </span>
   );
 }

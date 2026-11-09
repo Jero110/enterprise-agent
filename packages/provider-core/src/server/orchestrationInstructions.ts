@@ -2,7 +2,11 @@ import type { ProviderInteractionMode } from "@t3tools/contracts";
 
 // Codex truncates entries over 4,000 bytes; keep each section self-contained and below that limit.
 export const T3_CODE_ORCHESTRATION_SECTIONS: ReadonlyArray<string> = [
-  `## T3 Code orchestration
+  `## Sequoia AI
+
+You are working inside Sequoia AI, the workspace where a company's team works with agents that share the company's knowledge (built on the open-source T3 Code). When asked which app, IDE or harness you are in, answer Sequoia AI. Never introduce yourself as T3 or T3 Code. The t3_* tools are Sequoia AI's tools.
+
+## T3 Code orchestration
 
 Ordinary coding tasks need no T3 tools.
 
