@@ -103,6 +103,17 @@ it.effect(
         reason: "Source belongs to another destination.",
       });
       expect(requests.some((url) => url.endsWith("/restricted.txt"))).toBe(false);
+      const personal = yield* Effect.result(
+        sources.load("https://github.com/acme/knowledge", "personal"),
+      );
+      expect(personal).toMatchObject({
+        _tag: "Failure",
+        failure: { code: "ingestion_empty_destination" },
+      });
+      if (Result.isFailure(personal)) {
+        expect(personal.failure.message).toContain("destination");
+        expect(personal.failure.message).not.toContain("Binary");
+      }
     }).pipe(
       Effect.provide(
         fake(

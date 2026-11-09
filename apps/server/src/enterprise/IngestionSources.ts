@@ -347,10 +347,17 @@ const make = Effect.gen(function* () {
           return yield* fail("Repository raw bucket exceeds the total byte limit.");
         files.push({ path: `github/${owner}/${repo}/${commit.sha}/${entry.path}`, bytes });
       }
-      if (files.length === 0)
+      if (files.length === 0) {
+        if (skipped.some((source) => source.reason === "Source belongs to another destination."))
+          return yield* new EnterpriseError({
+            code: "ingestion_empty_destination",
+            message:
+              "No repository text sources match this destination. Choose General or an area listed in raw/_manifest.csv. Personal repository sources are not mapped automatically.",
+          });
         return yield* fail(
           "Repository raw bucket has no supported text sources. Binary PDF, spreadsheet and database extraction is not available.",
         );
+      }
       return { files, skipped };
     },
     Effect.timeoutOrElse({
