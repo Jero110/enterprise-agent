@@ -1,4 +1,4 @@
-// The boot screen (#boot-shell in index.html) sits above #root and draws the Sequoia logo while the
+// The boot screen (#boot-shell in index.html) sits above #root and draws the Norai logo while the
 // app loads. Once the app has mounted, it stays until the logo has finished drawing, then fades away.
 // It is never moved in the page: re-inserting it would restart the drawing.
 

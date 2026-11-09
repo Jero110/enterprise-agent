@@ -45,7 +45,7 @@ export function mcpToolPresentation(input: {
   if (!server) return title ? { title } : {};
   // The app's own tool server keeps its internal id; people see the product name.
   const name = /^t3[\s_-]?code$/iu.test(server)
-    ? "Sequoia AI"
+    ? "Norai"
     : (normalizeMcpText(input.serverDisplayName) ??
       normalizeMcpText(source && Reflect.get(source, "name")) ??
       normalizeMcpText(server.replace(/[_-]+/gu, " ")) ??

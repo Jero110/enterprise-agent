@@ -199,9 +199,9 @@ describe("DesktopAppIdentity", () => {
 
         const runtimeName = calls.setName[0];
         assert.isDefined(runtimeName);
-        assert.equal(runtimeName, `Sequoia AI ${stage}`);
+        assert.equal(runtimeName, `Norai ${stage}`);
         assert.match(runtimeName.replaceAll(" ", ""), /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/);
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, `Sequoia AI (${stage})`);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, `Norai (${stage})`);
       }),
       { calls, environment },
     );

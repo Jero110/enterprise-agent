@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import type { SettingsPath } from "./settingsSearch";
 
-const SETTINGS_ADVANCED_STORAGE_KEY = "sequoia.settings.advanced";
+const SETTINGS_ADVANCED_STORAGE_KEY = "norai.settings.advanced";
 
 // Everyday users start with the short menu. Tests keep every section so nav assertions hold.
 const DEFAULT_SHOW_ADVANCED = import.meta.env.MODE === "test";
