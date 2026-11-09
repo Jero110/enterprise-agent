@@ -290,6 +290,8 @@ export const McpToolUseCase = Schema.Struct({
         pending: Schema.Unknown,
         sources: Schema.Array(Schema.String),
         note: Schema.String,
+        destination: Schema.optional(Schema.String),
+        owner: Schema.optional(Schema.String),
       }),
     ),
     priorTurns: Schema.optional(
@@ -2342,7 +2344,11 @@ const main = Effect.gen(function* () {
         prompt:
           testCase.setup.ingestion === undefined
             ? testCase.prompt
-            : ingestionPrompt(testCase.setup.ingestion),
+            : ingestionPrompt({
+                ...testCase.setup.ingestion,
+                destination: testCase.setup.ingestion.destination ?? "general",
+                owner: testCase.setup.ingestion.owner ?? "eval@example.test",
+              }),
         setup: {
           ...testCase.setup,
           priorTurns,

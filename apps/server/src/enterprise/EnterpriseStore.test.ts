@@ -164,6 +164,7 @@ describe("EnterpriseStore", () => {
           id: "run-1",
           threadId: "thread-1",
           adminEmail: "jeronimo.deli@gmail.com",
+          destination: "global",
           folder: "/source",
           status: "running",
         });
