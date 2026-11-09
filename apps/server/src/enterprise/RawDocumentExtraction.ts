@@ -5,7 +5,7 @@ import * as NodeSqlite from "node:sqlite";
 import { extractDocumentText } from "../provider/documentTextWorker.ts";
 
 export const MAX_RAW_DOCUMENT_BYTES = 10 * 1024 * 1024;
-export const MAX_RAW_DOCUMENT_TEXT_CHARS = 250_000;
+const MAX_RAW_DOCUMENT_TEXT_CHARS = 250_000;
 
 const TRUNCATED = "\n\n[Extracted text truncated at enterprise document limits.]";
 

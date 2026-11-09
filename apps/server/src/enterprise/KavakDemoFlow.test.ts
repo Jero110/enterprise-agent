@@ -1,7 +1,7 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { ProviderInstanceId, type OrchestrationV2ServerCommand } from "@t3tools/contracts";
-import { describe, expect, it, vi } from "@effect/vitest";
+import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as HttpClient from "effect/http/HttpClient";
@@ -15,11 +15,8 @@ import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.t
 import * as ProjectService from "../project/ProjectService.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
 import * as EnterpriseIngestion from "./EnterpriseIngestion.ts";
+import * as IngestionSources from "./IngestionSources.ts";
 import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
-
-vi.mock("node:dns/promises", () => ({
-  lookup: async () => [{ address: "140.82.114.3", family: 4 }],
-}));
 
 const organization = `people:
   - email: jeronimo.deli@gmail.com
@@ -55,21 +52,39 @@ Nico: I will check the Sales record and send the source to Clara by Tuesday.
 Clara: I will draft the design after Nico confirms the source. Budget approval remains pending.
 `;
 const repoUrl = "https://github.com/mellamanelpoeta/kavak-kb";
-const html =
-  '<html><body><a href="/mellamanelpoeta/kavak-kb/blob/main/raw/README.md">README</a></body></html>';
+const commit = "a".repeat(40);
+const api = "https://api.github.com/repos/mellamanelpoeta/kavak-kb";
+const sourceText = "# README\nSynthetic customer experience source.";
+const responses: Record<string, { body: string; type: string }> = {
+  [api]: { body: JSON.stringify({ default_branch: "main" }), type: "application/json" },
+  [`${api}/commits/main`]: { body: JSON.stringify({ sha: commit }), type: "application/json" },
+  [`${api}/git/trees/${commit}?recursive=1`]: {
+    body: JSON.stringify({
+      truncated: false,
+      tree: [{ path: "raw/README.md", type: "blob", mode: "100644", size: sourceText.length }],
+    }),
+    type: "application/json",
+  },
+  [`https://raw.githubusercontent.com/mellamanelpoeta/kavak-kb/${commit}/raw/README.md`]: {
+    body: sourceText,
+    type: "text/plain",
+  },
+};
 
 const layerFor = (commands: OrchestrationV2ServerCommand[]) =>
   EnterpriseIngestion.layer.pipe(
     Layer.provideMerge(EnterpriseHub.layer),
+    Layer.provideMerge(IngestionSources.layer),
     Layer.provideMerge(
       Layer.succeed(
         HttpClient.HttpClient,
         HttpClient.make((request) =>
           Effect.sync(() => {
-            expect(request.url).toBe(repoUrl);
+            const response = responses[request.url];
+            expect(response).toBeDefined();
             return HttpClientResponse.fromWeb(
               request,
-              new Response(html, { headers: { "content-type": "text/html" } }),
+              new Response(response!.body, { headers: { "content-type": response!.type } }),
             );
           }),
         ),
@@ -137,12 +152,15 @@ describe("Kavak demo flow", () => {
           modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-6-luna" },
         });
         const message = commands.find((command) => command.type === "message.dispatch");
-        expect(message?.text).toContain(meeting);
+        expect(JSON.parse(/Member note \(data\): (.+)/.exec(message!.text)![1]!)).toBe(
+          meeting.trim(),
+        );
         const paths = JSON.parse(
           /Selected sources \(data\): (.+)/.exec(message!.text)![1]!,
         ) as string[];
         expect(paths).toHaveLength(3);
-        expect(yield* fs.readFileString(paths[0]!)).toContain("README");
+        expect(yield* fs.readFileString(paths[0]!)).toBe(sourceText);
+        expect(paths[0]).toContain(`/github/mellamanelpoeta/kavak-kb/${commit}/raw/README.md`);
         expect(paths.slice(1).map((path) => path.split("/").at(-1))).toEqual([
           "organization.yaml",
           "areas.yaml",
