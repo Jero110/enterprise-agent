@@ -36,10 +36,13 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "Share with team": "Compartir con el equipo",
   "Could not update sharing": "No se pudo cambiar cómo se comparte",
   "Share with your team": "Comparte con tu equipo",
+  "Summary only": "Solo resumen",
+  "Your team and their agents see only what you asked and the result. The chat itself stays on your computer.":
+    "Tu equipo y sus agentes solo ven lo que pediste y el resultado. El chat se queda en tu computadora.",
   "Team sharing": "Compartir con el equipo",
-  "Not shared": "Solo yo",
+  "Not shared": "No compartida",
   "Only you can see this conversation.": "Solo tú puedes ver este chat.",
-  "Team readable": "Mi equipo puede leerlo",
+  "Team readable": "Toda la conversación",
   "Your team can read this conversation and its subagents. Stop sharing any time.":
     "Tu equipo puede leer este chat. Puedes dejar de compartirlo cuando quieras.",
   "AI architecture": "Arquitectura de IA",

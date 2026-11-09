@@ -226,6 +226,8 @@ function TeamThreadReadOnlyDialog(props: {
     snapshot === null
       ? undefined
       : [...snapshot.messages].reverse().find((message) => message.role === "assistant");
+  const summaryOnly = props.summary?.publicationStatus === "summary";
+  const request = snapshot?.messages.find((message) => message.role === "user");
   const roleLabel = (role: "user" | "assistant" | "system") =>
     role === "user"
       ? (props.summary?.ownerDisplayName ?? t("User", undefined, "teamThread"))
@@ -238,9 +240,12 @@ function TeamThreadReadOnlyDialog(props: {
         <DialogHeader>
           <DialogTitle>{props.summary?.title ?? t("Team thread")}</DialogTitle>
           <DialogDescription>
-            {t("Read-only transcript from {name}.", {
-              name: props.summary?.ownerDisplayName ?? "",
-            })}
+            {t(
+              summaryOnly
+                ? "Summary shared by {name}. The full chat is not shared."
+                : "Read-only transcript from {name}.",
+              { name: props.summary?.ownerDisplayName ?? "" },
+            )}
           </DialogDescription>
           {props.summary?.ownerEmail === props.ownEmail && props.ownEmail !== null ? (
             <div>
@@ -260,6 +265,23 @@ function TeamThreadReadOnlyDialog(props: {
             <p className="text-sm text-muted-foreground">{t(query.error)}</p>
           ) : snapshot === null || query.isPending ? (
             <p className="text-sm text-muted-foreground">{t("Loading transcript…")}</p>
+          ) : summaryOnly ? (
+            <section className="space-y-3 rounded-lg border bg-card p-4">
+              {request ? (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">{t("What was asked")}</h3>
+                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                    {request.text}
+                  </p>
+                </div>
+              ) : null}
+              <div>
+                <h3 className="mb-1 text-sm font-medium">{t("Result", undefined, "teamThread")}</h3>
+                <p className="whitespace-pre-wrap text-sm">
+                  {lastAssistantMessage?.text ?? t("The assistant has not replied yet.")}
+                </p>
+              </div>
+            </section>
           ) : (
             <>
               <section className="rounded-lg border bg-card p-4">

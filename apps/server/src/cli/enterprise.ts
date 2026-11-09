@@ -124,7 +124,7 @@ export const makeEnterpriseCommand = <E, R>(
               return;
             }
             threads.push(
-              ...page.threads.filter((thread) => thread.publicationStatus === "read-only"),
+              ...page.threads.filter((thread) => thread.publicationStatus !== "unpublished"),
             );
             cursor = page.nextCursor;
           }

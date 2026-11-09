@@ -96,7 +96,7 @@ export const layer = McpToolAccess.toLayer(
           Effect.gen(function* () {
             yield* requireCliProfile;
             const threads = (yield* client.teamList).filter(
-              (thread) => thread.publicationStatus === "read-only",
+              (thread) => thread.publicationStatus !== "unpublished",
             );
             const start = input.cursor ?? 0;
             const page = threads.slice(start, start + 100);

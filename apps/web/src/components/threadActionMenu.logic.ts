@@ -1,5 +1,5 @@
 import { t } from "~/i18n";
-import type { ContextMenuItem } from "@t3tools/contracts";
+import type { ContextMenuItem, PublicationStatus } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
 
 export type ThreadActionMenuId =
@@ -23,7 +23,7 @@ export type ThreadActionMenuId =
   | "mark-unread"
   | "share-guest"
   | "publish"
-  | `publish:${"unpublished" | "read-only"}`
+  | `publish:${PublicationStatus}`
   | "copy"
   | "copy-path"
   | "copy-branch"
@@ -120,7 +120,7 @@ export interface ThreadActionMenuState {
   readonly canPublish?: boolean;
   /** A No project thread with its own folder, on a server that can promote it. */
   readonly canTurnIntoProject?: boolean;
-  readonly publicationStatus?: "unpublished" | "read-only";
+  readonly publicationStatus?: PublicationStatus;
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */
@@ -134,6 +134,7 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
     "publish",
     "publish:unpublished",
     "publish:read-only",
+    "publish:summary",
     "copy",
     "copy-path",
     "copy-branch",
@@ -261,6 +262,11 @@ export function buildThreadActionMenuItems(
                 id: "publish:read-only" as const,
                 label: t("Read-only", undefined, "threadMenu"),
                 checked: state.publicationStatus === "read-only",
+              },
+              {
+                id: "publish:summary" as const,
+                label: t("Summary only", undefined, "threadMenu"),
+                checked: state.publicationStatus === "summary",
               },
             ],
           },

@@ -87,7 +87,7 @@ export const layer = McpToolAccess.toLayer(
               return yield* client.teamList.pipe(
                 Effect.map((all) => {
                   const published = all.filter(
-                    (thread) => thread.publicationStatus === "read-only",
+                    (thread) => thread.publicationStatus !== "unpublished",
                   );
                   const start = input.cursor ?? 0;
                   const threads = published.slice(start, start + 100);
@@ -113,7 +113,7 @@ export const layer = McpToolAccess.toLayer(
                 ownerEmail: input.ownerEmail,
                 threadId: input.threadId,
               });
-              if (snapshot.summary.publicationStatus !== "read-only")
+              if (snapshot.summary.publicationStatus === "unpublished")
                 return yield* new EnterpriseError({
                   code: "access_denied",
                   message: "This conversation is not published.",

@@ -10,6 +10,7 @@ import {
 import { canSnooze, effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import {
   AuthOrchestrationOperateScope,
+  type PublicationStatus,
   type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -202,12 +203,16 @@ export function useThreadActionMenu(input: {
         }
         return;
       }
-      if (action === "publish:unpublished" || action === "publish:read-only") {
+      if (
+        action === "publish:unpublished" ||
+        action === "publish:read-only" ||
+        action === "publish:summary"
+      ) {
         const result = await publishTeamThread({
           environmentId: threadRef.environmentId,
           input: {
             threadId: threadRef.threadId,
-            status: action.slice("publish:".length) as "unpublished" | "read-only",
+            status: action.slice("publish:".length) as PublicationStatus,
           },
         });
         if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {

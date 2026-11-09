@@ -7,6 +7,7 @@ import {
 import type {
   EnterpriseOrgTeam,
   EnvironmentId,
+  PublicationStatus,
   ServerProviderSkill,
   ThreadId,
   ThreadKnowledgeScope,
@@ -306,7 +307,7 @@ function SharePanel(props: {
       thread.parentThreadId === null &&
       thread.ownerEmail === props.ownerEmail,
   );
-  const change = async (status: "unpublished" | "read-only") => {
+  const change = async (status: PublicationStatus) => {
     const result = await publish({
       environmentId: props.environmentId,
       input: { threadId: props.threadId, status },
@@ -327,7 +328,7 @@ function SharePanel(props: {
         aria-label={t("Team sharing")}
         disabled={!canPublish}
         value={summary?.publicationStatus ?? "unpublished"}
-        onValueChange={(value) => void change(value as "unpublished" | "read-only")}
+        onValueChange={(value) => void change(value as PublicationStatus)}
       >
         <label className="flex items-start gap-2 text-sm">
           <Radio value="unpublished" />
@@ -344,6 +345,17 @@ function SharePanel(props: {
             {t("Team readable")}
             <span className="block text-xs text-muted-foreground">
               {t("Your team can read this conversation and its subagents. Stop sharing any time.")}
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <Radio value="summary" />
+          <span>
+            {t("Summary only")}
+            <span className="block text-xs text-muted-foreground">
+              {t(
+                "Your team and their agents see only what you asked and the result. The chat itself stays on your computer.",
+              )}
             </span>
           </span>
         </label>

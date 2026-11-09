@@ -195,7 +195,7 @@ export function groupTeamThreads(
   }
   const hasRoster = groups.size > 0;
   for (const summary of summaries) {
-    if (summary.publicationStatus !== "read-only") continue;
+    if (summary.publicationStatus === "unpublished") continue;
     const key = teamMemberKey(summary.ownerEmail);
     let group = groups.get(key);
     if (group === undefined) {

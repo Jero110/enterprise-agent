@@ -15,6 +15,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
+import { summarizeSharedThread } from "./sharedThreadSummary.ts";
 
 export class TeamPublication extends Context.Service<
   TeamPublication,
@@ -44,7 +45,8 @@ interface ThreadRow {
   readonly title: string;
   readonly status: TeamThreadSummary["status"];
   readonly updated_at: string;
-  readonly publication_status: TeamThreadSummary["publicationStatus"];
+  readonly publication_status: "unpublished" | "read-only";
+  readonly publication_view: "full" | "summary";
   readonly publication_team_id: string | null;
 }
 const denied = new EnterpriseError({ code: "access_denied", message: "Thread access denied." });
@@ -65,12 +67,31 @@ const ancestors = (rows: ReadonlyMap<string, ThreadRow>, row: ThreadRow) => {
   }
   return undefined;
 };
+const sharingAncestors = (
+  rows: ReadonlyMap<string, ThreadRow>,
+  row: ThreadRow,
+  teamId: string | null,
+) =>
+  teamId === null
+    ? []
+    : (ancestors(rows, row) ?? []).filter(
+        (ancestor) =>
+          ancestor.publication_status === "read-only" && ancestor.publication_team_id === teamId,
+      );
 const isPublished = (rows: ReadonlyMap<string, ThreadRow>, row: ThreadRow, teamId: string | null) =>
-  teamId !== null &&
-  ancestors(rows, row)?.some(
-    (ancestor) =>
-      ancestor.publication_status === "read-only" && ancestor.publication_team_id === teamId,
-  ) === true;
+  sharingAncestors(rows, row, teamId).length > 0;
+// The most restrictive share in the chain wins: under a summary share nothing exposes the transcript.
+const publicationOf = (
+  rows: ReadonlyMap<string, ThreadRow>,
+  row: ThreadRow,
+  teamId: string | null,
+): TeamThreadSummary["publicationStatus"] => {
+  const sharing = sharingAncestors(rows, row, teamId);
+  if (sharing.length === 0) return "unpublished";
+  return sharing.some((ancestor) => ancestor.publication_view === "summary")
+    ? "summary"
+    : "read-only";
+};
 const toSummary = (
   rows: ReadonlyMap<string, ThreadRow>,
   row: ThreadRow,
@@ -83,7 +104,7 @@ const toSummary = (
   updatedAt: row.updated_at,
   ownerEmail: row.owner_email,
   ownerDisplayName: owner.displayName,
-  publicationStatus: isPublished(rows, row, owner.teamId) ? "read-only" : "unpublished",
+  publicationStatus: publicationOf(rows, row, owner.teamId),
 });
 
 export const layer = Layer.effect(
@@ -103,7 +124,7 @@ export const layer = Layer.effect(
       return member;
     });
     const ownerRows = (email: string) =>
-      sql<ThreadRow>`SELECT owner_email, thread_id, parent_thread_id, title, status, updated_at, publication_status, publication_team_id FROM enterprise_team_threads WHERE owner_email = ${email}`.pipe(
+      sql<ThreadRow>`SELECT owner_email, thread_id, parent_thread_id, title, status, updated_at, publication_status, publication_view, publication_team_id FROM enterprise_team_threads WHERE owner_email = ${email}`.pipe(
         Effect.map((rows) => new Map(rows.map((row) => [row.thread_id, row]))),
         Effect.orDie,
       );
@@ -126,7 +147,11 @@ export const layer = Layer.effect(
                 const row = rows.get(snapshot.threadId);
                 // A delayed turn upload must never resurrect an unpublished snapshot.
                 if (row === undefined || !isPublished(rows, row, owner.teamId)) continue;
-                yield* sql`UPDATE enterprise_team_threads SET snapshot_json = ${yield* encodeMessages(snapshot.messages).pipe(Effect.orDie)}
+                const messages =
+                  publicationOf(rows, row, owner.teamId) === "summary"
+                    ? summarizeSharedThread(snapshot.messages)
+                    : snapshot.messages;
+                yield* sql`UPDATE enterprise_team_threads SET snapshot_json = ${yield* encodeMessages(messages).pipe(Effect.orDie)}
           WHERE owner_email = ${owner.email} AND thread_id = ${snapshot.threadId}`;
               }
               return { updated: true };
@@ -138,7 +163,7 @@ export const layer = Layer.effect(
     const publish: TeamPublication["Service"]["publish"] = Effect.fn("TeamPublication.publish")(
       function* (sessionId, input) {
         const owner = yield* identity(sessionId);
-        if (owner.teamId === null && input.status === "read-only") return yield* denied;
+        if (owner.teamId === null && input.status !== "unpublished") return yield* denied;
         return yield* sql
           .withTransaction(
             Effect.gen(function* () {
@@ -160,13 +185,23 @@ export const layer = Layer.effect(
                   if (
                     ancestors(rows, row)?.some((ancestor) => ancestor.thread_id === input.threadId)
                   ) {
-                    yield* sql`UPDATE enterprise_team_threads SET publication_status = 'unpublished', publication_team_id = NULL, snapshot_json = NULL
+                    yield* sql`UPDATE enterprise_team_threads SET publication_status = 'unpublished', publication_view = 'full', publication_team_id = NULL, snapshot_json = NULL
               WHERE owner_email = ${owner.email} AND thread_id = ${row.thread_id}`;
                   }
                 }
               } else {
-                yield* sql`UPDATE enterprise_team_threads SET publication_status = 'read-only', publication_team_id = ${owner.teamId}
+                const view = input.status === "summary" ? "summary" : "full";
+                yield* sql`UPDATE enterprise_team_threads SET publication_status = 'read-only', publication_view = ${view}, publication_team_id = ${owner.teamId}
           WHERE owner_email = ${owner.email} AND thread_id = ${input.threadId}`;
+                // Drop stored snapshots under this thread so a switch never leaves the other view behind.
+                for (const row of rows.values()) {
+                  if (
+                    ancestors(rows, row)?.some((ancestor) => ancestor.thread_id === input.threadId)
+                  ) {
+                    yield* sql`UPDATE enterprise_team_threads SET snapshot_json = NULL
+              WHERE owner_email = ${owner.email} AND thread_id = ${row.thread_id}`;
+                  }
+                }
               }
               return { updated: true };
             }),
@@ -192,7 +227,7 @@ export const layer = Layer.effect(
           const rows = yield* ownerRows(owner.email);
           for (const row of rows.values()) {
             const summary = toSummary(rows, row, owner);
-            if (owner.email === viewer.email || summary.publicationStatus === "read-only") {
+            if (owner.email === viewer.email || summary.publicationStatus !== "unpublished") {
               summaries.push(summary);
             }
           }
@@ -224,9 +259,12 @@ export const layer = Layer.effect(
             code: "snapshot_unavailable",
             message: "The owner's IDE has not uploaded this snapshot yet.",
           });
+        const summary = toSummary(rows, row, owner);
+        const messages = yield* decodeMessages(json).pipe(Effect.orDie);
         return {
-          summary: toSummary(rows, row, owner),
-          messages: yield* decodeMessages(json).pipe(Effect.orDie),
+          summary,
+          messages:
+            summary.publicationStatus === "summary" ? summarizeSharedThread(messages) : messages,
         };
       },
     );
