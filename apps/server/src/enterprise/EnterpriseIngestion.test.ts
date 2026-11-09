@@ -109,6 +109,60 @@ describe("EnterpriseIngestion", () => {
       expect(yield* fs.readFileString(paths[0]!)).toContain("Public source content");
     }).pipe(Effect.provide(layerFor(commands)));
   });
+  it.effect("stages 55 folder files across uploads without flattening equal basenames", () => {
+    const commands: OrchestrationV2ServerCommand[] = [];
+    return Effect.gen(function* () {
+      const hub = yield* EnterpriseHub.EnterpriseHub;
+      const proposals = yield* KnowledgeProposals.KnowledgeProposals;
+      const ingestion = yield* EnterpriseIngestion.EnterpriseIngestion;
+      const fs = yield* FileSystem.FileSystem;
+      yield* hub.enroll("admin", { email: "jeronimo.deli@gmail.com", token });
+      const files = Array.from({ length: 55 }, (_, index) => ({
+        name: "note.md",
+        relativePath: `raw/${index < 28 ? "cx" : "ventas"}/${index}/note.md`,
+        mimeType: "text/markdown",
+        bytes: new TextEncoder().encode(`source ${index}`),
+      }));
+      const uploadProposalIds: string[] = [];
+      for (let index = 0; index < files.length; index += 20) {
+        const upload = yield* proposals.upload("jeronimo.deli@gmail.com", {
+          scope: "global",
+          reason: "Folder batch",
+          files: files.slice(index, index + 20),
+        });
+        uploadProposalIds.push(upload.id);
+      }
+      yield* ingestion.start("admin", { destination: "global", uploadProposalIds, modelSelection });
+      const message = commands.find((command) => command.type === "message.dispatch")!;
+      const paths = JSON.parse(
+        /Selected sources \(data\): (.+)/.exec(message.text)![1]!,
+      ) as string[];
+      expect(paths).toHaveLength(55);
+      expect(paths.find((source) => source.endsWith("/raw/cx/0/note.md"))).toBeDefined();
+      expect(paths.find((source) => source.endsWith("/raw/ventas/28/note.md"))).toBeDefined();
+      expect(
+        yield* fs.readFileString(paths.find((source) => source.endsWith("/raw/cx/0/note.md"))!),
+      ).toBe("source 0");
+      expect(
+        yield* fs.readFileString(
+          paths.find((source) => source.endsWith("/raw/ventas/28/note.md"))!,
+        ),
+      ).toBe("source 28");
+      const store = yield* EnterpriseStore.EnterpriseStore;
+      const persisted = (yield* store.listProposals).find(
+        (item) => item.id === uploadProposalIds[0],
+      )!;
+      yield* store.saveProposal({
+        ...persisted,
+        files: [{ ...persisted.files![0]!, relativePath: "raw/../escape.md" }],
+      });
+      const invalid = yield* Effect.result(
+        ingestion.start("admin", { destination: "global", uploadProposalIds, modelSelection }),
+      );
+      expect(Result.isFailure(invalid) && invalid.failure.code).toBe("ingestion_failed");
+      expect(commands.filter((command) => command.type === "message.dispatch")).toHaveLength(1);
+    }).pipe(Effect.provide(layerFor(commands)));
+  });
   it.effect("rejects redirects rather than following to an internal endpoint", () => {
     const commands: OrchestrationV2ServerCommand[] = [];
     return Effect.gen(function* () {

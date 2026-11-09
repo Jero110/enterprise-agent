@@ -38,6 +38,7 @@ export const KnowledgeProposal = Schema.Struct({
       Schema.Struct({
         id: Schema.String,
         name: Schema.String,
+        relativePath: Schema.optional(Schema.String),
         mimeType: Schema.String,
         sizeBytes: Schema.Number,
       }),
@@ -70,6 +71,7 @@ export const KnowledgeUploadInput = Schema.Struct({
   files: Schema.Array(
     Schema.Struct({
       name: TrimmedNonEmptyString,
+      relativePath: Schema.optional(TrimmedNonEmptyString),
       mimeType: TrimmedNonEmptyString,
       base64: TrimmedNonEmptyString,
     }),

@@ -19,6 +19,7 @@ import * as Digest from "effect/crypto/Digest";
 import * as Hex from "effect/encoding/Hex";
 import * as ServerConfig from "../config.ts";
 import * as KnowledgeProposals from "./KnowledgeProposals.ts";
+import { safeUploadPath } from "./KnowledgeProposals.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
@@ -193,6 +194,7 @@ const make = Effect.gen(function* () {
       const available = yield* store.listProposals;
       let uploadedCount = 0;
       let uploadedBytes = 0;
+      const stagedPaths = new Set<string>();
       for (const uploadId of new Set(uploads)) {
         const upload = available.find(
           (p) =>
@@ -209,16 +211,20 @@ const make = Effect.gen(function* () {
           uploadedCount++;
           uploadedBytes += attachment.bytes.byteLength;
           if (
-            uploadedCount > 20 ||
-            uploadedBytes > 40 * 1024 * 1024 ||
+            uploadedCount > 80 ||
+            uploadedBytes > 100 * 1024 * 1024 ||
             attachment.bytes.byteLength > 10 * 1024 * 1024 ||
             !file.name ||
             file.name === "." ||
             file.name === ".." ||
-            /[\\/\\\\\r\n\0]/.test(file.name)
+            /[\\/\\\\\r\n\0]/.test(file.name) ||
+            !safeUploadPath(file.name, file.relativePath ?? file.name)
           )
             return yield* fail("Invalid bucket upload.");
-          const destination = path.join(staging, upload.id, file.name);
+          const relativePath = file.relativePath ?? `${upload.id}/${file.name}`;
+          if (stagedPaths.has(relativePath)) return yield* fail("Duplicate bucket upload path.");
+          stagedPaths.add(relativePath);
+          const destination = path.join(staging, "uploads", relativePath);
           yield* fs
             .makeDirectory(path.dirname(destination), { recursive: true })
             .pipe(Effect.mapError(() => fail("Could not stage the bucket.")));

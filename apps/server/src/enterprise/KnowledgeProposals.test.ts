@@ -75,11 +75,13 @@ describe("KnowledgeProposals", () => {
           files: [
             {
               name: "evidence.txt",
+              relativePath: "raw/cx/evidence.txt",
               mimeType: "text/plain",
               base64: Buffer.from(bytes).toString("base64"),
             },
             {
-              name: "second.txt",
+              name: "evidence.txt",
+              relativePath: "raw/ventas/evidence.txt",
               mimeType: "text/plain",
               base64: Buffer.from("second").toString("base64"),
             },
@@ -90,6 +92,14 @@ describe("KnowledgeProposals", () => {
         const proposals = yield* KnowledgeProposals.KnowledgeProposals;
         const store = yield* EnterpriseStore.EnterpriseStore;
         const fileId = staged.files![0]!.id;
+        expect(staged.files?.map(({ name, relativePath }) => ({ name, relativePath }))).toEqual([
+          { name: "evidence.txt", relativePath: "raw/cx/evidence.txt" },
+          { name: "evidence.txt", relativePath: "raw/ventas/evidence.txt" },
+        ]);
+        expect(
+          (yield* proposals.inbox(ANA)).proposals.find((proposal) => proposal.id === staged.id)
+            ?.files,
+        ).toMatchObject(staged.files!);
         expect((yield* proposals.inbox(ANA)).proposals.map((p) => p.id)).toContain(staged.id);
         expect(Array.from((yield* proposals.readAttachment(ANA, staged.id, fileId)).bytes)).toEqual(
           Array.from(bytes),
@@ -211,6 +221,14 @@ describe("KnowledgeProposals", () => {
         { ...valid, scope: "frontend" },
         { ...valid, files: [] },
         { ...valid, files: [{ ...valid.files[0]!, name: "../attack.html" }] },
+        ...[
+          "../attack.html",
+          "/absolute/a.pdf",
+          "raw/./a.pdf",
+          "raw//a.pdf",
+          "raw\\a.pdf",
+          "raw/a/../a.pdf",
+        ].map((relativePath) => ({ ...valid, files: [{ ...valid.files[0]!, relativePath }] })),
         { ...valid, files: [{ ...valid.files[0]!, bytes: new Uint8Array(10_485_761) }] },
       ]) {
         expect(yield* codeOf(proposals.upload(BRUNO, input))).not.toBe("ok");
