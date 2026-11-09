@@ -63,11 +63,19 @@ export function IngestTab({
 
 export interface IncrementalIngestion {
   readonly canStart: boolean;
-  readonly start: (input: { folder?: string; note?: string }) => Promise<void>;
+  readonly start: (input: {
+    folder?: string;
+    note?: string;
+    uploadBatchId?: string;
+  }) => Promise<void>;
+  readonly stageUpload?: (
+    files: ReadonlyArray<{ name: string; mimeType: string; base64: string }>,
+  ) => Promise<{ uploadBatchId: string }>;
 }
 
 function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefined }) {
   const [folder, setFolder] = useState("");
+  const [uploadBatchId, setUploadBatchId] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -93,6 +101,54 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
         value={folder}
         onChange={(event) => setFolder(event.target.value)}
       />
+      <label className="block space-y-2 text-sm">
+        {t("Upload a new bucket")}
+        <input
+          type="file"
+          multiple
+          disabled={busy || !ingestion?.canStart || !ingestion.stageUpload}
+          onChange={async (event) => {
+            const files = Array.from(event.target.files ?? []);
+            event.target.value = "";
+            if (!ingestion?.stageUpload || files.length === 0) return;
+            if (
+              files.length > MAX_FILES ||
+              files.some((file) => file.size === 0 || file.size > MAX_FILE_BYTES) ||
+              files.reduce((size, file) => size + file.size, 0) > MAX_BATCH_BYTES
+            ) {
+              setError(t("Select 1–20 nonempty files (up to 10 MiB each, 35 MiB total)."));
+              return;
+            }
+            setBusy(true);
+            setError(null);
+            setStatus(null);
+            setUploadBatchId("");
+            try {
+              const encoded = await Promise.all(
+                files.map(async (file) => ({
+                  name: file.name,
+                  mimeType: file.type || "application/octet-stream",
+                  base64: await fileBase64(file),
+                })),
+              );
+              const staged = await ingestion.stageUpload(encoded);
+              setUploadBatchId(staged.uploadBatchId);
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : t("Could not stage upload"));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      </label>
+      {uploadBatchId && (
+        <div className="flex items-center gap-3 text-sm">
+          <p role="status">{t("Upload staged for the next run")}</p>
+          <Button size="xs" variant="outline" disabled={busy} onClick={() => setUploadBatchId("")}>
+            {t("Remove upload")}
+          </Button>
+        </div>
+      )}
       <Input
         nativeInput
         aria-label={t("Missing knowledge")}
@@ -103,7 +159,9 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
       />
       <Button
         size="sm"
-        disabled={busy || !ingestion?.canStart || (!folder.trim() && !note.trim())}
+        disabled={
+          busy || !ingestion?.canStart || (!folder.trim() && !note.trim() && !uploadBatchId)
+        }
         onClick={async () => {
           if (!ingestion) return;
           setBusy(true);
@@ -113,7 +171,9 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
             await ingestion.start({
               ...(folder.trim() ? { folder: folder.trim() } : {}),
               ...(note.trim() ? { note: note.trim() } : {}),
+              ...(uploadBatchId ? { uploadBatchId } : {}),
             });
+            setUploadBatchId("");
             setStatus(t("Ingestion started. Review proposed nodes in Changes."));
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : t("Could not start ingestion"));
