@@ -15,6 +15,7 @@ import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import { liveThreadShell } from "../mcp/McpToolAccess.testkit.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
+import { TeamMessenger } from "../team/TeamMessenger.ts";
 import { EnterpriseClient } from "./EnterpriseClient.ts";
 import { EnterpriseTeamToolkit, layer } from "./EnterpriseTeamToolkit.ts";
 
@@ -52,11 +53,13 @@ const caller = liveThreadShell(ThreadId.make("caller"));
 const handlers = (
   client: Partial<EnterpriseClient["Service"]>,
   shell: typeof caller | null = caller,
+  messenger: Partial<TeamMessenger["Service"]> = {},
 ) =>
   McpToolAccess.HandlersLayer.layer(layer).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.mock(EnterpriseClient)({ status: Effect.succeed({ identity: member }), ...client }),
+        Layer.mock(TeamMessenger)(messenger),
         Layer.mock(ThreadManagement.ThreadManagementService)({
           getThreadShell: () => Effect.succeed(shell),
         }),
@@ -215,4 +218,91 @@ it.effect(
         );
       }
     }),
+);
+
+it.effect(
+  "lists colleagues without the caller and proposes cards only through the messenger",
+  () => {
+    const sent: Array<Parameters<TeamMessenger["Service"]["sendCard"]>[0]> = [];
+    const task = { title: "Revisar promo", description: "", priority: null, dueDate: null };
+    return Effect.gen(function* () {
+      const toolkit = yield* EnterpriseTeamToolkit;
+      const colleagues = yield* toolkit
+        .handle("enterprise_colleagues_list", {})
+        .pipe(Stream.unwrap, Stream.runCollect);
+      expect(colleagues.at(-1)?.result).toEqual({
+        ok: true,
+        value: { colleagues: [{ memberKey: "k-ana", displayName: "Ana", team: "Ventas" }] },
+      });
+      const card = yield* toolkit
+        .handle("enterprise_card_send", { recipientKey: "k-ana", task, note: "para hoy" })
+        .pipe(Stream.unwrap, Stream.runCollect);
+      expect(card.at(-1)?.result).toMatchObject({ ok: true });
+      expect(sent).toEqual([{ recipientKey: "k-ana", task, note: "para hoy" }]);
+    }).pipe(
+      Effect.provide(
+        handlers(
+          {
+            org: Effect.succeed({
+              teams: [
+                {
+                  id: "ventas",
+                  name: "Ventas",
+                  access: "member",
+                  members: [
+                    { memberKey: "k-me", displayName: "Member", role: "member", isMe: true },
+                    { memberKey: "k-ana", displayName: "Ana", role: "lead", isMe: false },
+                    { displayName: "No key", role: "member", isMe: false },
+                  ],
+                },
+              ],
+            }),
+          },
+          caller,
+          {
+            sendCard: (input) =>
+              Effect.sync(() => {
+                sent.push(input);
+                return {
+                  id: "m1",
+                  kind: "task" as const,
+                  outgoing: true,
+                  fromKey: "k-me",
+                  fromDisplayName: "Member",
+                  toKey: "k-ana",
+                  toDisplayName: "Ana",
+                  note: input.note ?? null,
+                  skill: null,
+                  task: input.task,
+                  viaAgent: true,
+                  status: "unread" as const,
+                  createdAt: "2026-11-09T00:00:00Z",
+                };
+              }),
+          },
+        ),
+      ),
+      Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+    );
+  },
+);
+
+it.effect("refuses to send a card before the environment joins an enterprise", () =>
+  Effect.gen(function* () {
+    const toolkit = yield* EnterpriseTeamToolkit;
+    const result = yield* toolkit
+      .handle("enterprise_card_send", {
+        recipientKey: "k-ana",
+        task: { title: "x", description: "", priority: null, dueDate: null },
+      })
+      .pipe(Stream.unwrap, Stream.runCollect);
+    expect(result.at(-1)?.result).toMatchObject({ ok: false, code: "not_connected" });
+  }).pipe(
+    Effect.provide(
+      handlers({ status: Effect.succeed({ identity: null }) }, caller, {
+        sendCard: () => Effect.die("must not send"),
+      }),
+    ),
+    Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+  ),
 );

@@ -1,6 +1,12 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it, describe } from "@effect/vitest";
-import type { TeamMessage, TeamMessageHubSendInput } from "@t3tools/contracts";
+import {
+  ProjectBoardError,
+  ProjectId,
+  type ProjectBoard,
+  type TeamMessage,
+  type TeamMessageHubSendInput,
+} from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -8,6 +14,7 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 
 import * as EnterpriseClient from "../enterprise/EnterpriseClient.ts";
+import * as ProjectBoards from "../project/ProjectBoards.ts";
 import * as TeamMessenger from "./TeamMessenger.ts";
 
 const incoming = (overrides: Partial<TeamMessage> = {}): TeamMessage => ({
@@ -20,12 +27,26 @@ const incoming = (overrides: Partial<TeamMessage> = {}): TeamMessage => ({
   toDisplayName: "Bruno",
   note: null,
   skill: { name: "rag-search", description: "", content: "# RAG" },
+  task: null,
+  viaAgent: false,
   status: "unread",
   createdAt: "2026-11-09T12:00:00Z",
   ...overrides,
 });
 
-const setup = (inbox: ReadonlyArray<TeamMessage>) =>
+const project = ProjectId.make("project-1");
+const card = (overrides: Partial<TeamMessage> = {}) =>
+  incoming({
+    id: "c1",
+    kind: "task",
+    skill: null,
+    note: "para la junta",
+    viaAgent: true,
+    task: { title: "Buscar % de la promo", description: "Ventas", priority: "high", dueDate: null },
+    ...overrides,
+  });
+
+const setup = (inbox: ReadonlyArray<TeamMessage>, options: { readonly conflicts?: number } = {}) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -34,6 +55,25 @@ const setup = (inbox: ReadonlyArray<TeamMessage>) =>
     const codex = path.join(root, "codex");
     const sent: TeamMessageHubSendInput[] = [];
     const decided: string[] = [];
+    const board = { revision: 0, boards: [] as ReadonlyArray<ProjectBoard> };
+    let conflicts = options.conflicts ?? 0;
+    const boards = Layer.mock(ProjectBoards.ProjectBoards)({
+      get: ({ projectId }) =>
+        projectId === project
+          ? Effect.sync(() => ({ revision: board.revision, boards: board.boards }))
+          : Effect.fail(new ProjectBoardError({ code: "not_found" })),
+      save: (input) =>
+        Effect.suspend(() => {
+          if (conflicts > 0 || input.revision !== board.revision) {
+            conflicts -= 1;
+            board.revision += 1;
+            return Effect.fail(new ProjectBoardError({ code: "conflict" }));
+          }
+          board.revision += 1;
+          board.boards = input.boards;
+          return Effect.succeed({ revision: board.revision, boards: input.boards });
+        }),
+    });
     const client = Layer.mock(EnterpriseClient.EnterpriseClient)({
       messagesList: Effect.succeed(inbox),
       messageSend: (input) =>
@@ -48,7 +88,7 @@ const setup = (inbox: ReadonlyArray<TeamMessage>) =>
         }),
     });
     const messenger = yield* TeamMessenger.TeamMessenger.pipe(
-      Effect.provide(TeamMessenger.layer.pipe(Layer.provide(client))),
+      Effect.provide(TeamMessenger.layer.pipe(Layer.provide(Layer.merge(client, boards)))),
     );
     const run = <A, E>(effect: Effect.Effect<A, E>) =>
       effect.pipe(
@@ -57,7 +97,7 @@ const setup = (inbox: ReadonlyArray<TeamMessage>) =>
           CODEX_HOME: codex,
         }),
       );
-    return { fs, path, root, claude, codex, sent, decided, messenger, run };
+    return { fs, path, root, claude, codex, sent, decided, messenger, run, board };
   });
 const code = <A>(effect: Effect.Effect<A, { readonly code: string }>) =>
   effect.pipe(
@@ -148,6 +188,64 @@ describe("TeamMessenger", () => {
         ),
       ).toBe("invalid_message");
       expect(t.sent).toHaveLength(1);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("adds an accepted card once, on its own requests board, crediting the sender", () =>
+    Effect.gen(function* () {
+      const t = yield* setup([card()], { conflicts: 1 });
+      yield* t.messenger.decide({ id: "c1", decision: "accepted", projectId: project });
+      // A retry after the hub answer was lost must not add the card again.
+      yield* t.messenger.decide({ id: "c1", decision: "accepted", projectId: project });
+      expect(t.board.boards).toHaveLength(1);
+      const [requests] = t.board.boards;
+      expect(requests).toMatchObject({ id: TeamMessenger.TEAM_REQUESTS_BOARD.id });
+      expect(requests?.tasks).toEqual([
+        {
+          id: "c1",
+          title: "Buscar % de la promo",
+          description: "para la junta\n\nVentas\n\nLo pidió Ana (con su agente).",
+          status: "backlog",
+          priority: "high",
+          assignees: [],
+          tags: ["de Ana"],
+          dueDate: null,
+        },
+      ]);
+      expect(t.decided).toEqual(["c1:accepted", "c1:accepted"]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("needs a project to accept a card and never mixes up card and skill answers", () =>
+    Effect.gen(function* () {
+      const t = yield* setup([card(), incoming({ id: "s1" })]);
+      const answer = (id: string, decision: "accepted" | "installed", projectId?: ProjectId) =>
+        code(
+          t.run(
+            t.messenger.decide({
+              id,
+              decision,
+              ...(projectId === undefined ? {} : { projectId }),
+            }),
+          ),
+        );
+      expect(yield* answer("c1", "accepted")).toBe("invalid_message");
+      expect(yield* answer("c1", "accepted", ProjectId.make("elsewhere"))).toBe("invalid_message");
+      expect(yield* answer("s1", "accepted", project)).toBe("invalid_message");
+      expect(yield* answer("c1", "installed", project)).toBe("conflict");
+      expect(t.board.boards).toEqual([]);
+      expect(t.decided).toEqual([]);
+      expect(yield* t.fs.readDirectory(t.root)).toEqual([]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("sends an agent's card as a request, never as a board write", () =>
+    Effect.gen(function* () {
+      const t = yield* setup([]);
+      const task = { title: "Revisar", description: "", priority: null, dueDate: "2026-11-10" };
+      yield* t.messenger.sendCard({ recipientKey: "k", task });
+      expect(t.sent).toEqual([{ recipientKey: "k", task, viaAgent: true }]);
+      expect(t.board.boards).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 });

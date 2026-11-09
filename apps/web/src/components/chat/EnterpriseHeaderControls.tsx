@@ -7,6 +7,7 @@ import {
 import type {
   EnterpriseOrgTeam,
   EnvironmentId,
+  ProjectId,
   PublicationStatus,
   ServerProviderSkill,
   ThreadId,
@@ -182,6 +183,7 @@ function ContextPanel(props: {
 function EnterpriseContextDialog(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
+  readonly projectId: ProjectId | null;
   readonly skills: ReadonlyArray<ServerProviderSkill>;
 }) {
   const [open, setOpen] = useState(false);
@@ -267,7 +269,9 @@ function EnterpriseContextDialog(props: {
             </Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="sharing" className="flex min-h-0 flex-1 flex-col">
-            {open && <SharingPanel environmentId={props.environmentId} />}
+            {open && (
+              <SharingPanel environmentId={props.environmentId} projectId={props.projectId} />
+            )}
           </Tabs.Panel>
           <Tabs.Panel value="context" className="flex min-h-0 flex-1 flex-col">
             {open && <ContextPanel {...props} />}
@@ -384,6 +388,7 @@ function SharePanel(props: {
 /** Org chart, conversation context and team sharing: only for an IDE linked to an enterprise hub. */
 export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(props: {
   readonly threadId: ThreadId;
+  readonly projectId: ProjectId | null;
   readonly skills: ReadonlyArray<ServerProviderSkill>;
 }) {
   const { environmentId, identity } = useEnterpriseStatus();
@@ -398,6 +403,7 @@ export const EnterpriseHeaderControls = memo(function EnterpriseHeaderControls(p
         key={`${environmentId}:${props.threadId}`}
         environmentId={environmentId}
         threadId={props.threadId}
+        projectId={props.projectId}
         skills={props.skills}
       />
     </>

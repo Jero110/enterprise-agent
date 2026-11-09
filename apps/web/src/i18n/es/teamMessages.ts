@@ -67,4 +67,32 @@ export const ES_TEAM_MESSAGES: Readonly<Record<string, string>> = {
   "You already have a skill with that name. Rename or remove yours first.":
     "Ya tienes una skill con ese nombre. Cámbiale el nombre o quita la tuya primero.",
   "You can't message yourself.": "No te puedes mandar mensajes a ti.",
+  // Board cards
+  "teamMessage::accepted": "Agregada",
+  Card: "Tarjeta",
+  "Sent by {name}'s agent": "La mandó el agente de {name}",
+  "{name}'s agent sent it to you": "Te la mandó el agente de {name}",
+  "{name} sent it to you": "{name} te la mandó",
+  "You sent it to {name}": "Se la mandaste a {name}",
+  "Due {date}": "Para el {date}",
+  "Adding…": "Agregando…",
+  "Add to my board": "Agregar a mi tablero",
+  "Added to your Team requests board": "Se agregó a tu tablero Solicitudes del equipo",
+  "Cards for your board": "Tarjetas para tu tablero",
+  "Nobody writes on your board: a card a colleague or their agent sends lands on your Team requests board only if you add it.":
+    "Nadie escribe en tu tablero: una tarjeta que te manda un colega o su agente solo llega a tu tablero Solicitudes del equipo si tú la agregas.",
+  "No cards for you yet.": "Aún no te han mandado tarjetas.",
+  "Cards you sent": "Tarjetas que mandaste",
+  "Open a project to add the card to its board.":
+    "Abre un proyecto para agregar la tarjeta a su tablero.",
+  "That message isn't a card request.": "Ese mensaje no es una solicitud de tarjeta.",
+  "Could not add the card to your board. Try again.":
+    "No se pudo agregar la tarjeta a tu tablero. Intenta otra vez.",
+  "Your board kept changing. Try again.": "Tu tablero cambió mientras tanto. Intenta otra vez.",
+  "Send a skill or a card, not both.": "Manda una skill o una tarjeta, no las dos.",
+  "That card's title is too long.": "El título de esa tarjeta es demasiado largo.",
+  "That card's description is too long.": "La descripción de esa tarjeta es demasiado larga.",
+  "Messages don't need an answer.": "Los mensajes no necesitan respuesta.",
+  "A skill request is installed or declined.": "Una solicitud de skill se instala o se rechaza.",
+  "A card request is accepted or declined.": "Una solicitud de tarjeta se agrega o se rechaza.",
 };
