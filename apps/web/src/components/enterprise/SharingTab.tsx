@@ -52,9 +52,8 @@ export function SharingTab({ sharing }: { sharing?: PersonalSharing }) {
       sharing?.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("Could not update sharing"));
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
@@ -309,9 +308,8 @@ function PersonalPublication({
                 setPublished(false);
               } catch {
                 setFileError(t("Could not read file"));
-              } finally {
-                setReading(false);
               }
+              setReading(false);
             }}
           />
         </label>

@@ -139,9 +139,8 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
               setUploadProposalIds(staged.uploadProposalIds);
             } catch (cause) {
               setError(cause instanceof Error ? cause.message : t("Could not stage upload"));
-            } finally {
-              setBusy(false);
             }
+            setBusy(false);
           }}
         />
       </label>
@@ -189,9 +188,8 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
             setStatus(t("Ingestion started. Review proposed nodes in Changes."));
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : t("Could not start ingestion"));
-          } finally {
-            setBusy(false);
           }
+          setBusy(false);
         }}
       >
         {busy ? t("Starting…") : t("Start ingestion")}
