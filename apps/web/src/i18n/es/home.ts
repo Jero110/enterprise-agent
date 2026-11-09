@@ -36,7 +36,7 @@ export const ES_HOME: Readonly<Record<string, string>> = {
   // Projects and team
   "Projects and team": "Proyectos y equipo",
   "Join your company's team to see its projects and what your teammates share.":
-    "Únete al equipo de tu empresa para ver sus proyectos y lo que comparten tus compañeros.",
+    "Únete al equipo de tu empresa para ver sus proyectos y lo que comparte tu equipo.",
   "Open board": "Ver tablero",
   "No tasks on this project's board yet.": "El tablero de este proyecto aún no tiene tareas.",
   "1 task in progress": "1 tarea en curso",
