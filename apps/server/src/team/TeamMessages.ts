@@ -3,7 +3,10 @@ import {
   TEAM_MESSAGE_NOTE_MAX_CHARS,
   TEAM_SKILL_CONTENT_MAX_CHARS,
   TEAM_SKILL_NAME_PATTERN,
+  TEAM_TASK_DESCRIPTION_MAX_CHARS,
+  TEAM_TASK_TITLE_MAX_CHARS,
   TeamSharedSkill,
+  TeamSharedTask,
   type TeamMessage,
   type TeamMessageDecideInput,
   type TeamMessageHubSendInput,
@@ -20,7 +23,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 
-/** Direct messages and skill requests between members of one enterprise, kept on the hub. */
+/** Direct messages, skill requests and board-card requests between members of one enterprise, kept on the hub. */
 export class TeamMessages extends Context.Service<
   TeamMessages,
   {
@@ -54,6 +57,8 @@ interface MessageRow {
   readonly kind: TeamMessage["kind"];
   readonly note: string | null;
   readonly skill_json: string | null;
+  readonly task_json: string | null;
+  readonly via_agent: number;
   readonly status: TeamMessage["status"];
   readonly created_at: string;
 }
@@ -61,6 +66,16 @@ interface MessageRow {
 const SkillJson = Schema.fromJsonString(TeamSharedSkill);
 const decodeSkill = Schema.decodeUnknownEffect(SkillJson);
 const encodeSkill = Schema.encodeEffect(SkillJson);
+const TaskJson = Schema.fromJsonString(TeamSharedTask);
+const decodeTask = Schema.decodeUnknownEffect(TaskJson);
+const encodeTask = Schema.encodeEffect(TaskJson);
+
+/** How each kind of request can be answered: a message isn't answered, only read. */
+const DECISIONS: Record<TeamMessage["kind"], ReadonlyArray<TeamMessageDecideInput["decision"]>> = {
+  message: [],
+  skill: ["installed", "declined"],
+  task: ["accepted", "declined"],
+};
 
 const invalid = (message: string) => new EnterpriseError({ code: "invalid_message", message });
 const notFound = new EnterpriseError({
@@ -105,6 +120,8 @@ export const layer = Layer.effect(
         note: row.note,
         skill:
           row.skill_json === null ? null : yield* decodeSkill(row.skill_json).pipe(Effect.orDie),
+        task: row.task_json === null ? null : yield* decodeTask(row.task_json).pipe(Effect.orDie),
+        viaAgent: row.via_agent === 1,
         status: row.status,
         createdAt: row.created_at,
       } satisfies TeamMessage;
@@ -140,8 +157,17 @@ export const layer = Layer.effect(
         const note = input.note?.trim() ?? "";
         if (note.length > TEAM_MESSAGE_NOTE_MAX_CHARS)
           return yield* invalid("That message is too long.");
-        const skill = input.skill;
-        if (skill === undefined && note.length === 0) return yield* invalid("Write a message.");
+        const { skill, task } = input;
+        if (skill !== undefined && task !== undefined)
+          return yield* invalid("Send a skill or a card, not both.");
+        if (skill === undefined && task === undefined && note.length === 0)
+          return yield* invalid("Write a message.");
+        if (task !== undefined) {
+          if (task.title.length > TEAM_TASK_TITLE_MAX_CHARS)
+            return yield* invalid("That card's title is too long.");
+          if (task.description.length > TEAM_TASK_DESCRIPTION_MAX_CHARS)
+            return yield* invalid("That card's description is too long.");
+        }
         if (skill !== undefined) {
           if (!TEAM_SKILL_NAME_PATTERN.test(skill.name))
             return yield* invalid("Skill names use lowercase letters, numbers, - and _.");
@@ -165,14 +191,16 @@ export const layer = Layer.effect(
           id: yield* random.uuidV4(),
           from_email: sender.email,
           to_email: recipient.email,
-          kind: skill === undefined ? "message" : "skill",
+          kind: skill !== undefined ? "skill" : task !== undefined ? "task" : "message",
           note: note.length === 0 ? null : note,
           skill_json: skill === undefined ? null : yield* encodeSkill(skill).pipe(Effect.orDie),
+          task_json: task === undefined ? null : yield* encodeTask(task).pipe(Effect.orDie),
+          via_agent: input.viaAgent === true ? 1 : 0,
           status: "unread",
           created_at: DateTime.formatIso(yield* DateTime.now),
         };
-        yield* sql`INSERT INTO enterprise_team_messages (id, from_email, to_email, kind, note, skill_json, status, created_at)
-          VALUES (${row.id}, ${row.from_email}, ${row.to_email}, ${row.kind}, ${row.note}, ${row.skill_json}, ${row.status}, ${row.created_at})`.pipe(
+        yield* sql`INSERT INTO enterprise_team_messages (id, from_email, to_email, kind, note, skill_json, task_json, via_agent, status, created_at)
+          VALUES (${row.id}, ${row.from_email}, ${row.to_email}, ${row.kind}, ${row.note}, ${row.skill_json}, ${row.task_json}, ${row.via_agent}, ${row.status}, ${row.created_at})`.pipe(
           Effect.orDie,
         );
         return yield* toMessage(row, sender.email);
@@ -200,8 +228,15 @@ export const layer = Layer.effect(
             code: "access_denied",
             message: "Only the person who received it can answer.",
           });
-        if (row.kind !== "skill") return yield* invalid("Only skill requests can be installed.");
-        if (row.status === "installed" || row.status === "declined")
+        if (!DECISIONS[row.kind].includes(input.decision))
+          return yield* invalid(
+            row.kind === "message"
+              ? "Messages don't need an answer."
+              : row.kind === "skill"
+                ? "A skill request is installed or declined."
+                : "A card request is accepted or declined.",
+          );
+        if (row.status !== "unread" && row.status !== "read")
           return yield* new EnterpriseError({
             code: "conflict",
             message: "This request was already answered.",

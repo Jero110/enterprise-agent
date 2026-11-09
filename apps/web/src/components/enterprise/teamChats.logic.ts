@@ -33,13 +33,18 @@ export function isUnreadIncoming(message: TeamMessage): boolean {
   return !message.outgoing && message.status === "unread";
 }
 
-/** A skill a colleague sent you that you have not installed or declined yet. */
-export function isPendingSkill(message: TeamMessage): boolean {
+/** A skill or board card a colleague (or their agent) sent you that still waits on your answer. */
+export function isPendingRequest(message: TeamMessage): boolean {
   return (
     !message.outgoing &&
-    message.kind === "skill" &&
+    message.kind !== "message" &&
     (message.status === "unread" || message.status === "read")
   );
+}
+
+/** A skill a colleague sent you that you have not installed or declined yet. */
+export function isPendingSkill(message: TeamMessage): boolean {
+  return message.kind === "skill" && isPendingRequest(message);
 }
 
 /** What the mail badge counts: anything a colleague sent you that you have not opened. */

@@ -8,6 +8,7 @@ import {
   groupByDay,
   groupConversations,
   initials,
+  isPendingRequest,
   isPendingSkill,
   rosterPeople,
   shareableSkills,
@@ -26,6 +27,7 @@ function message(
     readonly at?: number;
     readonly status?: TeamMessage["status"];
     readonly skill?: string;
+    readonly task?: string;
     readonly note?: string | null;
   } = {},
 ): TeamMessage {
@@ -33,7 +35,7 @@ function message(
   const outgoing = options.outgoing ?? false;
   return {
     id: `m${String(nextId).padStart(3, "0")}`,
-    kind: options.skill === undefined ? "message" : "skill",
+    kind: options.skill !== undefined ? "skill" : options.task !== undefined ? "task" : "message",
     outgoing,
     fromKey: outgoing ? ME : other.key,
     fromDisplayName: outgoing ? "Me" : other.name,
@@ -44,6 +46,11 @@ function message(
       options.skill === undefined
         ? null
         : { name: options.skill, description: "does things", content: "# Skill" },
+    task:
+      options.task === undefined
+        ? null
+        : { title: options.task, description: "", priority: null, dueDate: null },
+    viaAgent: false,
     status: options.status ?? "read",
     createdAt: new Date(options.at ?? NOW).toISOString(),
   } as TeamMessage;
@@ -112,6 +119,27 @@ describe("unread and pending", () => {
     expect(isPendingSkill(message(ana, { skill: "x", status: "installed" }))).toBe(false);
     expect(isPendingSkill(message(ana, { skill: "x", outgoing: true }))).toBe(false);
     expect(isPendingSkill(message(ana))).toBe(false);
+    expect(isPendingSkill(message(ana, { task: "Promo", status: "unread" }))).toBe(false);
+  });
+
+  it("treats any received skill or card as a pending request until answered", () => {
+    expect(isPendingRequest(message(ana, { task: "Promo", status: "unread" }))).toBe(true);
+    expect(isPendingRequest(message(ana, { task: "Promo", status: "read" }))).toBe(true);
+    expect(isPendingRequest(message(ana, { task: "Promo", status: "accepted" }))).toBe(false);
+    expect(isPendingRequest(message(ana, { task: "Promo", status: "declined" }))).toBe(false);
+    expect(isPendingRequest(message(ana, { skill: "x", status: "read" }))).toBe(true);
+    expect(isPendingRequest(message(ana, { task: "Promo", outgoing: true }))).toBe(false);
+    expect(isPendingRequest(message(ana))).toBe(false);
+  });
+
+  it("groups card messages into the sender's chat", () => {
+    const conversations = groupConversations([
+      message(ana, { at: NOW - 5 * MINUTE }),
+      message(ana, { task: "Promo de octubre", status: "unread", at: NOW - MINUTE }),
+    ]);
+    expect(conversations).toHaveLength(1);
+    expect(conversations[0]?.lastMessage.task?.title).toBe("Promo de octubre");
+    expect(conversations[0]?.unreadCount).toBe(1);
   });
 });
 

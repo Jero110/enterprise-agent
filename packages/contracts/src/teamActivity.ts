@@ -93,6 +93,8 @@ export const TeamThreadSummary = Schema.Struct({
   ownerEmail: TrimmedNonEmptyString,
   ownerDisplayName: TrimmedNonEmptyString,
   publicationStatus: PublicationStatus,
+  /** Only on the owner's own threads: member keys it is shared with; absent means the whole team. */
+  audienceKeys: Schema.optionalKey(Schema.Array(TrimmedNonEmptyString)),
 });
 export type TeamThreadSummary = typeof TeamThreadSummary.Type;
 
@@ -139,9 +141,12 @@ export const TeamThreadReport = Schema.Struct({
 });
 export type TeamThreadReport = typeof TeamThreadReport.Type;
 
+export const TEAM_THREAD_AUDIENCE_MAX = 50;
 export const TeamThreadPublishInput = Schema.Struct({
   threadId: TrimmedNonEmptyString,
   status: PublicationStatus,
+  /** Member keys to share with instead of the whole team; your bosses can always read a share. */
+  audienceKeys: Schema.optionalKey(Schema.Array(TrimmedNonEmptyString)),
 });
 export type TeamThreadPublishInput = typeof TeamThreadPublishInput.Type;
 export const TeamPublicationResult = Schema.Struct({ updated: Schema.Boolean });

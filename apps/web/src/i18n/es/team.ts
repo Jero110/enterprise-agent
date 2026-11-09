@@ -37,14 +37,25 @@ export const ES_TEAM: Readonly<Record<string, string>> = {
   "Could not update sharing": "No se pudo cambiar cómo se comparte",
   "Share with your team": "Comparte con tu equipo",
   "Summary only": "Solo resumen",
-  "Your team and their agents see only what you asked and the result. The chat itself stays on your computer.":
-    "Tu equipo y sus agentes solo ven lo que pediste y el resultado. El chat se queda en tu computadora.",
+  "They and their agents see only what you asked and the result. The chat itself stays on your computer.":
+    "Ellos y sus agentes solo ven lo que pediste y el resultado. El chat se queda en tu computadora.",
+  "Who can read it": "Quién lo puede leer",
+  "My whole team": "Todo mi equipo",
+  "Only people I choose": "Solo las personas que elija",
+  "Tick who can read it. Until then your whole team can.":
+    "Marca quién lo puede leer. Mientras tanto lo puede leer todo tu equipo.",
+  "Your bosses (admins and your area's lead) can always read what you share.":
+    "Tus jefes (los admins y el líder de tu área) siempre pueden leer lo que compartes.",
+  "Share with fewer people, or with your whole team.":
+    "Compártelo con menos personas, o con todo tu equipo.",
+  "You can only share with people in your company.":
+    "Solo puedes compartir con personas de tu empresa.",
   "Team sharing": "Compartir con el equipo",
   "Not shared": "No compartida",
   "Only you can see this conversation.": "Solo tú puedes ver este chat.",
   "Team readable": "Toda la conversación",
-  "Your team can read this conversation and its subagents. Stop sharing any time.":
-    "Tu equipo puede leer este chat. Puedes dejar de compartirlo cuando quieras.",
+  "They can read this conversation and its subagents. Stop sharing any time.":
+    "Pueden leer este chat y sus subagentes. Puedes dejar de compartirlo cuando quieras.",
   "AI architecture": "Arquitectura de IA",
   Metrics: "Métricas",
   Business: "Negocio",

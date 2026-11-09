@@ -5,17 +5,20 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import {
   type EnvironmentId,
+  type ProjectId,
   type ServerProviderSkill,
   TEAM_MESSAGE_NOTE_MAX_CHARS,
   type TeamMessage,
 } from "@t3tools/contracts";
 import {
   ArrowLeftIcon,
+  BotIcon,
   MailIcon,
   MessagesSquareIcon,
   PackageIcon,
   PlusIcon,
   SendHorizontalIcon,
+  SquareKanbanIcon,
   SquarePenIcon,
   XIcon,
 } from "lucide-react";
@@ -46,6 +49,7 @@ import {
   groupByDay,
   groupConversations,
   initials,
+  isPendingRequest,
   isPendingSkill,
   isUnreadIncoming,
   rosterPeople,
@@ -105,6 +109,10 @@ function formatDaySeparator(iso: string, nowMs: number): string {
 }
 
 function previewText(message: TeamMessage): string {
+  if (message.task !== null)
+    return message.outgoing
+      ? t("You sent the card «{name}»", { name: message.task.title })
+      : t("Sent you the card «{name}»", { name: message.task.title });
   if (message.skill !== null)
     return message.outgoing
       ? t("You sent the skill «{name}»", { name: message.skill.name })
@@ -113,9 +121,13 @@ function previewText(message: TeamMessage): string {
   return message.outgoing ? t("You: {text}", { text: note }) : note;
 }
 
-/** What the status badge on a skill card says depends on whose side you are on. */
-function skillStatusLabel(message: TeamMessage): string {
-  if (message.status === "installed" || message.status === "declined")
+/** What the status badge on a skill or board card says depends on whose side you are on. */
+function requestStatusLabel(message: TeamMessage): string {
+  if (
+    message.status === "installed" ||
+    message.status === "accepted" ||
+    message.status === "declined"
+  )
     return t(message.status, undefined, "teamMessage");
   if (message.outgoing) return t(`sent-${message.status}`, undefined, "teamMessage");
   return t("to-answer", undefined, "teamMessage");
@@ -197,6 +209,8 @@ function BackButton({ onBack }: { readonly onBack: () => void }) {
 /** Your chats with colleagues, from the mail button in the chat header, docked on the right. */
 export function TeamMessagesButton(props: {
   readonly environmentId: EnvironmentId;
+  /** The open project: a card a colleague sends lands on its board when you accept it. */
+  readonly projectId: ProjectId | null;
   readonly skills: ReadonlyArray<ServerProviderSkill>;
 }) {
   const [open, setOpen] = useState(false);
@@ -235,6 +249,7 @@ export function TeamMessagesButton(props: {
             <ConversationView
               key={view.peer.key}
               environmentId={props.environmentId}
+              projectId={props.projectId}
               skills={props.skills}
               peer={view.peer}
               messages={messages}
@@ -365,7 +380,9 @@ function ConversationRow(props: {
                 hasUnread ? "text-foreground" : "text-muted-foreground",
               )}
             >
-              {conversation.lastMessage.skill !== null ? (
+              {conversation.lastMessage.task !== null ? (
+                <SquareKanbanIcon aria-hidden className="me-1 inline size-3 align-[-0.1em]" />
+              ) : conversation.lastMessage.skill !== null ? (
                 <PackageIcon aria-hidden className="me-1 inline size-3 align-[-0.1em]" />
               ) : null}
               {previewText(conversation.lastMessage)}
@@ -461,6 +478,7 @@ function scrollParentToBottom(node: HTMLDivElement | null): void {
 
 function ConversationView(props: {
   readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId | null;
   readonly skills: ReadonlyArray<ServerProviderSkill>;
   readonly peer: ChatPeer;
   readonly messages: ReadonlyArray<TeamMessage>;
@@ -525,6 +543,7 @@ function ConversationView(props: {
                   <MessageBubble
                     key={message.id}
                     environmentId={props.environmentId}
+                    projectId={props.projectId}
                     message={message}
                   />
                 ))}
@@ -547,13 +566,26 @@ function ConversationView(props: {
 
 function MessageBubble(props: {
   readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId | null;
   readonly message: TeamMessage;
 }) {
   const { message } = props;
   const mine = message.outgoing;
   return (
     <div className={cn("flex flex-col", mine ? "items-end" : "items-start")}>
-      {message.skill !== null ? (
+      {message.viaAgent ? (
+        <span className="mb-0.5 flex items-center gap-1 px-1 text-2xs text-muted-foreground">
+          <BotIcon aria-hidden className="size-3" />
+          {t("Sent by {name}'s agent", { name: message.fromDisplayName })}
+        </span>
+      ) : null}
+      {message.task !== null ? (
+        <TaskCard
+          environmentId={props.environmentId}
+          projectId={props.projectId}
+          message={message}
+        />
+      ) : message.skill !== null ? (
         <SkillCard environmentId={props.environmentId} message={message} />
       ) : (
         <div
@@ -569,7 +601,7 @@ function MessageBubble(props: {
       )}
       <span className="mt-0.5 px-1 text-2xs text-muted-foreground tabular-nums">
         {formatClock(message.createdAt)}
-        {mine && message.skill === null && message.status === "read" ? (
+        {mine && message.kind === "message" && message.status === "read" ? (
           <>
             <span className="mx-1">·</span>
             {t("sent-read", undefined, "teamMessage")}
@@ -634,9 +666,144 @@ function SkillCard(props: {
           size="sm"
           className="w-fit"
         >
-          {skillStatusLabel(message)}
+          {requestStatusLabel(message)}
         </Badge>
       )}
+    </div>
+  );
+}
+
+function TaskCard(props: {
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId | null;
+  readonly message: TeamMessage;
+}) {
+  const { message } = props;
+  const task = message.task;
+  if (task === null) return null;
+  const pending = isPendingRequest(message);
+  return (
+    <div
+      className={cn(
+        "w-[85%] max-w-80 space-y-2 rounded-2xl border bg-card p-3 text-card-foreground shadow-xs",
+        message.outgoing ? "rounded-br-md border-primary/30" : "rounded-bl-md border-border/70",
+      )}
+    >
+      <div className="flex items-start gap-2.5">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <SquareKanbanIcon aria-hidden className="size-4 text-primary" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="min-w-0 break-words font-medium text-sm">{task.title}</span>
+            <Badge variant="outline" size="sm">
+              {t("Card")}
+            </Badge>
+          </div>
+          {task.dueDate ? (
+            <p className="text-muted-foreground text-xs">
+              {t("Due {date}", { date: task.dueDate })}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      {task.description ? (
+        <p className="line-clamp-4 whitespace-pre-wrap break-words text-muted-foreground text-xs">
+          {task.description}
+        </p>
+      ) : null}
+      {message.note ? (
+        <p className="whitespace-pre-wrap break-words text-sm">{message.note}</p>
+      ) : null}
+      {pending ? (
+        <CardDecision
+          environmentId={props.environmentId}
+          projectId={props.projectId}
+          message={message}
+        />
+      ) : (
+        <Badge
+          variant={message.status === "accepted" ? "success" : "outline"}
+          size="sm"
+          className="w-fit"
+        >
+          {requestStatusLabel(message)}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+/** Add to my board / Decline for a card a colleague or their agent proposed. */
+function CardDecision(props: {
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId | null;
+  readonly message: TeamMessage;
+}) {
+  const decide = useAtomCommand(enterpriseEnvironment.decideTeamMessage, {
+    label: "answer card request",
+    reportFailure: false,
+  });
+  const canDecide = useAtomValue(
+    enterpriseEnvironment.decideTeamMessage.permissionAtom(props.environmentId),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const task = props.message.task;
+  if (task === null) return null;
+  const answer = async (decision: "accepted" | "declined") => {
+    setBusy(true);
+    setError(null);
+    const result = await decide({
+      environmentId: props.environmentId,
+      input: {
+        id: props.message.id,
+        decision,
+        ...(props.projectId === null ? {} : { projectId: props.projectId }),
+      },
+    });
+    setBusy(false);
+    if (result._tag === "Success") {
+      toastManager.add({
+        type: "success",
+        title:
+          decision === "accepted"
+            ? t("Added to your Team requests board")
+            : t("Declined {name}", { name: task.title }),
+      });
+    } else if (!isAtomCommandInterrupted(result)) {
+      setError(enterpriseFailureMessage(squashAtomCommandFailure(result)));
+    }
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          disabled={busy || !canDecide || props.projectId === null}
+          onClick={() => void answer("accepted")}
+        >
+          {busy ? t("Adding…") : t("Add to my board")}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy || !canDecide}
+          onClick={() => void answer("declined")}
+        >
+          {t("Decline")}
+        </Button>
+      </div>
+      {props.projectId === null ? (
+        <p className="text-muted-foreground text-xs">
+          {t("Open a project to add the card to its board.")}
+        </p>
+      ) : null}
+      {error !== null ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -957,16 +1124,93 @@ function SharedSkillRow(props: {
   );
 }
 
+function SharedCardRow(props: {
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId | null;
+  readonly message: TeamMessage;
+}) {
+  const task = props.message.task;
+  if (task === null) return null;
+  const pending = isPendingRequest(props.message);
+  const sender = props.message.viaAgent
+    ? t("{name}'s agent sent it to you", { name: props.message.fromDisplayName })
+    : t("{name} sent it to you", { name: props.message.fromDisplayName });
+  return (
+    <li className="space-y-2 rounded-lg border border-border/60 p-3">
+      <div className="flex items-start gap-2">
+        <SquareKanbanIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium">{task.title}</span>
+            <Badge variant="outline" size="sm">
+              {t("Card")}
+            </Badge>
+            {!pending ? (
+              <Badge variant="outline" size="sm">
+                {t(props.message.status, undefined, "teamMessage")}
+              </Badge>
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {props.message.outgoing
+              ? t("You sent it to {name}", { name: props.message.toDisplayName })
+              : sender}
+            {task.dueDate ? ` · ${t("Due {date}", { date: task.dueDate })}` : ""}
+            {" · "}
+            {formatWhen(props.message.createdAt)}
+          </p>
+        </div>
+      </div>
+      <p className="whitespace-pre-wrap text-sm">
+        {props.message.note ?? (
+          <span className="text-muted-foreground italic">{t("No message")}</span>
+        )}
+      </p>
+      {task.description ? (
+        <p className="whitespace-pre-wrap text-xs text-muted-foreground">{task.description}</p>
+      ) : null}
+      {pending ? (
+        <CardDecision
+          environmentId={props.environmentId}
+          projectId={props.projectId}
+          message={props.message}
+        />
+      ) : null}
+    </li>
+  );
+}
+
 export function usePendingSharedCount(environmentId: EnvironmentId): number {
-  return useTeamMessages(environmentId).messages.filter(isPendingSkill).length;
+  return useTeamMessages(environmentId).messages.filter(isPendingRequest).length;
 }
 
 /** The "Sharing" tab: skills colleagues shared with you, with their note, and what you shared. */
-export function SharingPanel({ environmentId }: { readonly environmentId: EnvironmentId }) {
+export function SharingPanel({
+  environmentId,
+  projectId,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId | null;
+}) {
   const { query, messages } = useTeamMessages(environmentId);
   const skills = messages.filter((message) => message.kind === "skill");
   const received = skills.filter((message) => !message.outgoing);
   const sent = skills.filter((message) => message.outgoing);
+  const cards = messages.filter((message) => message.kind === "task");
+  const receivedCards = cards.filter((message) => !message.outgoing);
+  const sentCards = cards.filter((message) => message.outgoing);
+  const cardRows = (list: ReadonlyArray<TeamMessage>) => (
+    <ul className="space-y-2">
+      {list.map((message) => (
+        <SharedCardRow
+          key={message.id}
+          environmentId={environmentId}
+          projectId={projectId}
+          message={message}
+        />
+      ))}
+    </ul>
+  );
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
       <p className="text-xs text-muted-foreground">
@@ -977,6 +1221,19 @@ export function SharingPanel({ environmentId }: { readonly environmentId: Enviro
       {query.error !== null && query.data === null ? (
         <p className="text-sm text-muted-foreground">{t(query.error)}</p>
       ) : null}
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium">{t("Cards for your board")}</h3>
+        <p className="text-xs text-muted-foreground">
+          {t(
+            "Nobody writes on your board: a card a colleague or their agent sends lands on your Team requests board only if you add it.",
+          )}
+        </p>
+        {receivedCards.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("No cards for you yet.")}</p>
+        ) : (
+          cardRows(receivedCards)
+        )}
+      </section>
       <section className="space-y-2">
         <h3 className="text-sm font-medium">{t("Shared with you")}</h3>
         {received.length === 0 ? (
@@ -989,6 +1246,12 @@ export function SharingPanel({ environmentId }: { readonly environmentId: Enviro
           </ul>
         )}
       </section>
+      {sentCards.length > 0 ? (
+        <section className="space-y-2">
+          <h3 className="text-sm font-medium">{t("Cards you sent")}</h3>
+          {cardRows(sentCards)}
+        </section>
+      ) : null}
       {sent.length > 0 ? (
         <section className="space-y-2">
           <h3 className="text-sm font-medium">{t("You shared")}</h3>

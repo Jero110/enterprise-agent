@@ -2,6 +2,8 @@ import {
   EnterpriseError,
   EnterpriseIdentity,
   OrchestratorMcpFailure,
+  TeamMessage,
+  TeamSharedTask,
   TeamThreadMessage,
   TeamThreadReference,
   TeamThreadSummary,
@@ -15,6 +17,7 @@ import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import { assertLiveCaller, loadCaller } from "../mcp/threadAccess.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
+import { TeamMessenger } from "../team/TeamMessenger.ts";
 import { EnterpriseClient } from "./EnterpriseClient.ts";
 import { asResult, hubResult } from "./EnterpriseToolkit.ts";
 
@@ -28,7 +31,32 @@ const shared = {
   ],
 };
 
+const Colleague = Schema.Struct({
+  memberKey: Schema.String,
+  displayName: Schema.String,
+  team: Schema.String,
+});
+
 export const EnterpriseTeamToolkit = Toolkit.make(
+  Tool.make("enterprise_colleagues_list", {
+    ...shared,
+    description:
+      "List the people in this environment's Enterprise (name, team and memberKey) so you can address a card to one of them with enterprise_card_send. Requires an active calling thread.",
+    parameters: Tool.EmptyParams,
+    success: hubResult(Schema.Struct({ colleagues: Schema.Array(Colleague) })),
+  }).annotate(Tool.Readonly, true),
+  Tool.make("enterprise_card_send", {
+    ...shared,
+    dependencies: [...shared.dependencies, TeamMessenger],
+    description:
+      "Propose a card for a colleague's project board (tablero), by memberKey from enterprise_colleagues_list. It does not touch their board: it arrives in their Messages and Sharing requests, and lands on their board only if they accept it. Use it only when the user asks you to send someone a task. Requires an active calling thread.",
+    parameters: Schema.Struct({
+      recipientKey: Schema.String,
+      task: TeamSharedTask,
+      note: Schema.optionalKey(Schema.String),
+    }),
+    success: hubResult(TeamMessage),
+  }),
   Tool.make("enterprise_team_list", {
     ...shared,
     description:
@@ -67,6 +95,7 @@ export const layer = McpToolAccess.toLayer(
   EnterpriseTeamToolkit,
   Effect.gen(function* () {
     const client = yield* EnterpriseClient;
+    const messenger = yield* TeamMessenger;
     // Enterprise sign-in belongs to the environment, not to a provider session or thread.
     const identity = Effect.fn("EnterpriseTeamToolkit.identity")(function* () {
       const { identity } = yield* client.status;
@@ -78,6 +107,44 @@ export const layer = McpToolAccess.toLayer(
       return identity;
     });
     return {
+      enterprise_colleagues_list: McpToolAccess.readsAsCaller(() =>
+        Effect.gen(function* () {
+          yield* assertLiveCaller(yield* loadCaller());
+          return yield* asResult(
+            Effect.gen(function* () {
+              yield* identity();
+              const org = yield* client.org;
+              return {
+                colleagues: org.teams.flatMap((team) =>
+                  team.members.flatMap((member) =>
+                    member.isMe || member.memberKey === undefined
+                      ? []
+                      : [
+                          {
+                            memberKey: member.memberKey,
+                            displayName: member.displayName,
+                            team: team.name,
+                          },
+                        ],
+                  ),
+                ),
+              };
+            }),
+          );
+        }),
+      ),
+      // Sends as this environment's signed-in member and needs a thread that may act; the hub limits agents too.
+      enterprise_card_send: McpToolAccess.actsAsCaller((input) =>
+        Effect.gen(function* () {
+          yield* assertLiveCaller(yield* loadCaller());
+          return yield* asResult(
+            Effect.gen(function* () {
+              yield* identity();
+              return yield* messenger.sendCard(input);
+            }),
+          );
+        }),
+      ),
       enterprise_team_list: McpToolAccess.readsAsCaller((input) =>
         Effect.gen(function* () {
           yield* assertLiveCaller(yield* loadCaller());

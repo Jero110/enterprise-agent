@@ -9,6 +9,8 @@ import * as Result from "effect/Result";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
+
 import * as TeamPublication from "./TeamPublication.ts";
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
 import * as EnterpriseHub from "../enterprise/EnterpriseHub.ts";
@@ -40,9 +42,14 @@ const summary = (threadId: string, parentThreadId: string | null = null) => ({
 const messages = [
   { role: "assistant" as const, text: "compact text", createdAt: "2026-11-05T00:00:00Z" },
 ];
+const bruno = "ent.test.bruno@gmail.com";
+const ines = "ent.test.ines@gmail.com";
+const gerry = "ent.test.gerry@gmail.com";
+const jero = "jeronimo.deli@gmail.com";
+const moreMembers = [bruno, ines, gerry];
 const enroll = Effect.gen(function* () {
   const hub = yield* EnterpriseHub.EnterpriseHub;
-  for (const email of [hugo, juan, ana, "jeronimo.deli@gmail.com"]) {
+  for (const email of [hugo, juan, ana, "jeronimo.deli@gmail.com", ...moreMembers]) {
     yield* hub.enroll(email, { email, token: "ACME-BANK-DEV-2026" });
   }
 });
@@ -220,5 +227,74 @@ describe("TeamPublication hub", () => {
         );
       }).pipe(Effect.provide(at), Effect.scoped);
     }).pipe(Effect.scoped, Effect.provide(base)),
+  );
+
+  it.effect("a share names who reads it; bosses read shares, nobody reads what isn't shared", () =>
+    Effect.gen(function* () {
+      yield* enroll;
+      const pub = yield* TeamPublication.TeamPublication;
+      const sees = (viewer: string) =>
+        Effect.gen(function* () {
+          const listed = (yield* pub.list(viewer)).some((thread) => thread.threadId === "parent");
+          const readable = !(yield* denied(
+            pub.get(viewer, { ownerEmail: hugo, threadId: "parent" }),
+          ));
+          expect(listed).toBe(readable);
+          return readable;
+        });
+      const who = Effect.gen(function* () {
+        const result: Record<string, boolean> = {};
+        for (const viewer of [juan, ines, bruno, ana, gerry, jero])
+          result[viewer] = yield* sees(viewer);
+        return result;
+      });
+      yield* pub.report(hugo, { summaries: [summary("parent")], snapshots: [] });
+      // Hugo (Frontend) shares only with Bruno, from Ledger.
+      yield* pub.publish(hugo, {
+        threadId: "parent",
+        status: "read-only",
+        audienceKeys: [teamMemberKey(bruno)],
+      });
+      yield* pub.report(hugo, { summaries: [], snapshots: [{ threadId: "parent", messages }] });
+      expect(yield* who).toEqual({
+        [juan]: false,
+        [ines]: false,
+        [bruno]: true,
+        [ana]: false,
+        [gerry]: true,
+        [jero]: true,
+      });
+      expect((yield* pub.list(hugo))[0]?.audienceKeys).toEqual([teamMemberKey(bruno)]);
+      expect((yield* pub.list(bruno))[0]?.audienceKeys).toBeUndefined();
+      expect(
+        yield* denied(
+          pub.publish(hugo, {
+            threadId: "parent",
+            status: "read-only",
+            audienceKeys: [teamMemberKey("outsider@example.com")],
+          }),
+        ),
+      ).toBe(true);
+      // Back to the whole team: Bruno loses access, Hugo's teammates gain it.
+      yield* pub.publish(hugo, { threadId: "parent", status: "summary" });
+      yield* pub.report(hugo, { summaries: [], snapshots: [{ threadId: "parent", messages }] });
+      expect(yield* who).toEqual({
+        [juan]: true,
+        [ines]: true,
+        [bruno]: false,
+        [ana]: false,
+        [gerry]: true,
+        [jero]: true,
+      });
+      yield* pub.publish(hugo, { threadId: "parent", status: "unpublished" });
+      expect(yield* who).toEqual({
+        [juan]: false,
+        [ines]: false,
+        [bruno]: false,
+        [ana]: false,
+        [gerry]: false,
+        [jero]: false,
+      });
+    }).pipe(Effect.provide(layer)),
   );
 });

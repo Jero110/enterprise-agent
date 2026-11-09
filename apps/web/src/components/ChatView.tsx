@@ -3269,7 +3269,11 @@ export default function ChatView(props: ChatViewProps) {
             environmentId={activeThread.environmentId}
             projectId={activeThread.projectId}
           />
-          <EnterpriseHeaderControls threadId={activeThread.id} skills={timelineSkills} />
+          <EnterpriseHeaderControls
+            threadId={activeThread.id}
+            projectId={activeThread.projectId ?? null}
+            skills={timelineSkills}
+          />
         </>
       }
     />

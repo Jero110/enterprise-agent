@@ -128,4 +128,31 @@ describe("TeamMessages hub", () => {
       expect(yield* code(messages.send(ana, { ...to, note: "now fine" }))).toBe("ok");
     }).pipe(Effect.provide(layer)),
   );
+
+  it.effect(
+    "card requests are validated, marked when an agent sent them, and only accepted or declined",
+    () =>
+      Effect.gen(function* () {
+        const messages = yield* enroll;
+        const to = { recipientKey: teamMemberKey(bruno) };
+        const task = { title: "Revisar promo", description: "", priority: null, dueDate: null };
+        expect(yield* code(messages.send(ana, { ...to, task, skill }))).toBe("invalid_message");
+        expect(
+          yield* code(messages.send(ana, { ...to, task: { ...task, title: "x".repeat(301) } })),
+        ).toBe("invalid_message");
+        const card = yield* messages.send(ana, { ...to, task, viaAgent: true });
+        expect(card).toMatchObject({ kind: "task", task, viaAgent: true, skill: null });
+        expect(yield* code(messages.decide(bruno, { id: card.id, decision: "installed" }))).toBe(
+          "invalid_message",
+        );
+        expect(yield* code(messages.decide(bruno, { id: card.id, decision: "accepted" }))).toBe(
+          "ok",
+        );
+        expect((yield* messages.list(ana))[0]).toMatchObject({ id: card.id, status: "accepted" });
+        const request = yield* messages.send(ana, { ...to, skill });
+        expect(yield* code(messages.decide(bruno, { id: request.id, decision: "accepted" }))).toBe(
+          "invalid_message",
+        );
+      }).pipe(Effect.provide(layer)),
+  );
 });
