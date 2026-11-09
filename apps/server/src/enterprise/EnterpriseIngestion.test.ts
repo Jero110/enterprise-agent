@@ -1,6 +1,7 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
+import * as IngestionSources from "./IngestionSources.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -39,6 +40,7 @@ const modelSelection = { instanceId: ProviderInstanceId.make("codex"), model: "g
 const layerFor = (commands: OrchestrationV2ServerCommand[], responseStatus = 200) =>
   EnterpriseIngestion.layer.pipe(
     Layer.provideMerge(EnterpriseHub.layer),
+    Layer.provideMerge(IngestionSources.layer),
     Layer.provideMerge(
       Layer.succeed(
         HttpClient.HttpClient,
@@ -428,6 +430,58 @@ describe("EnterpriseIngestion", () => {
           (yield* hub.knowledgeGraph("admin")).nodes.some(
             (node) => node.id === plan || node.id === action,
           ),
+        ).toBe(false);
+      }).pipe(Effect.provide(layerFor(commands)));
+    },
+  );
+  it.effect(
+    "accepts text meeting notes and keeps agreed decisions, pending authorization and owned next steps as unapplied proposals",
+    () => {
+      const commands: OrchestrationV2ServerCommand[] = [];
+      return Effect.gen(function* () {
+        const hub = yield* EnterpriseHub.EnterpriseHub;
+        const ingestion = yield* EnterpriseIngestion.EnterpriseIngestion;
+        const fs = yield* FileSystem.FileSystem;
+        yield* hub.enroll("admin", { email: "jeronimo.deli@gmail.com", token });
+        const bytes = yield* fs.readFile(
+          new URL("./fixtures/meet-notes.synthetic.txt", import.meta.url).pathname,
+        );
+        const upload = yield* hub.proposalUpload("admin", {
+          scope: "ledger",
+          reason: "Synthetic meeting notes",
+          files: [
+            {
+              name: "meeting.txt",
+              mimeType: "text/plain",
+              base64: Buffer.from(bytes).toString("base64"),
+            },
+          ],
+        });
+        const run = yield* ingestion.start("admin", {
+          uploadProposalIds: [upload.id],
+          destination: "ledger",
+          modelSelection,
+        });
+        const message = commands.find((command) => command.type === "message.dispatch")!;
+        const staged = (
+          JSON.parse(/Selected sources \(data\): (.+)/.exec(message.text)![1]!) as string[]
+        )[0]!;
+        expect(Array.from(yield* fs.readFile(staged))).toEqual(Array.from(bytes));
+        expect(message.text).toContain("A pending decision is not approved");
+        const proposal = yield* hub.ingestionPropose(run.threadId, {
+          kind: "create",
+          scope: "ledger",
+          path: "areas/ledger/catalog-review.md",
+          content:
+            "---\ntitle: Catalog review\ndescription: Synthetic review notes\narea: ledger\nlayer: business\nprivate: true\n---\nACORDADA: prepare a draft, not publish it. PENDIENTE: budget approval. Next steps: Persona Alfa prepares a draft; Persona Beta checks sources. No production change was executed.",
+          reason: "Preserve decision status and owners",
+          evidence: [staged],
+        });
+        expect(proposal.status).toBe("pending");
+        expect(proposal.content).toContain("PENDIENTE: budget approval");
+        expect(proposal.content).toContain("Persona Beta");
+        expect(
+          (yield* hub.knowledgeGraph("admin")).nodes.some((node) => node.id === proposal.path),
         ).toBe(false);
       }).pipe(Effect.provide(layerFor(commands)));
     },

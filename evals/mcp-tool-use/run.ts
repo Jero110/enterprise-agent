@@ -2346,8 +2346,8 @@ const main = Effect.gen(function* () {
             ? testCase.prompt
             : ingestionPrompt({
                 ...testCase.setup.ingestion,
-                destination: testCase.setup.ingestion.destination ?? "general",
-                owner: testCase.setup.ingestion.owner ?? "eval@example.test",
+                destination: testCase.setup.ingestion.destination ?? "global",
+                owner: testCase.setup.ingestion.owner ?? "a".repeat(64),
               }),
         setup: {
           ...testCase.setup,

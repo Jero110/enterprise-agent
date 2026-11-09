@@ -37,6 +37,9 @@ export type EnterpriseIngestStartInput = typeof EnterpriseIngestStartInput.Type;
 export const EnterpriseIngestStartResult = Schema.Struct({
   runId: Schema.String,
   threadId: Schema.String,
+  skippedSources: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ path: Schema.String, reason: Schema.String })),
+  ),
 });
 export type EnterpriseIngestStartResult = typeof EnterpriseIngestStartResult.Type;
 

@@ -1,0 +1,11 @@
+Reunión sintética — revisión del catálogo
+Fecha: 2026-01-02
+Invitados: Persona Alfa (Operaciones), Persona Beta (Datos)
+Resumen: revisar la documentación del catálogo antes de proponer una publicación.
+Decisiones:
+- ACORDADA: preparar un borrador de documentación; no publicarlo todavía.
+- PENDIENTE: autorizar presupuesto para la siguiente fase. No hubo aprobación.
+Próximos pasos:
+- [Persona Alfa] preparar el borrador para revisión.
+- [Persona Beta] comprobar las fuentes; no ejecutar cambios de producción.
+Detalles: la fecha de publicación sigue abierta. Una nota de reunión no autoriza acciones.
