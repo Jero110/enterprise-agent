@@ -90,7 +90,7 @@ describe("embedded knowledge graph", () => {
     graph.send({ type: "knowledge-nodes", nodes });
     expect(graph.inspect("nodes.length")).toBe(2000);
     expect(graph.inspect("links.length")).toBe(1999);
-    expect(graph.inspect("nodes.filter(n => n.hub).length")).toBe(4);
+    expect(graph.inspect("nodes.filter(n => n.hub).length")).toBe(0);
     expect(graph.inspect("nodes.every(n => Math.hypot(n.x, n.z) <= RAD)")).toBe(true);
     expect(
       graph.inspect("nodes.every(n => n.x === n.fx && n.z === n.fz && n.fy === LAYERS[n.li].y)"),
@@ -104,5 +104,36 @@ describe("embedded knowledge graph", () => {
     expect(vi.getTimerCount()).toBe(0);
     graph.send({ type: "knowledge-nodes", nodes: [] });
     expect(graph.inspect("nodes.length + links.length")).toBe(0);
+  });
+
+  it("keeps accepted CX Business and private Ventas Data Markdown as real linked documents", () => {
+    const graph = graphHarness();
+    graph.send({
+      type: "knowledge-nodes",
+      nodes: [
+        {
+          id: "areas/cx/experience.md",
+          title: "CX",
+          areaId: "cx",
+          layer: "business",
+          links: ["areas/ventas/sales.md"],
+        },
+        {
+          id: "areas/ventas/sales.md",
+          title: "Ventas",
+          areaId: "ventas",
+          layer: "data",
+          links: [],
+        },
+      ],
+    });
+    expect(graph.inspect("nodes.map(n => [n.id, n.areaId, n.layer, describe(n).kind])")).toEqual([
+      ["areas/cx/experience.md", "cx", "business", "document"],
+      ["areas/ventas/sales.md", "ventas", "data", "document"],
+    ]);
+    expect(graph.inspect("links.map(l => [l.source, l.target])")).toEqual([
+      ["areas/cx/experience.md", "areas/ventas/sales.md"],
+    ]);
+    expect(graph.inspect("nodes.every(n => !('content' in n))")).toBe(true);
   });
 });

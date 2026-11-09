@@ -91,6 +91,40 @@ describe("AreaKnowledge", () => {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const config = yield* ServerConfig.ServerConfig;
+        const repo = yield* KnowledgeRepo.KnowledgeRepo;
+        const cxPath = "areas/cx/experience.md";
+        const ventasPath = "areas/ventas/sales.md";
+        for (const [id, scope, content] of [
+          [
+            cxPath,
+            "cx",
+            `---\ntitle: CX\ndescription: Customer experience\narea: cx\nlayer: business\nprivate: false\nlinks: [${ventasPath}]\n---\n# CX\nCustomer journey`,
+          ],
+          [
+            ventasPath,
+            "ventas",
+            "---\ntitle: Ventas\ndescription: Sales pipeline\narea: ventas\nlayer: data\nprivate: true\nlinks: []\n---\n# Ventas\nPrivate revenue figures",
+          ],
+        ] as const) {
+          yield* repo.apply(
+            {
+              id: `accepted-${scope}`,
+              kind: "create",
+              scope,
+              path: id,
+              content,
+              reason: "Publish area Markdown",
+              evidence: [],
+              proposedBy: PREAUTHORIZED_ADMIN_EMAIL,
+              createdAt: "2026-01-01T00:00:00.000Z",
+              status: "pending",
+              baseContentHash: yield* repo.contentHash(id),
+              baseVersion: yield* repo.version(id),
+              targetVersion: "",
+            },
+            PREAUTHORIZED_ADMIN_EMAIL,
+          );
+        }
         yield* fs.writeFileString(
           path.join(config.baseDir, "enterprise/knowledge/areas/risk/node.md"),
           "---\ntitle: Risk model\ndescription: Exposure overview\narea: risk\nlayer: data\nprivate: true\nlinks: [global/overview.md]\n---\nSecret exposure body",
@@ -100,6 +134,30 @@ describe("AreaKnowledge", () => {
           "---\n[bad yaml\n---\n# Old document",
         );
         const graph = yield* knowledge.graph(ana);
+        expect(
+          graph.nodes.filter((node) => new Set<string>([cxPath, ventasPath]).has(node.id)),
+        ).toEqual([
+          {
+            id: cxPath,
+            areaId: "cx",
+            title: "CX",
+            description: "Customer experience",
+            layer: "business",
+            private: false,
+            links: [ventasPath],
+            accessible: false,
+          },
+          {
+            id: ventasPath,
+            areaId: "ventas",
+            title: "Ventas",
+            description: "Sales pipeline",
+            layer: "data",
+            private: true,
+            links: [],
+            accessible: false,
+          },
+        ]);
         expect(graph.nodes.find((node) => node.areaId === "risk")).toMatchObject({
           accessible: false,
           private: true,
