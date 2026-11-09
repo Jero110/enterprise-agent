@@ -5,10 +5,10 @@ import type { SettingsPath } from "./settingsSearch";
 
 const SETTINGS_ADVANCED_STORAGE_KEY = "norai.settings.advanced";
 
-// Everyday users start with the short menu. Tests keep every section so nav assertions hold.
-const DEFAULT_SHOW_ADVANCED = import.meta.env.MODE === "test";
+// Every section shows by default; the short menu is an opt-in ("Show only the basics").
+const DEFAULT_SHOW_ADVANCED = true;
 
-/** Developer-only sections hidden from the settings menu unless advanced settings are on. */
+/** Developer-only sections hidden from the settings menu when the short menu is on. */
 const ADVANCED_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set<SettingsPath>([
   "/settings/keybindings",
   "/settings/snap-shot",
@@ -23,7 +23,6 @@ const ADVANCED_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set<SettingsPath>
   "/settings/secrets",
   "/settings/maintenance",
   "/settings/labs",
-  "/settings/archived",
 ]);
 
 /** Per-device choice; hidden sections stay reachable by URL and search. */

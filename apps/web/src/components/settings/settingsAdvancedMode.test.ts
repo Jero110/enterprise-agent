@@ -10,7 +10,7 @@ describe("visibleSettingsNavGroups", () => {
     );
   });
 
-  it("hides developer sections and empty groups in simple mode", () => {
+  it("hides developer sections and empty groups in simple mode but keeps Archive", () => {
     const paths = visibleSettingsNavGroups(SETTINGS_NAV_GROUPS, false, "/settings/general").flatMap(
       (group) => group.paths,
     );
@@ -23,6 +23,7 @@ describe("visibleSettingsNavGroups", () => {
       "/settings/projects",
       "/settings/enterprise",
       "/settings/about",
+      "/settings/archived",
     ]);
   });
 

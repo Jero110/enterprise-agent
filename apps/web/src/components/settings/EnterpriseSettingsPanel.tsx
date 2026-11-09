@@ -9,7 +9,7 @@ import {
   type EnterpriseTeamSummary,
   type EnvironmentId,
 } from "@t3tools/contracts";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { t } from "~/i18n";
 
@@ -97,20 +97,7 @@ function IdentityRows({
     label: "disconnect enterprise",
     reportFailure: false,
   });
-  // Disconnecting takes two clicks so one misclick does not drop the team connection.
-  const [confirming, setConfirming] = useState(false);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the confirmation step expires on its own after a few seconds
-  useEffect(() => {
-    if (!confirming) return;
-    const timer = window.setTimeout(() => setConfirming(false), 4000);
-    return () => window.clearTimeout(timer);
-  }, [confirming]);
   const leave = async () => {
-    if (!confirming) {
-      setConfirming(true);
-      return;
-    }
-    setConfirming(false);
     setBusy(true);
     const result = await disconnect({ environmentId, input: {} });
     setBusy(false);
@@ -131,7 +118,7 @@ function IdentityRows({
               disabled={busy}
               onClick={() => void leave()}
             >
-              {busy ? t("Disconnecting…") : confirming ? t("Sure? Disconnect") : t("Disconnect")}
+              {busy ? t("Disconnecting…") : t("Disconnect")}
             </Button>
           }
         />

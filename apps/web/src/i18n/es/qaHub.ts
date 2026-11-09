@@ -2,7 +2,6 @@
 export const ES_QA_HUB: Readonly<Record<string, string>> = {
   // Settings → Empresa
   "Pending approval": "Por aprobar",
-  "Sure? Disconnect": "¿Seguro? Desconectar",
   "Could not disconnect": "No se pudo desconectar",
   // Joining no longer needs a one-time invite: the work email and team address are enough.
   "Connect with your work email and a one-time Enterprise invite. Nothing changes here until you do.":

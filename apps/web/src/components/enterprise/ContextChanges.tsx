@@ -8,7 +8,6 @@ import {
   useEnterpriseStatus,
 } from "~/state/enterprise";
 import { getLocale, t } from "~/i18n";
-import { cn } from "~/lib/utils";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 import {
@@ -554,23 +553,20 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           aria-label={t("Pending context changes")}
           className="overflow-hidden rounded-xl border bg-background"
         >
-          <div className={cn(SHOW_KNOWLEDGE_GRAPH && "grid lg:grid-cols-[minmax(0,1fr)_230px]")}>
-            {SHOW_KNOWLEDGE_GRAPH && (
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_230px]">
+            {/* The graph page is light-only; in dark mode it sits inset as a light card. */}
+            <div className="dark:p-2">
               <iframe
                 ref={frame}
                 title={t("Interactive context changes graph")}
                 sandbox="allow-scripts"
                 src="/context-graph/index.html"
-                className="h-[470px] w-full border-0"
+                className="block h-[470px] w-full border-0 bg-zinc-25 [color-scheme:light] dark:h-[454px] dark:rounded-lg dark:ring-1 dark:ring-white/10"
               />
-            )}
+            </div>
             <aside
               aria-label={t("Pending proposals by scope")}
-              className={cn(
-                "space-y-3 p-4",
-                SHOW_KNOWLEDGE_GRAPH &&
-                  "max-h-[470px] overflow-y-auto border-t lg:border-t-0 lg:border-l",
-              )}
+              className="max-h-[470px] space-y-3 overflow-y-auto border-t p-4 lg:border-t-0 lg:border-l"
             >
               {graphGroups.length === 0 && (
                 <p className="text-xs text-muted-foreground">
@@ -607,57 +603,8 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
           refresh={inbox.refresh}
         />
       )}
-      <section aria-label={t("Context changes history")} className="space-y-2">
-        <h2 className="font-medium">{t("Authored, assigned and history")}</h2>
-        {inbox.error ? (
-          <p role="alert">{inbox.error}</p>
-        ) : !inbox.data ? (
-          <p role="status">{t("Loading proposals…")}</p>
-        ) : proposals.length === 0 ? (
-          <p>{t("No proposals yet.")}</p>
-        ) : (
-          <div className="space-y-4">
-            <ProposalList
-              title={t("Assigned to you")}
-              proposals={assignedToYou}
-              teams={teams}
-              selected={selected}
-              onSelect={selectProposal}
-            />
-            <ProposalList
-              title={t("Authored by you")}
-              proposals={pending.filter(
-                (proposal) =>
-                  !assignedToYou.includes(proposal) && proposal.proposedBy === identity?.email,
-              )}
-              teams={teams}
-              selected={selected}
-              onSelect={selectProposal}
-            />
-            {!SHOW_KNOWLEDGE_GRAPH && (
-              <ProposalList
-                title={t("Other pending changes")}
-                proposals={pending.filter(
-                  (proposal) =>
-                    !assignedToYou.includes(proposal) && proposal.proposedBy !== identity?.email,
-                )}
-                teams={teams}
-                selected={selected}
-                onSelect={selectProposal}
-              />
-            )}
-            <ProposalList
-              title={t("History")}
-              proposals={proposals.filter((proposal) => proposal.status !== "pending")}
-              teams={teams}
-              selected={selected}
-              onSelect={selectProposal}
-            />
-          </div>
-        )}
-      </section>
-      <details aria-label={t("Ingest files")} className="space-y-3 rounded-xl border p-4">
-        <summary className="cursor-pointer font-medium">{t("Upload files (preview)")}</summary>
+      <section aria-label={t("Ingest files")} className="space-y-3 rounded-xl border p-4">
+        <h2 className="font-medium">{t("Ingest files")}</h2>
         <p className="text-xs text-muted-foreground">
           {t(
             "Stage files from this device for review. Approved files await future processing and are not added to current context.",
@@ -718,7 +665,56 @@ export function ContextChanges({ environmentId }: { readonly environmentId: Envi
         <Button size="xs" disabled={busy || files.length === 0} onClick={() => void submit()}>
           {busy ? t("Uploading…") : t("Stage for review")}
         </Button>
-      </details>
+      </section>
+      <section aria-label={t("Context changes history")} className="space-y-2">
+        <h2 className="font-medium">{t("Authored, assigned and history")}</h2>
+        {inbox.error ? (
+          <p role="alert">{inbox.error}</p>
+        ) : !inbox.data ? (
+          <p role="status">{t("Loading proposals…")}</p>
+        ) : proposals.length === 0 ? (
+          <p>{t("No proposals yet.")}</p>
+        ) : (
+          <div className="space-y-4">
+            <ProposalList
+              title={t("Assigned to you")}
+              proposals={assignedToYou}
+              teams={teams}
+              selected={selected}
+              onSelect={selectProposal}
+            />
+            <ProposalList
+              title={t("Authored by you")}
+              proposals={pending.filter(
+                (proposal) =>
+                  !assignedToYou.includes(proposal) && proposal.proposedBy === identity?.email,
+              )}
+              teams={teams}
+              selected={selected}
+              onSelect={selectProposal}
+            />
+            {!SHOW_KNOWLEDGE_GRAPH && (
+              <ProposalList
+                title={t("Other pending changes")}
+                proposals={pending.filter(
+                  (proposal) =>
+                    !assignedToYou.includes(proposal) && proposal.proposedBy !== identity?.email,
+                )}
+                teams={teams}
+                selected={selected}
+                onSelect={selectProposal}
+              />
+            )}
+            <ProposalList
+              title={t("History")}
+              proposals={proposals.filter((proposal) => proposal.status !== "pending")}
+              teams={teams}
+              selected={selected}
+              onSelect={selectProposal}
+            />
+          </div>
+        )}
+      </section>
     </div>
   );
 }

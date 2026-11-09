@@ -82,8 +82,7 @@ export function KnowledgeMap(props: {
   readonly canToggle: boolean;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
-  // Personal knowledge (this device's skills) is always on; its card only informs.
-  const individual = true;
+  const [individual, setIndividual] = useState(true);
   const [ready, setReady] = useState(false);
   const [previewNodes, setPreviewNodes] = useState<KnowledgeNode[]>([]);
   const [hiddenLayers, setHiddenLayers] = useState<string[]>([]);
@@ -184,22 +183,20 @@ export function KnowledgeMap(props: {
               <>
                 <div className="flex items-center justify-between">
                   <Icon className="size-4 text-muted-foreground" />
-                  {scope === "individual" ? null : (
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "flex h-4 w-7 items-center rounded-full p-0.5 transition-colors",
+                      enabled(scope) ? "bg-primary" : "bg-muted-foreground/30",
+                    )}
+                  >
                     <span
-                      aria-hidden="true"
                       className={cn(
-                        "flex h-4 w-7 items-center rounded-full p-0.5 transition-colors",
-                        enabled(scope) ? "bg-primary" : "bg-muted-foreground/30",
+                        "size-3 rounded-full bg-background transition-transform",
+                        enabled(scope) && "translate-x-3",
                       )}
-                    >
-                      <span
-                        className={cn(
-                          "size-3 rounded-full bg-background transition-transform",
-                          enabled(scope) && "translate-x-3",
-                        )}
-                      />
-                    </span>
-                  )}
+                    />
+                  </span>
                 </div>
                 <div className="mt-5 text-sm font-medium">{title}</div>
                 <div className="mt-1 text-xs text-muted-foreground">
@@ -212,25 +209,17 @@ export function KnowledgeMap(props: {
                 </div>
               </>
             );
-            if (scope === "individual")
-              return (
-                <div
-                  key={scope}
-                  className="rounded-xl border border-border bg-background p-4 shadow-sm"
-                >
-                  {body}
-                </div>
-              );
             return (
               <button
                 key={scope}
                 type="button"
                 aria-pressed={enabled(scope)}
-                disabled={!props.canToggle}
+                disabled={scope !== "individual" && !props.canToggle}
                 onClick={() => {
                   const next = { ...scopes, [scope]: !enabled(scope) };
                   sync(next);
-                  props.onToggle(scope, next[scope]);
+                  if (scope === "individual") setIndividual(next.individual);
+                  else props.onToggle(scope, next[scope]);
                 }}
                 className={cn(
                   "rounded-xl border p-4 text-left transition-colors hover:border-foreground/30 focus-visible:outline-2 focus-visible:outline-ring",
@@ -283,15 +272,18 @@ export function KnowledgeMap(props: {
           className={cn(
             "overflow-hidden rounded-xl border border-border/70",
             SHOW_KNOWLEDGE_GRAPH
-              ? "grid min-h-[470px] flex-1 bg-zinc-25 lg:grid-cols-[minmax(0,1fr)_230px]"
+              ? "grid min-h-[470px] flex-1 bg-background lg:grid-cols-[minmax(0,1fr)_230px]"
               : "bg-background",
           )}
         >
           {SHOW_KNOWLEDGE_GRAPH && (
-            <div className="relative min-h-[470px] overflow-hidden">
+            // The map page is light-only; in dark mode it sits inset as a light rounded card.
+            <div className="relative min-h-[470px] overflow-hidden bg-zinc-25 [color-scheme:light] dark:m-2 dark:min-h-[454px] dark:rounded-lg dark:ring-1 dark:ring-white/10">
               {!ready && (
-                <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
-                  {t("Loading knowledge map…")}
+                <div className="absolute inset-0 grid place-items-center">
+                  <span className="rounded-md bg-background px-2 py-1 text-xs text-muted-foreground shadow-sm">
+                    {t("Loading knowledge map…")}
+                  </span>
                 </div>
               )}
               <iframe
@@ -299,7 +291,7 @@ export function KnowledgeMap(props: {
                 title={t("Interactive 3D knowledge map")}
                 sandbox="allow-scripts"
                 src="/context-graph/index.html"
-                className="relative size-full min-h-[470px] border-0"
+                className="relative size-full min-h-[470px] border-0 dark:min-h-[454px]"
                 onLoad={() => {
                   setReady(true);
                   sync(scopes);
@@ -384,7 +376,7 @@ export function KnowledgeMap(props: {
                 <details
                   key={scope}
                   // Personal lists the device's skill ids; keep it folded so the list stays about company knowledge.
-                  open={!SHOW_KNOWLEDGE_GRAPH && scope !== "individual"}
+                  open={scope !== "individual"}
                   className={cn("py-2", !enabled(scope) && "opacity-40")}
                 >
                   <summary
@@ -399,21 +391,19 @@ export function KnowledgeMap(props: {
                         ? t("Your areas")
                         : t("Personal")}
                   </summary>
-                  {!SHOW_KNOWLEDGE_GRAPH &&
-                    scope === "individual" &&
+                  {scope === "individual" &&
                     enabledSkills.map((skill) => (
                       <p key={skill.name} className="truncate px-4 py-1 text-xs">
                         {skill.name}
                       </p>
                     ))}
-                  {!SHOW_KNOWLEDGE_GRAPH &&
-                    (scope === "individual"
-                      ? enabledSkills.length === 0
-                      : !nodes.some((node) => node.scope === scope)) && (
-                      <p className="px-4 py-1 text-xs text-muted-foreground">
-                        {t("Nothing here yet")}
-                      </p>
-                    )}
+                  {(scope === "individual"
+                    ? enabledSkills.length === 0
+                    : !nodes.some((node) => node.scope === scope)) && (
+                    <p className="px-4 py-1 text-xs text-muted-foreground">
+                      {t("Nothing here yet")}
+                    </p>
+                  )}
                   {LAYERS.map((layer) => {
                     const entries = nodes.filter(
                       (node) =>

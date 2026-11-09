@@ -332,11 +332,11 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 !compactSearchOpen && "max-md:hidden",
               )}
             >
-              <span className="truncate">{t("Show advanced settings")}</span>
+              <span className="truncate">{t("Show only the basics")}</span>
               <Switch
                 size="sm"
-                checked={showAdvanced}
-                onCheckedChange={(checked) => setShowAdvanced(Boolean(checked))}
+                checked={!showAdvanced}
+                onCheckedChange={(checked) => setShowAdvanced(!checked)}
               />
             </label>
             {isSearching && results.length === 0 ? (

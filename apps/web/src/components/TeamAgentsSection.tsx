@@ -7,11 +7,12 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import type { TeamThreadSummary } from "@t3tools/contracts";
-import { ChevronRightIcon, RefreshCwIcon, UsersIcon } from "lucide-react";
+import { ChevronRightIcon, CornerDownRightIcon, RefreshCwIcon, UsersIcon } from "lucide-react";
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
 import { useState } from "react";
 
 import { t } from "~/i18n";
+import { cn } from "~/lib/utils";
 import ChatMarkdown from "./ChatMarkdown";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { resolveProjectDefaultProviderModelSelection } from "../providerInstances";
@@ -22,6 +23,7 @@ import { useEnterpriseStatus } from "../state/enterprise";
 import { usePrimaryEnvironmentId } from "../state/environments";
 import { useEnvironmentQuery } from "../state/query";
 import { useAtomCommand } from "../state/use-atom-command";
+import { nestSubagentThreads } from "./TeamAgentsSection.logic";
 import { Button } from "./ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "./ui/collapsible";
 import {
@@ -33,6 +35,8 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { toastManager } from "./ui/toast";
+
+const THREAD_INDENT = ["pl-7", "pl-10", "pl-13", "pl-16"] as const;
 
 export function TeamAgentsSection() {
   const environmentId = usePrimaryEnvironmentId();
@@ -52,10 +56,8 @@ export function TeamAgentsSection() {
 
   // Polls refresh every 10 s; keep the last list (a failure keeps its previous success) instead of
   // flashing "Loading" or an error while a refresh is in flight.
-  // Subagent chats belong to their parent conversation; list top-level chats only.
-  const summaries = (summariesQuery.data ?? []).filter(
-    (summary) => summary.parentThreadId === null,
-  );
+  // Subagent chats are listed indented under their parent conversation.
+  const summaries = summariesQuery.data ?? [];
   const team = rosterQuery.data?.teams.find((team) => team.id === identity?.teamId);
   const groups = groupTeamThreads(summaries, team?.members ?? [], identity?.email ?? null);
   const hasSummaries = summariesQuery.data !== null;
@@ -108,9 +110,13 @@ export function TeamAgentsSection() {
             </span>
           </CollapsibleTrigger>
           <CollapsiblePanel animate={false}>
-            {owner.threads.map((summary) => (
+            {nestSubagentThreads(owner.threads).map(({ summary, depth }) => (
               <button
-                className="flex w-full items-center gap-2 rounded-md py-1.5 pl-7 pr-2 text-left text-sm hover:bg-sidebar-row-hover"
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm hover:bg-sidebar-row-hover",
+                  // Each subagent level indents a little more, capped so titles keep room in the sidebar.
+                  THREAD_INDENT[Math.min(depth, THREAD_INDENT.length - 1)],
+                )}
                 key={summary.threadId}
                 onClick={() => {
                   setSelected(summary);
@@ -118,6 +124,12 @@ export function TeamAgentsSection() {
                 }}
                 type="button"
               >
+                {depth > 0 ? (
+                  <CornerDownRightIcon
+                    className="size-3 shrink-0 text-sidebar-muted-foreground"
+                    aria-label={t("Subagent chat")}
+                  />
+                ) : null}
                 <span className="min-w-0 flex-1 truncate">{summary.title}</span>
                 <span className="text-2xs text-sidebar-muted-foreground">
                   {t(summary.status, undefined, "teamThread")}
@@ -309,7 +321,7 @@ function TeamThreadReadOnlyDialog(props: {
                   <p className="text-sm">{t("The assistant has not replied yet.")}</p>
                 )}
               </section>
-              <details>
+              <details open>
                 <summary className="cursor-pointer text-sm text-muted-foreground">
                   {t("See full conversation")}
                 </summary>
@@ -333,24 +345,25 @@ function TeamThreadReadOnlyDialog(props: {
               </details>
             </>
           )}
-          {isOwn ? null : (
-            <div className="space-y-2">
-              <Button
-                size="sm"
-                disabled={!canContinue || snapshot === null || continuing}
-                onClick={() => void continueInMyThread()}
-              >
-                {continuing
-                  ? t("Starting…", undefined, "teamThread")
-                  : t("Take to my chat to summarize")}
-              </Button>
-              {continueError !== null ? (
-                <p role="alert" className="text-sm text-destructive">
-                  {continueError}
-                </p>
-              ) : null}
-            </div>
-          )}
+          <div className="mt-4 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "Copies this conversation as text into a new chat of yours. Files and the agent's session are not copied.",
+              )}
+            </p>
+            <Button
+              size="sm"
+              disabled={!canContinue || snapshot === null || continuing}
+              onClick={() => void continueInMyThread()}
+            >
+              {continuing ? t("Starting…", undefined, "teamThread") : t("Continue in my thread")}
+            </Button>
+            {continueError !== null ? (
+              <p role="alert" className="text-sm text-destructive">
+                {continueError}
+              </p>
+            ) : null}
+          </div>
         </DialogPanel>
       </DialogPopup>
     </Dialog>

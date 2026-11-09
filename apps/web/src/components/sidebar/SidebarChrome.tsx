@@ -34,7 +34,6 @@ import {
 } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
-import { useShowAdvancedSettings } from "../settings/settingsAdvancedMode";
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
@@ -236,8 +235,6 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
   const pullRequestsSupported = usePullRequestsSupported();
-  // Pull requests and token usage are developer pages; the simple menu shows only Settings.
-  const [showAdvanced] = useShowAdvancedSettings();
   const closeMobileSidebar = () => {
     if (isMobile) {
       setOpenMobile(false);
@@ -283,20 +280,18 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             label={t("Settings")}
             onClick={handleSettingsClick}
           />
-          {showAdvanced && pullRequestsSupported ? (
+          {pullRequestsSupported ? (
             <SidebarUtilityItem
               icon={<PullRequestGlyph.pullRequest />}
               label={t("Pull requests")}
               onClick={handlePullRequestsClick}
             />
           ) : null}
-          {showAdvanced ? (
-            <SidebarUtilityItem
-              icon={<ChartNoAxesColumnIcon />}
-              label={t("Usage")}
-              onClick={handleUsageClick}
-            />
-          ) : null}
+          <SidebarUtilityItem
+            icon={<ChartNoAxesColumnIcon />}
+            label={t("Usage")}
+            onClick={handleUsageClick}
+          />
         </>
       )}
       <SidebarThreadUndoNotice />

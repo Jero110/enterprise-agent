@@ -13,7 +13,7 @@ export function EnterpriseHeaderButton() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   if (environmentId === null) return null;
-  // The sidebar header is narrow: show just your name, with team and role in the tooltip.
+  // The sidebar header is narrow: the label truncates and the tooltip keeps the full line.
   const summary = identity
     ? `${identity.displayName} · ${identity.teamName ?? t("No team")} · ${t(identity.role, undefined, "role")}`
     : t("Join your team");
@@ -27,7 +27,7 @@ export function EnterpriseHeaderButton() {
         onClick={() => (identity ? void navigate({ to: "/settings/enterprise" }) : setOpen(true))}
       >
         <Building2Icon className="size-3.5 shrink-0" />
-        <span className="truncate">{identity ? identity.displayName : t("Join team")}</span>
+        <span className="truncate">{identity ? summary : t("Join team")}</span>
       </Button>
       <ConnectEnterpriseDialog environmentId={environmentId} open={open} onOpenChange={setOpen} />
     </>

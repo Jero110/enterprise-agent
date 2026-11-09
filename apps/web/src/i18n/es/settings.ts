@@ -10,9 +10,6 @@ export const ES_SETTINGS: Readonly<Record<string, string>> = {
   "Clear settings search": "Borrar búsqueda",
   "No settings found": "No encontramos opciones",
   "Settings search results": "Resultados de búsqueda",
-  "Show advanced settings": "Mostrar opciones avanzadas",
-  "Show developer sections in the settings menu. Off keeps the menu short.":
-    "Muestra en el menú las secciones para desarrolladores. Apagado, el menú queda corto y sencillo.",
   "Restore device defaults": "Restaurar valores de este equipo",
   "Reconnect {name} to change its settings.":
     "Vuelve a conectar {name} para cambiar su configuración.",

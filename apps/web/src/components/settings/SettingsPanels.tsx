@@ -843,14 +843,14 @@ export function GeneralSettingsPanel() {
           }
         />
         <SettingsRow
-          id="show-advanced-settings"
-          title="Show advanced settings"
-          description="Show developer sections in the settings menu. Off keeps the menu short."
+          id="show-basic-settings-only"
+          title="Show only the basics"
+          description="Hide developer sections from the settings menu to keep it short."
           control={
             <Switch
-              checked={showAdvanced}
-              onCheckedChange={(checked) => setShowAdvanced(Boolean(checked))}
-              aria-label={t("Show advanced settings")}
+              checked={!showAdvanced}
+              onCheckedChange={(checked) => setShowAdvanced(!checked)}
+              aria-label={t("Show only the basics")}
             />
           }
         />

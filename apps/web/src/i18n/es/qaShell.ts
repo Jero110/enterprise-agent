@@ -52,4 +52,11 @@ export const ES_QA_SHELL: Readonly<Record<string, string>> = {
   "Thread search is unavailable on this server.":
     "La búsqueda de chats no está disponible en este servidor.",
   "Unable to run command": "No se pudo ejecutar el comando",
+  "Show only the basics": "Mostrar solo lo básico",
+  "Hide developer sections from the settings menu to keep it short.":
+    "Oculta del menú las secciones para desarrolladores para que quede corto y sencillo.",
+  "Continue in my thread": "Continuar en mi chat",
+  "Copies this conversation as text into a new chat of yours. Files and the agent's session are not copied.":
+    "Copia esta conversación como texto a un chat nuevo tuyo. No copia archivos ni la sesión del agente.",
+  "Subagent chat": "Chat de subagente",
 };
