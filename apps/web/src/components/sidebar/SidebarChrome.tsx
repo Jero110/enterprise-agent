@@ -20,7 +20,7 @@ import {
   SidebarStageBackdrop,
   useEnvironmentStageLabel,
 } from "../SidebarStageBackdrop";
-import { NoraiSymbol } from "../NoraiSymbol";
+import { T3Wordmark } from "../T3Wordmark";
 import { EnterpriseHeaderButton } from "../enterprise/EnterpriseHeaderButton";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -196,8 +196,7 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
         onBackdrop ? "text-white" : "text-foreground",
       )}
     >
-      <NoraiSymbol aria-hidden className="size-5 shrink-0" />
-      norai
+      <T3Wordmark role="img" aria-label="norAi" className="h-5 w-auto shrink-0" />
     </span>
   );
 }
