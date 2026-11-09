@@ -60,9 +60,7 @@ export function ProjectBoardProvider({
       if (result._tag === "Success") {
         saved = true;
       } else {
-        setError(
-          t("Could not save the board. Refresh and try again."),
-        );
+        setError(t("Could not save the board. Refresh and try again."));
       }
     } catch {
       setError(t("Could not reach the server. Refresh and try again."));
