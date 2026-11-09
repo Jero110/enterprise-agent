@@ -2,6 +2,7 @@ import type {
   EnvironmentId,
   EnterpriseOrgFiles,
   EnterpriseOrgImportResult,
+  ModelSelection,
 } from "@t3tools/contracts";
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { useEnvironmentScope } from "~/state/session";
@@ -64,19 +65,21 @@ export function IngestTab({
 
 export interface IncrementalIngestion {
   readonly canStart: boolean;
+  readonly modelSelection: ModelSelection;
   readonly start: (input: {
     folder?: string;
     note?: string;
-    uploadBatchId?: string;
+    uploadProposalIds?: ReadonlyArray<string>;
+    modelSelection: ModelSelection;
   }) => Promise<void>;
   readonly stageUpload?: (
     files: ReadonlyArray<{ name: string; mimeType: string; base64: string }>,
-  ) => Promise<{ uploadBatchId: string }>;
+  ) => Promise<{ uploadProposalIds: ReadonlyArray<string> }>;
 }
 
 function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefined }) {
   const [folder, setFolder] = useState("");
-  const [uploadBatchId, setUploadBatchId] = useState("");
+  const [uploadProposalIds, setUploadProposalIds] = useState<ReadonlyArray<string>>([]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -123,7 +126,7 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
             setBusy(true);
             setError(null);
             setStatus(null);
-            setUploadBatchId("");
+            setUploadProposalIds([]);
             try {
               const encoded = await Promise.all(
                 files.map(async (file) => ({
@@ -133,7 +136,7 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
                 })),
               );
               const staged = await ingestion.stageUpload(encoded);
-              setUploadBatchId(staged.uploadBatchId);
+              setUploadProposalIds(staged.uploadProposalIds);
             } catch (cause) {
               setError(cause instanceof Error ? cause.message : t("Could not stage upload"));
             } finally {
@@ -142,10 +145,15 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
           }}
         />
       </label>
-      {uploadBatchId && (
+      {uploadProposalIds.length > 0 && (
         <div className="flex items-center gap-3 text-sm">
           <p role="status">{t("Upload staged for the next run")}</p>
-          <Button size="xs" variant="outline" disabled={busy} onClick={() => setUploadBatchId("")}>
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={busy}
+            onClick={() => setUploadProposalIds([])}
+          >
             {t("Remove upload")}
           </Button>
         </div>
@@ -161,7 +169,9 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
       <Button
         size="sm"
         disabled={
-          busy || !ingestion?.canStart || (!folder.trim() && !note.trim() && !uploadBatchId)
+          busy ||
+          !ingestion?.canStart ||
+          (!folder.trim() && !note.trim() && uploadProposalIds.length === 0)
         }
         onClick={async () => {
           if (!ingestion) return;
@@ -172,9 +182,10 @@ function IngestionRun({ ingestion }: { ingestion: IncrementalIngestion | undefin
             await ingestion.start({
               ...(folder.trim() ? { folder: folder.trim() } : {}),
               ...(note.trim() ? { note: note.trim() } : {}),
-              ...(uploadBatchId ? { uploadBatchId } : {}),
+              ...(uploadProposalIds.length > 0 ? { uploadProposalIds } : {}),
+              modelSelection: ingestion.modelSelection,
             });
-            setUploadBatchId("");
+            setUploadProposalIds([]);
             setStatus(t("Ingestion started. Review proposed nodes in Changes."));
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : t("Could not start ingestion"));
