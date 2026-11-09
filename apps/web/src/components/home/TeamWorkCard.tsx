@@ -6,11 +6,10 @@ import { t } from "~/i18n";
 import { enterpriseEnvironment, useEnterpriseStatus } from "~/state/enterprise";
 import { usePrimaryEnvironmentId } from "~/state/environments";
 import { useEnvironmentQuery } from "~/state/query";
+import { countUnreadIncoming } from "../enterprise/teamChats.logic";
 import { ProjectsBoardDialog } from "../projects/ProjectsBoardDialog";
 import { Button } from "../ui/button";
-
-const CARD_CLASS_NAME =
-  "-mt-2 hidden w-full min-w-0 flex-col gap-1.5 rounded-xl border border-border/70 bg-card/60 px-3 py-2.5 text-left shadow-xs [@media(min-height:40rem)]:flex";
+import { HOME_CARD_CLASS_NAME } from "./homeCard";
 
 const SEPARATOR = <span className="mx-1">·</span>;
 
@@ -47,7 +46,7 @@ export const TeamWorkCard = memo(function TeamWorkCard({
 
   if (!connected) {
     return (
-      <div className={CARD_CLASS_NAME} data-home-team-work>
+      <div className={HOME_CARD_CLASS_NAME} data-home-team-work>
         <div className="flex items-center gap-2 font-medium text-foreground text-sm">
           <UsersIcon aria-hidden className="size-4 shrink-0 text-primary" />
           {t("Projects and team")}
@@ -67,13 +66,11 @@ export const TeamWorkCard = memo(function TeamWorkCard({
   const blocked = tasks.filter((task) => task.status === "blocked").length;
   // Every top-level shared chat, yours included, so the count matches the sidebar.
   const sharedThreads = (shared.data ?? []).filter((thread) => thread.parentThreadId === null);
-  // Skill requests have their own place in the inbox; only notes count as new messages.
-  const unreadMessages = (inbox.data ?? []).filter(
-    (message) => message.kind === "message" && !message.outgoing && message.status === "unread",
-  ).length;
+  // The same count as the mail badge: anything a colleague sent you that you have not opened.
+  const unreadMessages = countUnreadIncoming(inbox.data ?? []);
 
   return (
-    <div className={CARD_CLASS_NAME} data-home-team-work>
+    <div className={HOME_CARD_CLASS_NAME} data-home-team-work>
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2 font-medium text-foreground text-sm">
           <SquareKanbanIcon aria-hidden className="size-4 shrink-0 text-primary" />

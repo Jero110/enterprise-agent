@@ -13,15 +13,6 @@ export const ES_CHAT: Readonly<Record<string, string>> = {
   "to start": "para empezar",
   "Add a project to start": "Agrega un proyecto para empezar",
 
-  // Starter suggestions
-  Suggestions: "Sugerencias",
-  "What was the discount on our last promo?":
-    "¿De cuánto fue el descuento de nuestra última promo?",
-  "Summarize today's meeting and tell me what's mine": "Resume la junta de hoy y dime qué me toca",
-  "Request access to the Sales area": "Pide acceso al área de Ventas",
-  "What does my team's wiki know about…?": "¿Qué sabe la wiki de mi equipo sobre…?",
-  "What does my team's wiki know about ": "¿Qué sabe la wiki de mi equipo sobre ",
-
   // Composer
   "Ask anything. @ files, $ skills, / commands":
     "Pregúntame lo que quieras. Usa @ para archivos y / para comandos",

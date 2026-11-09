@@ -3,11 +3,26 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentId, ServerProviderSkill, TeamMessage } from "@t3tools/contracts";
-import { MailIcon, PackageIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import {
+  type EnvironmentId,
+  type ServerProviderSkill,
+  TEAM_MESSAGE_NOTE_MAX_CHARS,
+  type TeamMessage,
+} from "@t3tools/contracts";
+import {
+  ArrowLeftIcon,
+  MailIcon,
+  MessagesSquareIcon,
+  PackageIcon,
+  PlusIcon,
+  SendHorizontalIcon,
+  SquarePenIcon,
+  XIcon,
+} from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { t } from "~/i18n";
+import { useNowMinute } from "~/hooks/useNowMinute";
+import { getLocale, t } from "~/i18n";
 import { cn } from "~/lib/utils";
 import { enterpriseEnvironment, enterpriseFailureMessage } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
@@ -15,28 +30,95 @@ import { environmentServerConfigsAtom } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { Textarea } from "../ui/textarea";
+import { Input } from "../ui/input";
+import { Sheet, SheetPopup, SheetTitle } from "../ui/sheet";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import {
+  mentionsSkill,
+  noteWithoutSkillCommand,
+  rankSkillsForMessage,
+} from "./skillSuggestion.logic";
+import {
+  conversationMessages,
+  countUnreadIncoming,
+  dayLabel,
+  groupByDay,
+  groupConversations,
+  initials,
+  isPendingSkill,
+  isUnreadIncoming,
+  rosterPeople,
+  shareableSkills,
+  type TeamConversation,
+} from "./teamChats.logic";
 
-const NO_SKILL = "__none__";
-const NO_PEOPLE = "__no_people__";
+/** How many of your skills the suggestion strip offers at once. */
+const SKILL_SUGGESTION_LIMIT = 6;
 
-function isPendingSkill(message: TeamMessage): boolean {
-  return (
-    !message.outgoing &&
-    message.kind === "skill" &&
-    (message.status === "unread" || message.status === "read")
-  );
+interface ChatPeer {
+  readonly key: string;
+  readonly displayName: string;
 }
 
-function formatWhen(iso: string): string {
+type InboxView =
+  | { readonly kind: "list" }
+  | { readonly kind: "new" }
+  | { readonly kind: "chat"; readonly peer: ChatPeer };
+
+function dateLocale(): string {
+  return getLocale() === "es" ? "es-MX" : "en-US";
+}
+
+function parseDate(iso: string): Date | null {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : date.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatClock(iso: string): string {
+  return parseDate(iso)?.toLocaleTimeString(dateLocale(), { timeStyle: "short" }) ?? "";
+}
+
+/** The time on a chat row: the hour today, "Yesterday", the weekday this week, or the date. */
+function formatListTime(iso: string, nowMs: number): string {
+  const date = parseDate(iso);
+  if (date === null) return "";
+  const label = dayLabel(iso, nowMs);
+  if (label.kind === "today") return formatClock(iso);
+  if (label.kind === "yesterday") return t("Yesterday", undefined, "teamChat");
+  const sixDaysMs = 6 * 86_400_000;
+  if (nowMs - date.getTime() < sixDaysMs)
+    return date.toLocaleDateString(dateLocale(), { weekday: "long" });
+  return date.toLocaleDateString(dateLocale(), { dateStyle: "short" });
+}
+
+function formatDaySeparator(iso: string, nowMs: number): string {
+  const label = dayLabel(iso, nowMs);
+  if (label.kind === "today") return t("Today", undefined, "teamChat");
+  if (label.kind === "yesterday") return t("Yesterday", undefined, "teamChat");
+  const sameYear = label.date.getFullYear() === new Date(nowMs).getFullYear();
+  return label.date.toLocaleDateString(dateLocale(), {
+    day: "numeric",
+    month: "long",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
+function previewText(message: TeamMessage): string {
+  if (message.skill !== null)
+    return message.outgoing
+      ? t("You sent the skill «{name}»", { name: message.skill.name })
+      : t("Sent you the skill «{name}»", { name: message.skill.name });
+  const note = (message.note ?? "").replace(/\s+/g, " ").trim();
+  return message.outgoing ? t("You: {text}", { text: note }) : note;
+}
+
+/** What the status badge on a skill card says depends on whose side you are on. */
+function skillStatusLabel(message: TeamMessage): string {
+  if (message.status === "installed" || message.status === "declined")
+    return t(message.status, undefined, "teamMessage");
+  if (message.outgoing) return t(`sent-${message.status}`, undefined, "teamMessage");
+  return t("to-answer", undefined, "teamMessage");
 }
 
 function useTeamMessages(environmentId: EnvironmentId) {
@@ -46,97 +128,524 @@ function useTeamMessages(environmentId: EnvironmentId) {
   return { query, messages: query.data ?? [] };
 }
 
-/** Skills a teammate could install: every SKILL.md any of this IDE's agents found, once each. */
-function shareableSkills(skills: ReadonlyArray<ServerProviderSkill>) {
-  const seen = new Set<string>();
-  return skills.filter((skill) => {
-    if (!skill.enabled || !/SKILL\.md$/i.test(skill.path) || seen.has(skill.name)) return false;
-    seen.add(skill.name);
-    return true;
-  });
+/** Every SKILL.md this IDE's agents found: the active chat's agent may not be the one that has it. */
+function useShareableSkills(
+  environmentId: EnvironmentId,
+  skills: ReadonlyArray<ServerProviderSkill>,
+): ReadonlyArray<ServerProviderSkill> {
+  const providers = useAtomValue(environmentServerConfigsAtom).get(environmentId)?.providers;
+  return shareableSkills([...skills, ...(providers ?? []).flatMap((provider) => provider.skills)]);
 }
 
-/** What the badge says depends on whose side you are on. */
-function statusLabel(message: TeamMessage): string | null {
-  if (message.status === "installed" || message.status === "declined")
-    return t(message.status, undefined, "teamMessage");
-  if (message.outgoing) return t(`sent-${message.status}`, undefined, "teamMessage");
-  return message.kind === "skill" ? t("to-answer", undefined, "teamMessage") : null;
+/** The current minute as epoch ms; re-renders once a minute so relative times stay right. */
+function useNowMs(): number {
+  return Date.parse(`${useNowMinute()}:00.000Z`);
 }
 
-function MessageRow({
-  environmentId,
-  message,
-  highlighted,
-  onReply,
-}: {
-  readonly environmentId: EnvironmentId;
-  readonly message: TeamMessage;
-  readonly highlighted: boolean;
-  readonly onReply: (recipientKey: string) => void;
-}) {
-  const label = statusLabel(message);
+function Avatar({ name, className }: { readonly name: string; readonly className?: string }) {
   return (
-    <li
+    <span
+      aria-hidden
       className={cn(
-        "space-y-1 rounded-lg border border-border/60 p-3",
-        highlighted && "border-primary/50 bg-primary/5",
+        "flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/12 font-medium text-primary text-sm",
+        className,
       )}
     >
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-          {message.outgoing
-            ? t("To {name}", { name: message.toDisplayName })
-            : t("From {name}", { name: message.fromDisplayName })}
-        </span>
-        {label !== null && message.skill === null ? (
-          <Badge variant="outline" size="sm">
-            {label}
-          </Badge>
-        ) : null}
-        <span>{formatWhen(message.createdAt)}</span>
-        {!message.outgoing ? (
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            className="-my-1 -me-1.5"
-            onClick={() => onReply(message.fromKey)}
-          >
-            {t("Reply")}
-          </Button>
-        ) : null}
-      </div>
-      {message.skill ? (
-        <div className="flex items-center gap-1.5 text-xs">
-          <PackageIcon aria-hidden className="size-3.5 text-primary" />
-          <span className="font-medium">{message.skill.name}</span>
-          {label !== null ? (
-            <Badge variant="outline" size="sm">
-              {label}
-            </Badge>
+      {initials(name)}
+    </span>
+  );
+}
+
+function PanelHeader({ children }: { readonly children: ReactNode }) {
+  return (
+    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-3">
+      {children}
+    </div>
+  );
+}
+
+function CloseInboxButton({ onClose }: { readonly onClose: () => void }) {
+  return (
+    <Button
+      type="button"
+      size="icon-sm"
+      variant="ghost"
+      aria-label={t("Close")}
+      className="shrink-0"
+      onClick={onClose}
+    >
+      <XIcon />
+    </Button>
+  );
+}
+
+function BackButton({ onBack }: { readonly onBack: () => void }) {
+  return (
+    <Button
+      type="button"
+      size="icon-sm"
+      variant="ghost"
+      aria-label={t("Back")}
+      className="-ms-1 shrink-0"
+      onClick={onBack}
+    >
+      <ArrowLeftIcon />
+    </Button>
+  );
+}
+
+/** Your chats with colleagues, from the mail button in the chat header, docked on the right. */
+export function TeamMessagesButton(props: {
+  readonly environmentId: EnvironmentId;
+  readonly skills: ReadonlyArray<ServerProviderSkill>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<InboxView>({ kind: "list" });
+  const { query, messages } = useTeamMessages(props.environmentId);
+  const unread = countUnreadIncoming(messages);
+  const close = () => setOpen(false);
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size={unread > 0 ? "sm" : "icon-sm"}
+              variant="ghost"
+              aria-label={t("Messages")}
+              aria-expanded={open}
+              data-pressed={open ? "" : undefined}
+              className="shrink-0 [-webkit-app-region:no-drag]"
+              onClick={() => setOpen((current) => !current)}
+            />
+          }
+        >
+          <MailIcon className="size-4" />
+          {unread > 0 ? (
+            <span className="rounded-full bg-primary px-1.5 text-2xs font-medium text-primary-foreground">
+              {unread}
+            </span>
           ) : null}
+        </TooltipTrigger>
+        <TooltipPopup side="bottom">{t("Messages")}</TooltipPopup>
+      </Tooltip>
+      <Sheet open={open} onOpenChange={setOpen} modal={false} disablePointerDismissal>
+        <SheetPopup side="right" variant="docked" showCloseButton={false}>
+          {view.kind === "chat" ? (
+            <ConversationView
+              key={view.peer.key}
+              environmentId={props.environmentId}
+              skills={props.skills}
+              peer={view.peer}
+              messages={messages}
+              onBack={() => setView({ kind: "list" })}
+              onClose={close}
+            />
+          ) : view.kind === "new" ? (
+            <NewChatView
+              environmentId={props.environmentId}
+              onBack={() => setView({ kind: "list" })}
+              onClose={close}
+              onPick={(peer) => setView({ kind: "chat", peer })}
+            />
+          ) : (
+            <ConversationListView
+              loading={query.data === null && query.error === null}
+              error={query.data === null ? query.error : null}
+              messages={messages}
+              onNewChat={() => setView({ kind: "new" })}
+              onOpenChat={(peer) => setView({ kind: "chat", peer })}
+              onClose={close}
+            />
+          )}
+        </SheetPopup>
+      </Sheet>
+    </>
+  );
+}
+
+function ConversationListView(props: {
+  readonly loading: boolean;
+  readonly error: string | null;
+  readonly messages: ReadonlyArray<TeamMessage>;
+  readonly onNewChat: () => void;
+  readonly onOpenChat: (peer: ChatPeer) => void;
+  readonly onClose: () => void;
+}) {
+  const conversations = groupConversations(props.messages);
+  const now = useNowMs();
+  return (
+    <>
+      <PanelHeader>
+        <div className="min-w-0 flex-1 ps-1">
+          <SheetTitle size="sm">{t("Messages")}</SheetTitle>
         </div>
-      ) : null}
-      <p className="whitespace-pre-wrap text-sm">
-        {message.note ?? <span className="text-muted-foreground italic">{t("No message")}</span>}
-      </p>
-      {isPendingSkill(message) ? (
-        <SkillDecision environmentId={environmentId} message={message} className="pt-1" />
-      ) : null}
+        <Button type="button" size="sm" variant="outline" onClick={props.onNewChat}>
+          <SquarePenIcon />
+          {t("New chat")}
+        </Button>
+        <CloseInboxButton onClose={props.onClose} />
+      </PanelHeader>
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {props.error !== null ? (
+          <p className="px-3 py-4 text-muted-foreground text-sm">{t(props.error)}</p>
+        ) : props.loading ? (
+          <p className="px-3 py-4 text-muted-foreground text-sm">{t("Loading…")}</p>
+        ) : conversations.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-muted">
+              <MessagesSquareIcon aria-hidden className="size-5 text-muted-foreground" />
+            </span>
+            <div className="space-y-1">
+              <p className="font-medium text-sm">{t("No chats yet")}</p>
+              <p className="text-muted-foreground text-xs">
+                {t("Write to anyone in your company. Your conversations will show up here.")}
+              </p>
+            </div>
+            <Button type="button" size="sm" onClick={props.onNewChat}>
+              <SquarePenIcon />
+              {t("New chat")}
+            </Button>
+          </div>
+        ) : (
+          <ul className="flex flex-col">
+            {conversations.map((conversation) => (
+              <ConversationRow
+                key={conversation.key}
+                conversation={conversation}
+                nowMs={now}
+                onOpen={() =>
+                  props.onOpenChat({
+                    key: conversation.key,
+                    displayName: conversation.displayName,
+                  })
+                }
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  );
+}
+
+function ConversationRow(props: {
+  readonly conversation: TeamConversation;
+  readonly nowMs: number;
+  readonly onOpen: () => void;
+}) {
+  const { conversation } = props;
+  const hasUnread = conversation.unreadCount > 0;
+  return (
+    <li>
+      <button
+        type="button"
+        className="flex w-full min-w-0 items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        onClick={props.onOpen}
+      >
+        <Avatar name={conversation.displayName} />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-baseline gap-2">
+            <span className="min-w-0 flex-1 truncate font-medium text-foreground text-sm">
+              {conversation.displayName}
+            </span>
+            <span
+              className={cn(
+                "shrink-0 text-2xs tabular-nums",
+                hasUnread ? "font-medium text-primary" : "text-muted-foreground",
+              )}
+            >
+              {formatListTime(conversation.lastMessage.createdAt, props.nowMs)}
+            </span>
+          </span>
+          <span className="flex items-center gap-2">
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate text-xs",
+                hasUnread ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {conversation.lastMessage.skill !== null ? (
+                <PackageIcon aria-hidden className="me-1 inline size-3 align-[-0.1em]" />
+              ) : null}
+              {previewText(conversation.lastMessage)}
+            </span>
+            {hasUnread ? (
+              <span
+                className="flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full bg-primary px-1 font-medium text-2xs text-primary-foreground tabular-nums"
+                aria-label={t("{count} unread", { count: conversation.unreadCount })}
+              >
+                {conversation.unreadCount}
+              </span>
+            ) : null}
+          </span>
+        </span>
+      </button>
     </li>
   );
 }
 
-function Compose(props: {
+function NewChatView(props: {
   readonly environmentId: EnvironmentId;
-  readonly skills: ReadonlyArray<ServerProviderSkill>;
-  readonly recipientKey: string | null;
-  readonly onRecipientChange: (recipientKey: string | null) => void;
+  readonly onBack: () => void;
+  readonly onClose: () => void;
+  readonly onPick: (peer: ChatPeer) => void;
 }) {
   const org = useEnvironmentQuery(
     enterpriseEnvironment.org({ environmentId: props.environmentId, input: {} }),
   );
+  const [search, setSearch] = useState("");
+  const people = rosterPeople(org.data?.teams ?? []);
+  const needle = search.trim().toLocaleLowerCase();
+  const shown =
+    needle.length === 0
+      ? people
+      : people.filter((person) =>
+          `${person.displayName} ${person.teams}`.toLocaleLowerCase().includes(needle),
+        );
+  return (
+    <>
+      <PanelHeader>
+        <BackButton onBack={props.onBack} />
+        <div className="min-w-0 flex-1">
+          <SheetTitle size="sm">{t("New chat")}</SheetTitle>
+        </div>
+        <CloseInboxButton onClose={props.onClose} />
+      </PanelHeader>
+      <div className="shrink-0 px-3 pt-3">
+        <Input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t("Search colleagues")}
+          aria-label={t("Search colleagues")}
+        />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {org.data === null ? (
+          <p className="px-3 py-4 text-muted-foreground text-sm">
+            {org.error !== null ? t(org.error) : t("Loading…")}
+          </p>
+        ) : shown.length === 0 ? (
+          <p className="px-3 py-4 text-muted-foreground text-sm">
+            {people.length === 0 ? t("No colleagues yet") : t("Nobody matches that search.")}
+          </p>
+        ) : (
+          <ul className="flex flex-col">
+            {shown.map((person) => (
+              <li key={person.key}>
+                <button
+                  type="button"
+                  className="flex w-full min-w-0 items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  onClick={() => props.onPick({ key: person.key, displayName: person.displayName })}
+                >
+                  <Avatar name={person.displayName} className="size-9" />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-medium text-sm">{person.displayName}</span>
+                    <span className="truncate text-muted-foreground text-xs">{person.teams}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  );
+}
+
+function scrollParentToBottom(node: HTMLDivElement | null): void {
+  const scroller = node?.parentElement;
+  if (scroller) scroller.scrollTop = scroller.scrollHeight;
+}
+
+function ConversationView(props: {
+  readonly environmentId: EnvironmentId;
+  readonly skills: ReadonlyArray<ServerProviderSkill>;
+  readonly peer: ChatPeer;
+  readonly messages: ReadonlyArray<TeamMessage>;
+  readonly onBack: () => void;
+  readonly onClose: () => void;
+}) {
+  const thread = conversationMessages(props.messages, props.peer.key);
+  const days = groupByDay(thread);
+  const now = useNowMs();
+  const markRead = useAtomCommand(enterpriseEnvironment.readTeamMessage, {
+    label: "read team message",
+    reportFailure: false,
+  });
+  // Each message is marked read once; the 10 s poll would otherwise ask again until it lands.
+  const markedRef = useRef(new Set<string>());
+  const { environmentId } = props;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- tells the hub this open chat's new messages were read
+  useEffect(() => {
+    for (const message of thread) {
+      if (!isUnreadIncoming(message) || markedRef.current.has(message.id)) continue;
+      markedRef.current.add(message.id);
+      void markRead({ environmentId, input: { id: message.id } });
+    }
+  }, [thread, markRead, environmentId, markedRef]);
+  const latest = thread.at(-1);
+  // The newest message carries the name the hub knows today.
+  const name =
+    latest === undefined
+      ? props.peer.displayName
+      : latest.outgoing
+        ? latest.toDisplayName
+        : latest.fromDisplayName;
+  return (
+    <>
+      <PanelHeader>
+        <BackButton onBack={props.onBack} />
+        <Avatar name={name} className="size-8 text-xs" />
+        <div className="min-w-0 flex-1">
+          <SheetTitle size="sm">{name}</SheetTitle>
+        </div>
+        <CloseInboxButton onClose={props.onClose} />
+      </PanelHeader>
+      <div
+        className="scrollbar-gutter-both min-h-0 flex-1 overflow-y-auto bg-muted/30 px-3 py-3"
+        role="log"
+        aria-label={t("Conversation with {name}", { name })}
+      >
+        {thread.length === 0 ? (
+          <p className="mx-auto mt-10 max-w-64 text-center text-muted-foreground text-xs">
+            {t("Say hi to {name}. You can also send them one of your skills.", { name })}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {days.map((day) => (
+              <section key={day.dayKey} className="flex flex-col gap-1.5">
+                <div className="sticky top-0 z-1 flex justify-center py-1">
+                  <span className="rounded-full bg-background/90 px-2.5 py-0.5 text-2xs text-muted-foreground shadow-xs ring-1 ring-border/60">
+                    {formatDaySeparator(day.messages[0]?.createdAt ?? "", now)}
+                  </span>
+                </div>
+                {day.messages.map((message) => (
+                  <MessageBubble
+                    key={message.id}
+                    environmentId={props.environmentId}
+                    message={message}
+                  />
+                ))}
+              </section>
+            ))}
+          </div>
+        )}
+        {/* Keyed on the newest message: it remounts, and scrolls the chat down, when the chat
+            opens or a message arrives, but not when a poll only changes a status. */}
+        <div key={latest?.id ?? "empty"} ref={scrollParentToBottom} aria-hidden />
+      </div>
+      <ChatComposer
+        environmentId={props.environmentId}
+        skills={props.skills}
+        recipientKey={props.peer.key}
+      />
+    </>
+  );
+}
+
+function MessageBubble(props: {
+  readonly environmentId: EnvironmentId;
+  readonly message: TeamMessage;
+}) {
+  const { message } = props;
+  const mine = message.outgoing;
+  return (
+    <div className={cn("flex flex-col", mine ? "items-end" : "items-start")}>
+      {message.skill !== null ? (
+        <SkillCard environmentId={props.environmentId} message={message} />
+      ) : (
+        <div
+          className={cn(
+            "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm leading-relaxed",
+            mine
+              ? "rounded-br-md bg-primary text-primary-foreground"
+              : "rounded-bl-md bg-background text-foreground ring-1 ring-border/60",
+          )}
+        >
+          {message.note}
+        </div>
+      )}
+      <span className="mt-0.5 px-1 text-2xs text-muted-foreground tabular-nums">
+        {formatClock(message.createdAt)}
+        {mine && message.skill === null && message.status === "read" ? (
+          <>
+            <span className="mx-1">·</span>
+            {t("sent-read", undefined, "teamMessage")}
+          </>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+function SkillCard(props: {
+  readonly environmentId: EnvironmentId;
+  readonly message: TeamMessage;
+}) {
+  const { message } = props;
+  const skill = message.skill;
+  if (skill === null) return null;
+  const pending = isPendingSkill(message);
+  return (
+    <div
+      className={cn(
+        "w-[85%] max-w-80 space-y-2 rounded-2xl border bg-card p-3 text-card-foreground shadow-xs",
+        message.outgoing ? "rounded-br-md border-primary/30" : "rounded-bl-md border-border/70",
+      )}
+    >
+      <div className="flex items-start gap-2.5">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <PackageIcon aria-hidden className="size-4 text-primary" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="min-w-0 truncate font-medium text-sm">{skill.name}</span>
+            <Badge variant="outline" size="sm">
+              {t("Skill")}
+            </Badge>
+          </div>
+          {skill.description ? (
+            <p className="line-clamp-3 text-muted-foreground text-xs">{skill.description}</p>
+          ) : null}
+        </div>
+      </div>
+      {message.note ? (
+        <p className="whitespace-pre-wrap break-words text-sm">{message.note}</p>
+      ) : null}
+      <details className="text-xs">
+        <summary className="cursor-pointer text-muted-foreground">
+          {t("See what the skill tells the agent")}
+        </summary>
+        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-2 text-2xs">
+          {skill.content}
+        </pre>
+      </details>
+      {pending ? (
+        <SkillDecision
+          environmentId={props.environmentId}
+          message={message}
+          declineLabel={t("No, thanks")}
+        />
+      ) : (
+        <Badge
+          variant={message.status === "installed" ? "success" : "outline"}
+          size="sm"
+          className="w-fit"
+        >
+          {skillStatusLabel(message)}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function ChatComposer(props: {
+  readonly environmentId: EnvironmentId;
+  readonly skills: ReadonlyArray<ServerProviderSkill>;
+  readonly recipientKey: string;
+}) {
   const canSend = useAtomValue(
     enterpriseEnvironment.sendTeamMessage.permissionAtom(props.environmentId),
   );
@@ -144,237 +653,184 @@ function Compose(props: {
     label: "send team message",
     reportFailure: false,
   });
-  const { recipientKey, onRecipientChange: setRecipientKey } = props;
-  const [note, setNote] = useState("");
-  const [skillPath, setSkillPath] = useState(NO_SKILL);
+  const skills = useShareableSkills(props.environmentId, props.skills);
+  const [text, setText] = useState("");
+  const [attached, setAttached] = useState<ServerProviderSkill | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const people = new Map<string, string>();
-  for (const team of org.data?.teams ?? [])
-    for (const member of team.members)
-      if (!member.isMe && member.memberKey !== undefined)
-        people.set(member.memberKey, `${member.displayName} · ${team.name}`);
-  const providers =
-    useAtomValue(environmentServerConfigsAtom).get(props.environmentId)?.providers ?? [];
-  // The active chat's agent may not be the one that has the skill, so offer every agent's.
-  const skills = shareableSkills([
-    ...props.skills,
-    ...providers.flatMap((provider) => provider.skills),
-  ]);
-  const hasSkill = skillPath !== NO_SKILL;
-  const ready = recipientKey !== null && (hasSkill || note.trim().length > 0) && !sending;
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- focuses the DOM textarea when a chat opens
+  useEffect(() => {
+    textareaRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const talksAboutSkill = mentionsSkill(text);
+  const showSkills = attached === null && (pickerOpen || (talksAboutSkill && !suggestionDismissed));
+  const suggestions = showSkills
+    ? rankSkillsForMessage(skills, text).slice(0, SKILL_SUGGESTION_LIMIT)
+    : [];
+  const note = text.trim();
+  const ready = canSend && !sending && (attached !== null || note.length > 0);
+
+  const attach = (skill: ServerProviderSkill) => {
+    setAttached(skill);
+    setText((current) => noteWithoutSkillCommand(current));
+    setPickerOpen(false);
+    textareaRef.current?.focus({ preventScroll: true });
+  };
+
   const submit = async () => {
-    if (!ready || recipientKey === null) return;
+    if (!ready) return;
     setSending(true);
     setError(null);
     const result = await send({
       environmentId: props.environmentId,
       input: {
-        recipientKey,
-        ...(note.trim().length > 0 ? { note: note.trim() } : {}),
-        ...(hasSkill ? { skillPath } : {}),
+        recipientKey: props.recipientKey,
+        ...(note.length > 0 ? { note } : {}),
+        ...(attached !== null ? { skillPath: attached.path } : {}),
       },
     });
     setSending(false);
     if (result._tag === "Success") {
-      setNote("");
-      setSkillPath(NO_SKILL);
-      toastManager.add({ type: "success", title: t("Sent") });
+      setText("");
+      setAttached(null);
+      setSuggestionDismissed(false);
+      textareaRef.current?.focus({ preventScroll: true });
     } else if (!isAtomCommandInterrupted(result)) {
       setError(enterpriseFailureMessage(squashAtomCommandFailure(result)));
     }
   };
+
   return (
     <form
-      className="space-y-2 rounded-lg border bg-card p-3"
+      className="shrink-0 space-y-2 border-t border-border/60 bg-background p-2.5"
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
       }}
     >
-      <Select
-        value={recipientKey}
-        onValueChange={(value) => setRecipientKey(value)}
-        items={[...people].map(([value, label]) => ({ value, label }))}
-      >
-        <SelectTrigger size="sm" aria-label={t("Send to")}>
-          <SelectValue placeholder={t("Who do you want to write to?")} />
-        </SelectTrigger>
-        <SelectPopup>
-          {people.size === 0 ? (
-            <SelectItem value={NO_PEOPLE} disabled>
-              {t("No colleagues yet")}
-            </SelectItem>
-          ) : null}
-          {[...people].map(([key, label]) => (
-            <SelectItem key={key} value={key}>
-              {label}
-            </SelectItem>
-          ))}
-        </SelectPopup>
-      </Select>
-      <Textarea
-        aria-label={t("Message")}
-        placeholder={hasSkill ? t("Why should they use it? (optional)") : t("Write a message")}
-        value={note}
-        maxLength={2_000}
-        onChange={(event) => setNote(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-            event.preventDefault();
-            void submit();
-          }
-        }}
-      />
-      <div className="flex items-center gap-2">
-        <Select
-          value={skillPath}
-          onValueChange={(value) => setSkillPath(value ?? NO_SKILL)}
-          items={[
-            { value: NO_SKILL, label: t("No skill") },
-            ...skills.map((skill) => ({
-              value: skill.path,
-              label: skill.displayName ?? skill.name,
-            })),
-          ]}
-        >
-          <SelectTrigger size="sm" aria-label={t("Share a skill")} className="min-w-0 flex-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectPopup>
-            <SelectItem value={NO_SKILL}>{t("No skill")}</SelectItem>
-            {skills.map((skill) => (
-              <SelectItem key={skill.path} value={skill.path}>
-                {skill.displayName ?? skill.name}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
-        <Button type="submit" size="sm" disabled={!ready || !canSend}>
-          {sending ? t("Sending…") : hasSkill ? t("Send request") : t("Send")}
-        </Button>
-      </div>
       {error !== null ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="px-1 text-destructive text-xs">
           {error}
         </p>
       ) : null}
-    </form>
-  );
-}
-
-/** Direct messages and skill requests between colleagues, from the chat header. */
-export function TeamMessagesButton(props: {
-  readonly environmentId: EnvironmentId;
-  readonly skills: ReadonlyArray<ServerProviderSkill>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [recipientKey, setRecipientKey] = useState<string | null>(null);
-  // What was new when the inbox opened stays highlighted while it is open (and while it fades out).
-  const [newIds, setNewIds] = useState<ReadonlySet<string>>(() => new Set());
-  const [composeMounted, setComposeMounted] = useState(false);
-  const composeRef = useRef<HTMLDivElement | null>(null);
-  const { query, messages } = useTeamMessages(props.environmentId);
-  const markRead = useAtomCommand(enterpriseEnvironment.readTeamMessage, {
-    label: "read team message",
-    reportFailure: false,
-  });
-  const isUnread = (message: TeamMessage) => !message.outgoing && message.status === "unread";
-  // Pending skill requests are counted by the "To approve" pill; the mail badge counts messages.
-  const unread = messages.filter((message) => message.kind === "message" && isUnread(message));
-  const onOpenChange = (next: boolean) => {
-    if (next === open) return;
-    setOpen(next);
-    if (next) {
-      setComposeMounted(true);
-      setNewIds(new Set(messages.filter(isUnread).map((message) => message.id)));
-      return;
-    }
-    // Closing the inbox reads the plain messages it showed; skill requests stay pending until answered.
-    for (const message of unread)
-      void markRead({ environmentId: props.environmentId, input: { id: message.id } });
-  };
-  const replyTo = (key: string) => {
-    setRecipientKey(key);
-    requestAnimationFrame(() => {
-      const compose = composeRef.current;
-      if (compose === null) return;
-      compose.scrollIntoView({ block: "start", behavior: "smooth" });
-      compose.querySelector("textarea")?.focus({ preventScroll: true });
-    });
-  };
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      // Keep the form until the close animation ends so the popup does not jump while fading out.
-      onOpenChangeComplete={(isOpen) => {
-        if (!isOpen) setComposeMounted(false);
-      }}
-    >
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              size={unread.length > 0 ? "sm" : "icon-sm"}
-              variant="ghost"
-              aria-label={t("Messages")}
-              className="shrink-0 [-webkit-app-region:no-drag]"
-              onClick={() => onOpenChange(true)}
-            />
-          }
-        >
-          <MailIcon className="size-4" />
-          {unread.length > 0 ? (
-            <span className="rounded-full bg-primary px-1.5 text-2xs font-medium text-primary-foreground">
-              {unread.length}
+      {showSkills ? (
+        <div className="space-y-1.5 rounded-xl border border-border/70 bg-muted/40 p-2">
+          <div className="flex items-center gap-2 px-0.5">
+            <span className="min-w-0 flex-1 font-medium text-muted-foreground text-xs">
+              {t("Send a skill? Your skills:")}
             </span>
-          ) : null}
-        </TooltipTrigger>
-        <TooltipPopup side="bottom">{t("Messages")}</TooltipPopup>
-      </Tooltip>
-      <DialogPopup className="flex max-h-[min(760px,90dvh)] w-[min(640px,94vw)] max-w-none flex-col overflow-hidden">
-        <div className="shrink-0 border-b border-border/60 px-6 py-4">
-          <DialogTitle>{t("Messages")}</DialogTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t(
-              "Write to anyone in your company or send them a skill. Skills are only installed if they accept.",
-            )}
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
-          {composeMounted && (
-            <div ref={composeRef} className="scroll-mt-4">
-              <Compose
-                environmentId={props.environmentId}
-                skills={props.skills}
-                recipientKey={recipientKey}
-                onRecipientChange={setRecipientKey}
-              />
+            <Button
+              type="button"
+              size="icon-xs"
+              variant="ghost-muted"
+              aria-label={t("Hide skills")}
+              className="-my-1"
+              onClick={() => {
+                setPickerOpen(false);
+                setSuggestionDismissed(true);
+              }}
+            >
+              <XIcon />
+            </Button>
+          </div>
+          {suggestions.length === 0 ? (
+            <p className="px-0.5 text-muted-foreground text-xs">
+              {t("You have no skills to share yet.")}
+            </p>
+          ) : (
+            <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
+              {suggestions.map((skill) => (
+                <button
+                  key={skill.path}
+                  type="button"
+                  className="flex max-w-full min-w-0 flex-col rounded-lg border border-border/70 bg-background px-2.5 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:max-w-44"
+                  onClick={() => attach(skill)}
+                >
+                  <span className="truncate font-medium text-xs">
+                    {skill.displayName ?? skill.name}
+                  </span>
+                  {(skill.shortDescription ?? skill.description) ? (
+                    <span className="truncate text-2xs text-muted-foreground">
+                      {skill.shortDescription ?? skill.description}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
             </div>
           )}
-          {query.error !== null && query.data === null ? (
-            <p className="text-sm text-muted-foreground">{t(query.error)}</p>
-          ) : query.data === null ? (
-            <p className="text-sm text-muted-foreground">{t("Loading…")}</p>
-          ) : messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("No messages yet.")}</p>
-          ) : (
-            <ul className="space-y-2">
-              {messages.map((message) => (
-                <MessageRow
-                  key={message.id}
-                  environmentId={props.environmentId}
-                  message={message}
-                  highlighted={newIds.has(message.id) || isUnread(message)}
-                  onReply={replyTo}
-                />
-              ))}
-            </ul>
-          )}
         </div>
-      </DialogPopup>
-    </Dialog>
+      ) : null}
+      {attached !== null ? (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1.5">
+          <PackageIcon aria-hidden className="size-4 shrink-0 text-primary" />
+          <span className="min-w-0 flex-1 truncate text-xs">
+            {t("Skill attached: {name}", { name: attached.displayName ?? attached.name })}
+          </span>
+          <Button
+            type="button"
+            size="icon-xs"
+            variant="ghost-muted"
+            aria-label={t("Remove skill")}
+            className="-my-1"
+            onClick={() => setAttached(null)}
+          >
+            <XIcon />
+          </Button>
+        </div>
+      ) : null}
+      <div className="flex items-end gap-1.5">
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          aria-label={t("Attach a skill")}
+          aria-pressed={pickerOpen}
+          className="shrink-0"
+          disabled={attached !== null}
+          onClick={() => {
+            setPickerOpen((current) => !current);
+            setSuggestionDismissed(false);
+          }}
+        >
+          <PlusIcon />
+        </Button>
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          value={text}
+          maxLength={TEAM_MESSAGE_NOTE_MAX_CHARS}
+          aria-label={t("Message")}
+          placeholder={
+            attached !== null ? t("Why should they use it? (optional)") : t("Write a message")
+          }
+          className="field-sizing-content max-h-32 min-h-9 min-w-0 flex-1 resize-none rounded-2xl border border-input bg-background px-3.5 py-2 text-sm leading-5 outline-none transition-shadow placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/24"
+          onChange={(event) => {
+            const next = event.target.value;
+            setText(next);
+            if (!mentionsSkill(next)) setSuggestionDismissed(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            void submit();
+          }}
+        />
+        <Button
+          type="submit"
+          size="icon"
+          aria-label={sending ? t("Sending…") : t("Send")}
+          className="shrink-0"
+          disabled={!ready}
+        >
+          <SendHorizontalIcon />
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -382,6 +838,7 @@ export function TeamMessagesButton(props: {
 function SkillDecision(props: {
   readonly environmentId: EnvironmentId;
   readonly message: TeamMessage;
+  readonly declineLabel?: string;
   readonly className?: string;
 }) {
   const decide = useAtomCommand(enterpriseEnvironment.decideTeamMessage, {
@@ -427,7 +884,7 @@ function SkillDecision(props: {
           disabled={busy || !canDecide}
           onClick={() => void answer("declined")}
         >
-          {t("Decline")}
+          {props.declineLabel ?? t("Decline")}
         </Button>
       </div>
       {error !== null ? (
@@ -436,6 +893,12 @@ function SkillDecision(props: {
         </p>
       ) : null}
     </div>
+  );
+}
+
+function formatWhen(iso: string): string {
+  return (
+    parseDate(iso)?.toLocaleString(dateLocale(), { dateStyle: "short", timeStyle: "short" }) ?? ""
   );
 }
 

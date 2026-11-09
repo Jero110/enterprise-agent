@@ -1,23 +1,6 @@
-// Spanish strings for the home screen insights (time saved, daily summary). Keys are the exact English text passed to t().
+// Spanish strings for the home screen boxes (today's summary, projects and team). Keys are the exact English text passed to t().
 export const ES_HOME: Readonly<Record<string, string>> = {
   "Your day": "Tu día",
-  // Time saved
-  "Norai saved you": "Norai te ahorró",
-  "{minutes} min": "{minutes} min",
-  "{hours} h": "{hours} h",
-  "{hours} h {minutes} min": "{hours} h {minutes} min",
-  "in the last {days} days": "en los últimos {days} días",
-  "today: {time}": "hoy: {time}",
-  "today: nothing yet": "hoy: todavía nada",
-  "Your time saved will show up here": "Aquí verás el tiempo que te ahorras",
-  "Ask an agent for something and Norai will keep count.":
-    "Pídele algo a un agente y Norai llevará la cuenta.",
-  "How is this estimated?": "¿Cómo se calcula?",
-  "How we estimate this": "Cómo lo calculamos",
-  "Each task an agent finishes counts as {multiplier} times the time the agent worked on it, between {min} and {max} min per task.":
-    "Cada tarea que termina un agente cuenta como {multiplier} veces el tiempo que trabajó en ella, entre {min} y {max} min por tarea.",
-  "We only count the latest task of each chat from the last {days} days, so you probably saved more.":
-    "Solo contamos la tarea más reciente de cada chat de los últimos {days} días, así que seguramente te ahorraste más.",
   // Today's summary
   "Today's summary": "Resumen de hoy",
   "1 chat with activity": "1 chat con actividad",

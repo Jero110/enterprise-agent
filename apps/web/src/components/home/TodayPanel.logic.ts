@@ -1,21 +1,7 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import { isListedThreadLineage } from "@t3tools/contracts";
 
-/**
- * The time-saved estimate, in one place so the info popover can quote the same numbers.
- * Each task an agent finished counts as `multiplier` times the minutes the agent worked on it,
- * kept between `minMinutesPerTask` and `maxMinutesPerTask` so a one-line answer never counts as
- * nothing and a long run never inflates the total.
- */
-export const TIME_SAVED_ESTIMATE = {
-  multiplier: 3,
-  minMinutesPerTask: 5,
-  maxMinutesPerTask: 30,
-  windowDays: 7,
-} as const;
-
 const RECENT_CHAT_LIMIT = 3;
-const DAY_MS = 86_400_000;
 const MINUTE_MS = 60_000;
 
 type HomeThread = Pick<
@@ -42,10 +28,6 @@ interface HomeRecentChat {
 }
 
 interface HomeDaySummary {
-  /** Estimated minutes of manual work saved over the last `windowDays` days. */
-  readonly weekMinutes: number;
-  readonly weekTasks: number;
-  readonly todayMinutes: number;
   /** Tasks the agents finished since local midnight. */
   readonly todayTasks: number;
   /** Chats an agent worked on since local midnight, including ones still working. */
@@ -76,16 +58,6 @@ function startOfLocalDay(nowMs: number): number {
   return day.getTime();
 }
 
-function estimateTaskMinutes(startedAtMs: number | null, completedAtMs: number): number {
-  const agentMinutes =
-    startedAtMs === null ? 0 : Math.max(0, (completedAtMs - startedAtMs) / MINUTE_MS);
-  const estimate = Math.round(agentMinutes * TIME_SAVED_ESTIMATE.multiplier);
-  return Math.min(
-    TIME_SAVED_ESTIMATE.maxMinutesPerTask,
-    Math.max(TIME_SAVED_ESTIMATE.minMinutesPerTask, estimate),
-  );
-}
-
 function chatState(thread: HomeThread): HomeChatState | null {
   if (
     thread.hasPendingApprovals ||
@@ -101,8 +73,8 @@ function chatState(thread: HomeThread): HomeChatState | null {
 }
 
 /**
- * What the agents did for the user, from the thread list the sidebar already holds. The list
- * carries only each chat's latest agent run, so a chat counts at most once: the estimate errs low.
+ * What the agents did for the user today, from the thread list the sidebar already holds. The list
+ * carries only each chat's latest agent run, so a chat counts at most once.
  * Subagent and side chats are left out, because their work is part of the chat that started them.
  */
 export function summarizeHomeDay(
@@ -110,10 +82,6 @@ export function summarizeHomeDay(
   nowMs: number,
 ): HomeDaySummary {
   const todayStartMs = startOfLocalDay(nowMs);
-  const windowStartMs = nowMs - TIME_SAVED_ESTIMATE.windowDays * DAY_MS;
-  let weekMinutes = 0;
-  let weekTasks = 0;
-  let todayMinutes = 0;
   let todayTasks = 0;
   let chatsWorkedToday = 0;
   let waitingOnYou = 0;
@@ -128,17 +96,11 @@ export function summarizeHomeDay(
     if (
       run?.status === "completed" &&
       completedAtMs !== null &&
-      completedAtMs >= windowStartMs &&
+      completedAtMs >= todayStartMs &&
       // `nowMs` is the start of the current minute, so a task finished mid-minute still counts.
       completedAtMs < nowMs + MINUTE_MS
     ) {
-      const minutes = estimateTaskMinutes(startedAtMs, completedAtMs);
-      weekMinutes += minutes;
-      weekTasks += 1;
-      if (completedAtMs >= todayStartMs) {
-        todayMinutes += minutes;
-        todayTasks += 1;
-      }
+      todayTasks += 1;
     }
 
     if (thread.archivedAt !== null) continue;
@@ -166,9 +128,6 @@ export function summarizeHomeDay(
   );
 
   return {
-    weekMinutes,
-    weekTasks,
-    todayMinutes,
     todayTasks,
     chatsWorkedToday,
     waitingOnYou,
@@ -179,10 +138,4 @@ export function summarizeHomeDay(
       state: chat.state,
     })),
   };
-}
-
-/** Whole hours and the leftover minutes, for labels like "3 h 20 min". */
-export function splitMinutes(totalMinutes: number): { hours: number; minutes: number } {
-  const rounded = Math.max(0, Math.round(totalMinutes));
-  return { hours: Math.floor(rounded / 60), minutes: rounded % 60 };
 }

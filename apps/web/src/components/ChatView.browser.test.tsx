@@ -65,32 +65,3 @@ it("a new draft does not load its reserved thread before the server lists it", a
   // A 404 here marks the thread deleted, and the view never loads it once the send creates it.
   expect(threadRequests).toEqual([]);
 });
-
-it("a starter suggestion fills the empty draft without sending, then the chips hide", async () => {
-  using _environment = installFakeEnvironment([]);
-  __setClientSettingsForTests({
-    ...DEFAULT_CLIENT_SETTINGS,
-    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
-  });
-  const draftId = DraftId.make("draft-starter-suggestions");
-  useComposerDraftStore
-    .getState()
-    .setProjectDraftThreadId(scopeProjectRef(ENVIRONMENT_ID, PROJECT_ID), draftId);
-
-  const router = getRouter(createMemoryHistory({ initialEntries: [`/draft/${draftId}`] }));
-  await router.load();
-  await using _app = await render(<AppRoot router={router} />, {
-    // AppRoot brings its own router.
-    router: false,
-  });
-  const suggestion = page.getByRole("button", { name: "What was the discount on our last promo?" });
-  await suggestion.click();
-
-  await expect
-    .element(page.getByTestId("composer-editor"))
-    .toHaveTextContent("What was the discount on our last promo?");
-  await expect.element(suggestion).not.toBeInTheDocument();
-  expect(useComposerDraftStore.getState().getComposerDraft(draftId)?.prompt).toBe(
-    "What was the discount on our last promo?",
-  );
-});

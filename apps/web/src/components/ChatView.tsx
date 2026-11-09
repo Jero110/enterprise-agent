@@ -261,7 +261,6 @@ import {
 import { useEnvironmentShellHasSnapshot } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
-import { DraftStarterSuggestions } from "./chat/DraftStarterSuggestions";
 import { TeamWorkCard } from "./home/TeamWorkCard";
 import { TodayPanel } from "./home/TodayPanel";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
@@ -1812,9 +1811,6 @@ export default function ChatView(props: ChatViewProps) {
     composerRef.current?.focusAtEnd();
   };
   const focusComposerStable = useStableCallback(focusComposer);
-  const insertStarterSuggestionStable = useStableCallback((prompt: string) => {
-    composerRef.current?.insertTextAtEnd(prompt);
-  });
   const canInterruptRunningThread =
     canOperateThread && deriveCanInterruptRunningThread(activeThread !== undefined, activeRuntime);
   const onInterrupt = async () => {
@@ -3841,19 +3837,21 @@ export default function ChatView(props: ChatViewProps) {
                             </div>
                           ) : null}
                           {!(isLocalDraftThread && activeProject === null) ? (
-                            <>
-                              <DraftStarterSuggestions
-                                draftTarget={composerDraftTarget}
-                                onPick={insertStarterSuggestionStable}
-                              />
-                              <TodayPanel />
+                            // Two boxes side by side, the same height; "Today's summary" takes the
+                            // whole row when there is no team project. Short windows hide them.
+                            <section
+                              aria-label={t("Your day")}
+                              className="hidden gap-3 sm:[&:has(>:nth-child(2))]:grid-cols-2 [@media(min-height:40rem)]:grid"
+                              data-home-cards
+                            >
                               {activeProject && !activeProjectIsScratch ? (
                                 <TeamWorkCard
                                   environmentId={environmentId}
                                   projectId={activeProject.id}
                                 />
                               ) : null}
-                            </>
+                              <TodayPanel />
+                            </section>
                           ) : null}
                         </div>
                       ) : null}
