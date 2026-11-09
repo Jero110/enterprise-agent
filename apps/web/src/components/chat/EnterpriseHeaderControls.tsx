@@ -226,6 +226,7 @@ function EnterpriseContextDialog(props: {
                 <ConnectedIngestTab
                   environmentId={props.environmentId}
                   modelSelection={props.modelSelection}
+                  onReview={() => setTab("changes")}
                 />
               )}
             </Tabs.Panel>

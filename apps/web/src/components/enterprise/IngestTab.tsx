@@ -2,11 +2,14 @@ import type {
   EnvironmentId,
   EnterpriseOrgFiles,
   EnterpriseOrgImportResult,
+  EnterpriseIngestStartResult,
   ModelSelection,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { useRef, useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import { FolderOpenIcon, Link2Icon, FilesIcon, UploadCloudIcon } from "lucide-react";
 import {
   enterpriseEnvironment,
   enterpriseFailureMessage,
@@ -38,19 +41,34 @@ export function IngestTab({
   environmentId,
   connectors,
   ingestion,
+  onReview,
 }: {
   environmentId: EnvironmentId;
   connectors?: ReactNode;
   ingestion?: IncrementalIngestion;
+  onReview?: () => void;
 }) {
   const { identity } = useEnterpriseStatus();
   if (!identity) return null;
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-8">
-      <IngestionRun environmentId={environmentId} ingestion={ingestion} />
+      <IngestionRun
+        key={`${environmentId}:${identity.email}`}
+        environmentId={environmentId}
+        ingestion={ingestion}
+        onReview={onReview}
+      />
       {identity.role === "admin" && (
         <>
-          <OrgImport environmentId={environmentId} />
+          <details
+            className="rounded-xl border bg-background p-5"
+            aria-label={t("Organization setup")}
+          >
+            <summary className="cursor-pointer font-medium">
+              {t("Organization setup (admins)")}
+            </summary>
+            <OrgImport environmentId={environmentId} />
+          </details>
           <details aria-label={t("Connectors")} className="rounded-xl border p-4">
             <summary className="cursor-pointer font-medium">{t("Connectors (optional)")}</summary>
             {connectors}
@@ -71,7 +89,7 @@ export interface IncrementalIngestion {
     destination: string;
     uploadProposalIds?: ReadonlyArray<string>;
     modelSelection: ModelSelection;
-  }) => Promise<void>;
+  }) => Promise<EnterpriseIngestStartResult>;
   readonly stageUpload?: (
     files: ReadonlyArray<{ name: string; relativePath?: string; mimeType: string; base64: string }>,
     destination: string,
@@ -81,37 +99,63 @@ export interface IncrementalIngestion {
 function IngestionRun({
   environmentId,
   ingestion,
+  onReview,
 }: {
   environmentId: EnvironmentId;
   ingestion: IncrementalIngestion | undefined;
+  onReview: (() => void) | undefined;
 }) {
   const org = useEnvironmentQuery(enterpriseEnvironment.org({ environmentId, input: {} }));
+  const { identity } = useEnterpriseStatus();
+  const runKey = `t3:enterprise-ingest:${environmentId}:${identity?.email ?? ""}`;
+  const fileInput = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement>(null);
+  const [sourceMode, setSourceMode] = useState<"url" | "folder" | "files">("url");
   const [destination, setDestination] = useState("personal");
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [run, setRun] = useState<EnterpriseIngestStartResult | null>(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(runKey) ?? "null") as unknown;
+      if (
+        saved &&
+        typeof saved === "object" &&
+        "runId" in saved &&
+        "threadId" in saved &&
+        typeof saved.runId === "string" &&
+        typeof saved.threadId === "string"
+      )
+        return saved as EnterpriseIngestStartResult;
+    } catch {
+      return null;
+    }
+    return null;
+  });
+  const [stagedCount, setStagedCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const sourceUrls = urls.split(/[\s,]+/).filter(Boolean);
+  const sourceUrls = sourceMode === "url" ? urls.split(/[\s,]+/).filter(Boolean) : [];
+  const selectedFiles = sourceMode === "url" ? [] : files;
   const start = async () => {
     if (!ingestion || busy) return;
-    const fileError = uploadFileError(files);
+    const fileError = uploadFileError(selectedFiles);
     if (sourceUrls.length > 10 || fileError) {
       setError(t(fileError ?? "Choose at most 10 URLs."));
       return;
     }
-    if (files.length && !ingestion.stageUpload) {
+    if (selectedFiles.length && !ingestion.stageUpload) {
       setError(t("File upload is unavailable for this connection."));
       return;
     }
     setBusy(true);
     setError(null);
-    setStatus(null);
+    setStagedCount(0);
+    setRun(null);
     try {
       const uploadProposalIds: string[] = [];
       if (ingestion.stageUpload) {
-        for (const batch of uploadBatches(files)) {
+        for (const batch of uploadBatches(selectedFiles)) {
           const staged = await ingestion.stageUpload(
             await Promise.all(
               batch.map(async (file) => ({
@@ -124,9 +168,10 @@ function IngestionRun({
             destination,
           );
           uploadProposalIds.push(...staged.uploadProposalIds);
+          setStagedCount((count) => count + batch.length);
         }
       }
-      await ingestion.start({
+      const started = await ingestion.start({
         destination,
         ...(note.trim() ? { note: note.trim() } : {}),
         ...(sourceUrls.length ? { sourceUrls } : {}),
@@ -136,9 +181,12 @@ function IngestionRun({
       setFiles([]);
       setUrls("");
       setNote("");
-      setStatus(
-        t("Run started. Check Changes after processing; nothing is approved automatically."),
-      );
+      setRun(started);
+      try {
+        sessionStorage.setItem(runKey, JSON.stringify(started));
+      } catch {
+        // Session storage is optional; the run remains visible until this panel unmounts.
+      }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : t("Could not start ingestion");
       setError(t(ingestStartError(message, sourceUrls)));
@@ -146,18 +194,26 @@ function IngestionRun({
     setBusy(false);
   };
   return (
-    <section aria-label={t("Incremental ingestion")} className="space-y-3 rounded-xl border p-4">
-      <h2 className="font-medium">{t("Add knowledge")}</h2>
-      <p className="text-sm text-muted-foreground">
-        {t(
-          "Drop files or paste public HTTPS links. Changes are proposed for review, not applied automatically.",
-        )}
-      </p>
-      <label className="block text-sm">
-        {t("Destination")}
+    <section
+      aria-label={t("Incremental ingestion")}
+      className="space-y-5 rounded-xl border bg-background p-5 sm:p-6"
+    >
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold">{t("Add knowledge")}</h2>
+        <p className="text-sm text-muted-foreground">
+          {t(
+            "Choose a source. The agent prepares proposals; you decide what enters the knowledge map.",
+          )}
+        </p>
+      </div>
+      <div className="space-y-2">
+        <label htmlFor="ingest-destination" className="text-sm font-medium">
+          {t("1. Where should it go?")}
+        </label>
         <select
+          id="ingest-destination"
           aria-label={t("Destination")}
-          className="ml-2 rounded border bg-background p-1"
+          className="block w-full max-w-xs rounded-lg border border-input bg-background px-3 py-2 text-sm"
           value={destination}
           onChange={(event) => {
             setDestination(event.target.value);
@@ -173,97 +229,236 @@ function IngestionRun({
           ))}
           <option value="global">{t("General")}</option>
         </select>
-      </label>
-      <p className="text-xs text-muted-foreground">
-        {destination === "personal"
-          ? t("Only you review Personal proposals; they are filed under your account.")
-          : destination === "global"
-            ? t("A company admin reviews General proposals.")
-            : t("Your area's lead or a company admin reviews Area proposals.")}
-      </p>
-      <label
-        className="block rounded border border-dashed p-4 text-sm"
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          if (busy || !ingestion?.canStart) return;
-          const dropped = droppedUploadFiles(event.dataTransfer);
-          if (dropped === null) {
-            setFiles([]);
-            setError(
-              t("Folders cannot be dropped here. Use Choose folder to select raw/ instead."),
-            );
-            return;
+        <p className="text-xs text-muted-foreground">
+          {destination === "personal"
+            ? t("Only you review Personal proposals; they are filed under your account.")
+            : destination === "global"
+              ? t("A company admin reviews General proposals.")
+              : t("Your area's lead or a company admin reviews Area proposals.")}
+        </p>
+      </div>
+      <div className="space-y-3">
+        <p className="text-sm font-medium">{t("2. Choose one source")}</p>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t("Source type")}>
+          {(
+            [
+              ["url", Link2Icon, t("Repository URL")],
+              ["folder", FolderOpenIcon, t("Folder")],
+              ["files", FilesIcon, t("Files")],
+            ] as const
+          ).map(([mode, Icon, label]) => (
+            <Button
+              key={mode}
+              size="sm"
+              variant={sourceMode === mode ? "secondary" : "outline"}
+              aria-pressed={sourceMode === mode}
+              disabled={busy}
+              onClick={() => {
+                setSourceMode(mode);
+                setFiles([]);
+                setError(null);
+              }}
+            >
+              <Icon className="size-4" /> {label}
+            </Button>
+          ))}
+        </div>
+        {sourceMode === "url" ? (
+          <div className="space-y-2 rounded-xl border bg-muted/20 p-4">
+            <label htmlFor="ingest-url" className="text-sm font-medium">
+              {t("Public HTTPS repository or document URL")}
+            </label>
+            <Input
+              nativeInput
+              id="ingest-url"
+              type="url"
+              aria-label={t("Public HTTPS URLs")}
+              placeholder="https://github.com/owner/repository"
+              disabled={busy || !ingestion?.canStart}
+              value={urls}
+              onChange={(event) => setUrls(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "For a repository, use its root URL. Only supported files in the selected destination are prepared.",
+              )}
+            </p>
+          </div>
+        ) : (
+          <div
+            className="space-y-3 rounded-xl border border-dashed bg-muted/20 p-5"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              if (busy || !ingestion?.canStart) return;
+              const dropped = droppedUploadFiles(event.dataTransfer);
+              if (dropped === null) {
+                setFiles([]);
+                setError(
+                  t("Folders cannot be dropped here. Use Choose folder to select raw/ instead."),
+                );
+                return;
+              }
+              setSourceMode("files");
+              setError(null);
+              setFiles(dropped);
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <UploadCloudIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {sourceMode === "folder"
+                    ? t("Select a folder, including its subfolders")
+                    : t("Choose files or drop them here")}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {sourceMode === "folder"
+                    ? t("Use the folder picker for raw/. Dragging a folder is not supported.")
+                    : t("Original relative paths are kept for review.")}
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy || !ingestion?.canStart}
+              onClick={() => (sourceMode === "folder" ? folderInput : fileInput).current?.click()}
+            >
+              {sourceMode === "folder" ? t("Choose folder") : t("Choose files")}
+            </Button>
+            <input
+              ref={(input) => {
+                folderInput.current = input;
+                input?.setAttribute("webkitdirectory", "");
+              }}
+              type="file"
+              multiple
+              className="sr-only"
+              aria-label={t("Choose folder")}
+              disabled={busy || !ingestion?.canStart}
+              onChange={(event) => {
+                const selected = droppedUploadFiles({ items: [], files: event.target.files ?? [] });
+                event.target.value = "";
+                setFiles(selected ?? []);
+                setError(
+                  selected === null
+                    ? t("This folder could not be read. Choose folder again and select raw/.")
+                    : null,
+                );
+              }}
+            />
+            <input
+              ref={fileInput}
+              type="file"
+              multiple
+              className="sr-only"
+              aria-label={t("Choose files")}
+              disabled={busy || !ingestion?.canStart}
+              onChange={(event) => {
+                setFiles(Array.from(event.target.files ?? []));
+                event.target.value = "";
+                setError(null);
+              }}
+            />
+            {selectedFiles.length > 0 && (
+              <p role="status" className="text-xs text-muted-foreground">
+                {t("{count} files selected", { count: selectedFiles.length })} ·{" "}
+                {selectedFiles.slice(0, 3).map(uploadPath).join(", ")}
+                {selectedFiles.length > 3 ? "…" : ""}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+      <details className="text-sm">
+        <summary className="cursor-pointer text-muted-foreground">
+          {t("Add a note for the agent (optional)")}
+        </summary>
+        <div className="mt-2 max-w-xl">
+          <Input
+            nativeInput
+            aria-label={t("Missing knowledge")}
+            placeholder={t("What should the agent look for?")}
+            disabled={busy || !ingestion?.canStart}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+        </div>
+      </details>
+      <div className="flex flex-wrap items-center gap-3 border-t pt-4">
+        <Button
+          size="sm"
+          disabled={
+            busy ||
+            !ingestion?.canStart ||
+            (!selectedFiles.length && !sourceUrls.length && !note.trim())
           }
-          setError(null);
-          setFiles(dropped);
-        }}
-      >
-        {t("Drop files here or choose files")}
-        <input
-          aria-label={t("Choose files")}
-          className="block"
-          type="file"
-          multiple
-          disabled={busy || !ingestion?.canStart}
-          onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
-        />
-        <span className="mt-2 block">{t("Choose folder (for raw/ and nested files)")}</span>
-        <input
-          aria-label={t("Choose folder")}
-          className="block"
-          type="file"
-          multiple
-          ref={(input) => input?.setAttribute("webkitdirectory", "")}
-          disabled={busy || !ingestion?.canStart}
-          onChange={(event) => {
-            const selected = droppedUploadFiles({ items: [], files: event.target.files ?? [] });
-            setFiles(selected ?? []);
-            setError(
-              selected === null
-                ? t("This folder could not be read. Choose folder again and select raw/.")
-                : null,
-            );
-          }}
-        />
-      </label>
-      {files.length > 0 && (
-        <p className="text-xs">
-          {t("{count} files selected", { count: files.length })} ·{" "}
-          {files.slice(0, 3).map(uploadPath).join(", ")}
-          {files.length > 3 ? "…" : ""}
+          onClick={() => void start()}
+        >
+          {busy ? t("Preparing…") : t("Start ingestion")}
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {t("Nothing is published until a reviewer approves it.")}
+        </p>
+      </div>
+      {busy && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {selectedFiles.length
+            ? stagedCount < selectedFiles.length
+              ? t("Staging {count} of {total} selected files…", {
+                  count: stagedCount,
+                  total: selectedFiles.length,
+                })
+              : t("Files staged. Starting agent turn…")
+            : t("Starting agent turn…")}
         </p>
       )}
-      <textarea
-        aria-label={t("Public HTTPS URLs")}
-        placeholder={t("Paste public HTTPS URLs, one per line")}
-        className="w-full rounded border bg-background p-2 text-sm"
-        rows={2}
-        value={urls}
-        disabled={busy || !ingestion?.canStart}
-        onChange={(event) => setUrls(event.target.value)}
-      />
-      <Input
-        nativeInput
-        aria-label={t("Missing knowledge")}
-        placeholder={t("Optional note about missing knowledge")}
-        disabled={busy || !ingestion?.canStart}
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-      />
-      <Button
-        size="sm"
-        disabled={
-          busy || !ingestion?.canStart || (!files.length && !sourceUrls.length && !note.trim())
-        }
-        onClick={() => void start()}
-      >
-        {busy ? t("Starting…") : t("Start ingestion")}
-      </Button>
-      {status && (
-        <p role="status" className="text-sm">
-          {status}
-        </p>
+      {run && (
+        <div role="status" className="space-y-2 rounded-xl border bg-muted/20 p-4 text-sm">
+          <p className="font-medium">{t("Agent run started")}</p>
+          <p className="text-muted-foreground">
+            {t(
+              "Proposals will appear in Changes for your review. Nothing is approved automatically.",
+            )}
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            {identity?.hubEnvironmentId === environmentId ? (
+              <Link
+                className="font-medium text-primary underline underline-offset-2"
+                to="/$environmentId/$threadId"
+                params={{ environmentId, threadId: run.threadId }}
+              >
+                {t("Open agent turn")}
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">
+                {t("The agent turn runs on the hub. Its status appears here.")}
+              </span>
+            )}
+            {onReview && (
+              <Button size="sm" variant="outline" onClick={onReview}>
+                {t("Review proposals")}
+              </Button>
+            )}
+          </div>
+          {run.skippedSources?.length ? (
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer">
+                {t("{count} sources were skipped; no content was invented for them.", {
+                  count: run.skippedSources.length,
+                })}
+              </summary>
+              <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto pl-4">
+                {run.skippedSources.map((source) => (
+                  <li key={source.path}>
+                    {source.path} · {source.reason}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </div>
       )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
@@ -339,7 +534,7 @@ function OrgImport({ environmentId }: { environmentId: EnvironmentId }) {
     setBusy(false);
   };
   return (
-    <section aria-label={t("Organization import")} className="space-y-3 rounded-xl border p-4">
+    <section aria-label={t("Organization import")} className="mt-4 space-y-3 border-t pt-4">
       <h2 className="font-medium">{t("Organization and areas (admins)")}</h2>
       <p className="text-sm text-muted-foreground">
         {t(
@@ -357,7 +552,7 @@ function OrgImport({ environmentId }: { environmentId: EnvironmentId }) {
             {t("Download template")} · {name}.yaml
           </Button>
           <label
-            className="block rounded border border-dashed p-3 text-sm"
+            className="block cursor-pointer rounded-lg border border-dashed bg-muted/20 p-4 text-sm hover:border-foreground/30"
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
@@ -366,7 +561,7 @@ function OrgImport({ environmentId }: { environmentId: EnvironmentId }) {
           >
             {name}.yaml · {fileNames[name] ?? t("Drop or choose a YAML file")}
             <input
-              className="block text-xs"
+              className="sr-only"
               type="file"
               accept=".yaml,.yml"
               aria-label={name + ".yaml"}
