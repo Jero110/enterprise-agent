@@ -1,5 +1,6 @@
 import {
   EnterpriseError,
+  KnowledgeNodeMetadata,
   type KnowledgeDocument,
   type KnowledgeProposal,
 } from "@t3tools/contracts";
@@ -10,6 +11,8 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
+import { parse as parseYaml } from "yaml";
 
 import * as ServerConfig from "../config.ts";
 import * as EnterpriseStore from "../enterprise/EnterpriseStore.ts";
@@ -46,6 +49,37 @@ export class KnowledgeRepo extends Context.Service<
 
 const titleOf = (path: string, content: string): string =>
   /^#\s+(.+)$/m.exec(content)?.[1]?.trim() ?? path;
+
+const Frontmatter = Schema.Struct({
+  title: Schema.NonEmptyString,
+  area: Schema.NonEmptyString,
+  ...KnowledgeNodeMetadata.fields,
+  links: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+
+const decodeFrontmatter = Schema.decodeUnknownSync(Frontmatter);
+
+const documentOf = (id: string, raw: string): KnowledgeDocument => {
+  const areaId = id.startsWith("global/") ? GENERAL_AREA : id.split("/")[1]!;
+  const fallback = { id, areaId, title: titleOf(id, raw), content: raw };
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw);
+  if (!match) return fallback;
+  try {
+    const metadata = decodeFrontmatter(parseYaml(match[1]!));
+    return {
+      id,
+      areaId: metadata.area,
+      title: metadata.title,
+      description: metadata.description,
+      layer: metadata.layer,
+      private: metadata.private,
+      links: metadata.links ?? [],
+      content: raw.slice(match[0].length),
+    };
+  } catch {
+    return fallback;
+  }
+};
 
 export const layer = Layer.effect(
   KnowledgeRepo,
@@ -107,10 +141,7 @@ export const layer = Layer.effect(
       ];
       const read = yield* Effect.forEach(paths, (id) =>
         fs.readFileString(path.join(root, id)).pipe(
-          Effect.map((content): KnowledgeDocument => {
-            const areaId = id.startsWith("global/") ? GENERAL_AREA : id.split("/")[1]!;
-            return { id, areaId, title: titleOf(id, content), content };
-          }),
+          Effect.map((content) => documentOf(id, content)),
           Effect.option,
         ),
       );

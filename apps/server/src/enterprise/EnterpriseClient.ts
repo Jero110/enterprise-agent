@@ -25,6 +25,7 @@ import {
   type EnterpriseStatus,
   KnowledgeDocument,
   KnowledgeDocumentList,
+  KnowledgeGraph,
   type KnowledgeGetInput,
   type KnowledgeSearchInput,
   KnowledgeSearchResult,
@@ -123,6 +124,10 @@ export class EnterpriseClient extends Context.Service<
       input: EnterpriseRevokeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
     /** The hub's answer for this member; the IDE never filters or caches knowledge itself. */
+    readonly knowledgeGraph: Effect.Effect<KnowledgeGraph, EnterpriseError>;
+    readonly knowledgeRequestAccess: (
+      input: KnowledgeGetInput,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
     readonly knowledgeList: Effect.Effect<KnowledgeDocumentList, EnterpriseError>;
     readonly knowledgeSearch: (
       input: KnowledgeSearchInput,
@@ -434,6 +439,12 @@ const make = Effect.gen(function* () {
     revoke: Effect.fn("EnterpriseClient.revoke")((input) =>
       withConnection((hub) =>
         callResult(hub, "enterprise_member_revoke", input, EnterpriseMembers),
+      ),
+    ),
+    knowledgeGraph: withConnection((hub) => callResult(hub, "knowledge_graph", {}, KnowledgeGraph)),
+    knowledgeRequestAccess: Effect.fn("EnterpriseClient.knowledgeRequestAccess")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "knowledge_request_access", input, KnowledgeProposal),
       ),
     ),
     knowledgeList: withConnection((hub) =>

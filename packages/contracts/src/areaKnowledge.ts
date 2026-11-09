@@ -9,11 +9,36 @@ export type AreaId = typeof AreaId.Type;
 export const AreaRequestStatus = Schema.Literals(["pending", "approved", "denied"]);
 export type AreaRequestStatus = typeof AreaRequestStatus.Type;
 
+export const KnowledgeLayer = Schema.Literals(["metrics", "business", "ai", "data"]);
+export type KnowledgeLayer = typeof KnowledgeLayer.Type;
+
+export const KnowledgeNodeMetadata = Schema.Struct({
+  description: Schema.String,
+  layer: KnowledgeLayer,
+  private: Schema.Boolean,
+  links: Schema.Array(Schema.String),
+});
+
+export const KnowledgeGraphNode = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  areaId: AreaId,
+  title: TrimmedNonEmptyString,
+  ...KnowledgeNodeMetadata.fields,
+  accessible: Schema.Boolean,
+  content: Schema.optionalKey(Schema.String),
+});
+export const KnowledgeGraph = Schema.Struct({ nodes: Schema.Array(KnowledgeGraphNode) });
+export type KnowledgeGraph = typeof KnowledgeGraph.Type;
+
 export const KnowledgeDocument = Schema.Struct({
   id: TrimmedNonEmptyString,
   areaId: AreaId,
   title: TrimmedNonEmptyString,
   content: Schema.String,
+  description: Schema.optionalKey(Schema.String),
+  layer: Schema.optionalKey(KnowledgeLayer),
+  private: Schema.optionalKey(Schema.Boolean),
+  links: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type KnowledgeDocument = typeof KnowledgeDocument.Type;
 

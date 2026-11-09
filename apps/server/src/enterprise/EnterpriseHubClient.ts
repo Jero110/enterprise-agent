@@ -86,6 +86,12 @@ const make = Effect.gen(function* () {
     revoke: Effect.fn("EnterpriseHubClient.revoke")(function* (input) {
       return yield* hub.revoke(yield* session, input);
     }),
+    knowledgeGraph: Effect.flatMap(session, hub.knowledgeGraph),
+    knowledgeRequestAccess: Effect.fn("EnterpriseHubClient.knowledgeRequestAccess")(
+      function* (input) {
+        return yield* hub.knowledgeRequestAccess(yield* session, input);
+      },
+    ),
     knowledgeList: Effect.flatMap(session, hub.knowledgeList),
     knowledgeGet: Effect.fn("EnterpriseHubClient.knowledgeGet")(function* (input) {
       return yield* hub.knowledgeGet(yield* session, input);

@@ -64,7 +64,7 @@ describe("EnterpriseStore", () => {
         people: (yield* store.listMembers).map((member) => ({
           email: member.email,
           displayName: member.displayName,
-          areaId: member.teamId,
+          areaId: member.teamId!,
           role: member.role,
           reportsTo: member.reportsTo,
         })),

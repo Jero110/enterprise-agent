@@ -50,7 +50,12 @@ import {
   ThreadContextInput,
   ThreadContextSetInput,
 } from "./enterprise.ts";
-import { KnowledgeDocument, KnowledgeDocumentList, KnowledgeGetInput } from "./areaKnowledge.ts";
+import {
+  KnowledgeGraph,
+  KnowledgeDocument,
+  KnowledgeDocumentList,
+  KnowledgeGetInput,
+} from "./areaKnowledge.ts";
 import {
   KnowledgeProposeInput,
   KnowledgeProposal,
@@ -566,6 +571,8 @@ export const WS_METHODS = {
   enterpriseMembersList: "enterprise.members.list",
   enterpriseMembersAuthorize: "enterprise.members.authorize",
   enterpriseMembersRevoke: "enterprise.members.revoke",
+  enterpriseKnowledgeGraph: "enterprise.knowledge.graph",
+  enterpriseKnowledgeRequestAccess: "enterprise.knowledge.requestAccess",
   enterpriseKnowledgeList: "enterprise.knowledge.list",
   enterpriseKnowledgeGet: "enterprise.knowledge.get",
   enterpriseKnowledgePropose: "enterprise.knowledge.propose",
@@ -1004,6 +1011,20 @@ const WsEnterpriseMembersRevokeRpc = Rpc.make(WS_METHODS.enterpriseMembersRevoke
   success: EnterpriseMembers,
   error: enterpriseError,
 });
+
+const WsEnterpriseKnowledgeGraphRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeGraph, {
+  payload: Schema.Struct({}),
+  success: KnowledgeGraph,
+  error: enterpriseError,
+});
+const WsEnterpriseKnowledgeRequestAccessRpc = Rpc.make(
+  WS_METHODS.enterpriseKnowledgeRequestAccess,
+  {
+    payload: KnowledgeGetInput,
+    success: KnowledgeProposal,
+    error: enterpriseError,
+  },
+);
 
 const WsEnterpriseKnowledgeListRpc = Rpc.make(WS_METHODS.enterpriseKnowledgeList, {
   payload: Schema.Struct({}),
@@ -2230,6 +2251,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseMembersListRpc,
   WsEnterpriseMembersAuthorizeRpc,
   WsEnterpriseMembersRevokeRpc,
+  WsEnterpriseKnowledgeGraphRpc,
+  WsEnterpriseKnowledgeRequestAccessRpc,
   WsEnterpriseKnowledgeListRpc,
   WsEnterpriseKnowledgeGetRpc,
   WsEnterpriseIngestStartRpc,

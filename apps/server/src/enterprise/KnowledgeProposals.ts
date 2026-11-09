@@ -70,7 +70,7 @@ const canApprove = (
 ) => {
   if (proposal.scope === "personal") return proposal.recipient === member.email;
   if (member.role === "admin") return true;
-  if (proposal.kind === "area-access" || proposal.scope === "global") return false;
+  if (proposal.scope === "global") return false;
   const lead = (areaId: string) =>
     (member.teamId === areaId && member.role === "lead") ||
     grants.some((grant) => grant.areaId === areaId && grant.role === "lead");

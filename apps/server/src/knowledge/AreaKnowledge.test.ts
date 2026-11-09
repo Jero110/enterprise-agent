@@ -4,6 +4,8 @@ import { expect, it, describe } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Exit from "effect/Exit";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 
 import { PREAUTHORIZED_ADMIN_EMAIL } from "@t3tools/contracts";
@@ -45,6 +47,57 @@ const layerAreaKnowledge = (overrides?: Partial<ServerConfig.ServerConfig["Servi
   );
 
 describe("AreaKnowledge", () => {
+  it.effect(
+    "graph previews expose metadata but never a forbidden body, including guessed paths",
+    () =>
+      Effect.gen(function* () {
+        const knowledge = yield* AreaKnowledge.AreaKnowledge;
+        const ana = (yield* knowledge.getMemberPrincipal("ent.test.ana@gmail.com"))!;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const config = yield* ServerConfig.ServerConfig;
+        yield* fs.writeFileString(
+          path.join(config.baseDir, "enterprise/knowledge/areas/risk/node.md"),
+          "---\ntitle: Risk model\ndescription: Exposure overview\narea: risk\nlayer: data\nprivate: true\nlinks: [global/overview.md]\n---\nSecret exposure body",
+        );
+        yield* fs.writeFileString(
+          path.join(config.baseDir, "enterprise/knowledge/global/broken.md"),
+          "---\n[bad yaml\n---\n# Old document",
+        );
+        const graph = yield* knowledge.graph(ana);
+        expect(graph.nodes.find((node) => node.areaId === "risk")).toMatchObject({
+          accessible: false,
+          private: true,
+        });
+        expect(graph.nodes.find((node) => node.areaId === "risk")).not.toHaveProperty("content");
+        expect(graph.nodes.find((node) => node.areaId === "general")).toMatchObject({
+          accessible: true,
+          content: expect.any(String),
+        });
+        expect(graph.nodes.find((node) => node.id === "areas/risk/node.md")).toEqual({
+          id: "areas/risk/node.md",
+          areaId: "risk",
+          title: "Risk model",
+          description: "Exposure overview",
+          layer: "data",
+          private: true,
+          links: ["global/overview.md"],
+          accessible: false,
+        });
+        const admin = (yield* knowledge.getMemberPrincipal(PREAUTHORIZED_ADMIN_EMAIL))!;
+        expect((yield* knowledge.readDocument(admin, "areas/risk/node.md")).content).toBe(
+          "Secret exposure body",
+        );
+        expect(graph.nodes.find((node) => node.id === "global/broken.md")?.title).toBe(
+          "Old document",
+        );
+        expect(
+          Exit.isFailure(
+            yield* knowledge.readDocument(ana, "areas/risk/README.md").pipe(Effect.exit),
+          ),
+        ).toBe(true);
+      }).pipe(Effect.provide(layerAreaKnowledge())),
+  );
   describe("listDocuments", () => {
     it.effect("admin sees general + every team document", () =>
       Effect.gen(function* () {

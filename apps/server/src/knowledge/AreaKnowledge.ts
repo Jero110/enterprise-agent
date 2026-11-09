@@ -1,6 +1,7 @@
 import {
   type VerifiedIdentity,
   type KnowledgeDocument,
+  type KnowledgeGraph,
   type KnowledgeDocumentSummary,
   type KnowledgeSearchHit,
   type AreaRequest,
@@ -22,6 +23,8 @@ export interface AreaKnowledgeService {
 
   /** The principal of an enrolled member's email, or null when the email cannot enter. */
   readonly getMemberPrincipal: (email: string) => Effect.Effect<TeamPrincipal | null>;
+
+  readonly graph: (principal: TeamPrincipal) => Effect.Effect<KnowledgeGraph>;
 
   readonly listDocuments: (
     principal: TeamPrincipal,
@@ -83,7 +86,7 @@ const scoreDocument = (doc: KnowledgeDocument, terms: ReadonlyArray<string>) => 
 };
 
 const canReadDocument = (principal: TeamPrincipal, areaId: AreaId): boolean =>
-  areaId === GENERAL_AREA || principal.areaIds.includes(areaId);
+  principal.isAdmin || areaId === GENERAL_AREA || principal.areaIds.includes(areaId);
 
 export const layer = Layer.effect(
   AreaKnowledge,
@@ -132,6 +135,27 @@ export const layer = Layer.effect(
       Effect.map(repo.documents, (docs) =>
         docs.filter((doc) => canReadDocument(principal, doc.areaId)),
       );
+
+    const graph = Effect.fn("AreaKnowledge.graph")(function* (principal: TeamPrincipal) {
+      const current = yield* getMemberPrincipal(principal.email);
+      if (current === null) return { nodes: [] };
+      return {
+        nodes: (yield* repo.documents).map((doc) => {
+          const accessible = canReadDocument(current, doc.areaId);
+          return {
+            id: doc.id,
+            areaId: doc.areaId,
+            title: doc.title,
+            description: doc.description ?? "",
+            layer: doc.layer ?? ("business" as const),
+            private: doc.private ?? doc.areaId !== GENERAL_AREA,
+            links: doc.links ?? [],
+            accessible,
+            ...(accessible ? { content: doc.content } : {}),
+          };
+        }),
+      };
+    });
 
     const listDocuments: AreaKnowledgeService["listDocuments"] = (principal) =>
       Effect.map(readable(principal), (docs) =>
@@ -274,6 +298,7 @@ export const layer = Layer.effect(
     return {
       getPrincipal,
       getMemberPrincipal,
+      graph,
       listDocuments,
       searchDocuments,
       readDocument,

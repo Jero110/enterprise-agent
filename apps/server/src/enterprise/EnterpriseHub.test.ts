@@ -35,6 +35,44 @@ const codeOf = <A>(effect: Effect.Effect<A, { readonly code: string }>) =>
   );
 
 describe("EnterpriseHub", () => {
+  it.effect(
+    "node access requests reach the area lead and bodies follow approval and revocation",
+    () =>
+      Effect.gen(function* () {
+        const hub = yield* EnterpriseHub.EnterpriseHub;
+        const store = yield* EnterpriseStore.EnterpriseStore;
+        const riskLead = (yield* store.listMembers).find(
+          (member) => member.teamId === "risk" && member.role === "lead",
+        )!;
+        yield* hub.enroll("ana", { email: ANA, token: TOKEN });
+        yield* hub.enroll("risk-lead", { email: riskLead.email, token: TOKEN });
+        yield* hub.enroll("unrelated", { email: "ent.test.bruno@gmail.com", token: TOKEN });
+        expect(
+          (yield* hub.knowledgeGraph("ana")).nodes.find((node) => node.areaId === "risk"),
+        ).not.toHaveProperty("content");
+        expect(yield* codeOf(hub.knowledgeRequestAccess("ana", { path: "../../risk" }))).toBe(
+          "document_not_found",
+        );
+        const request = yield* hub.knowledgeRequestAccess("ana", { path: "areas/risk/README.md" });
+        expect(
+          (yield* hub.proposalInbox("risk-lead", {})).proposals.some((p) => p.id === request.id),
+        ).toBe(true);
+        expect(
+          (yield* hub.proposalInbox("unrelated", {})).proposals.some((p) => p.id === request.id),
+        ).toBe(false);
+        yield* hub.proposalDecide("risk-lead", { id: request.id, action: "approve" });
+        expect(
+          (yield* hub.knowledgeGraph("ana")).nodes.find((node) => node.areaId === "risk"),
+        ).toHaveProperty("content");
+        yield* hub.proposalDecide("risk-lead", { id: request.id, action: "revert" });
+        expect(
+          (yield* hub.knowledgeGraph("ana")).nodes.find((node) => node.areaId === "risk"),
+        ).not.toHaveProperty("content");
+        expect(yield* codeOf(hub.knowledgeGet("ana", { path: "areas/risk/README.md" }))).toBe(
+          "access_denied",
+        );
+      }).pipe(Effect.provide(layer)),
+  );
   it.effect("attributes ingestion proposals only to registered admin threads", () =>
     Effect.gen(function* () {
       const hub = yield* EnterpriseHub.EnterpriseHub;

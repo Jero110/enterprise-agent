@@ -17,6 +17,7 @@ import {
   type EnterpriseRevokeMemberInput,
   type KnowledgeDocument,
   type KnowledgeDocumentList,
+  type KnowledgeGraph,
   type KnowledgeGetInput,
   type KnowledgeSearchInput,
   type KnowledgeSearchResult,
@@ -102,6 +103,11 @@ export class EnterpriseHub extends Context.Service<
       input: EnterpriseRevokeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
     /** Knowledge calls are scoped by the enrolled member's team and grants, re-read each call. */
+    readonly knowledgeGraph: (sessionId: string) => Effect.Effect<KnowledgeGraph, EnterpriseError>;
+    readonly knowledgeRequestAccess: (
+      sessionId: string,
+      input: KnowledgeGetInput,
+    ) => Effect.Effect<KnowledgeProposal, EnterpriseError>;
     readonly knowledgeList: (
       sessionId: string,
     ) => Effect.Effect<KnowledgeDocumentList, EnterpriseError>;
@@ -434,6 +440,34 @@ const make = Effect.gen(function* () {
     orgImport,
     authorize,
     revoke,
+    knowledgeGraph: Effect.fn("EnterpriseHub.knowledgeGraph")(function* (sessionId) {
+      return yield* knowledge.graph(yield* principalOf(sessionId));
+    }),
+    knowledgeRequestAccess: Effect.fn("EnterpriseHub.knowledgeRequestAccess")(
+      function* (sessionId, input) {
+        const principal = yield* principalOf(sessionId);
+        const node = (yield* knowledge.graph(principal)).nodes.find(
+          (node) => node.id === input.path,
+        );
+        if (!node)
+          return yield* new EnterpriseError({
+            code: "document_not_found",
+            message: "Document not found.",
+          });
+        if (node.accessible)
+          return yield* new EnterpriseError({
+            code: "conflict",
+            message: "You already have access to this node.",
+          });
+        return yield* proposals.propose(principal.email, {
+          kind: "area-access",
+          scope: node.areaId,
+          path: "",
+          reason: "Request area knowledge access",
+          evidence: [],
+        });
+      },
+    ),
     knowledgeList,
     knowledgeSearch,
     knowledgeGet,

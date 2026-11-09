@@ -53,6 +53,12 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     tag: WS_METHODS.enterpriseKnowledgeList,
     staleTimeMs: 10_000,
   });
+  const knowledgeGraph = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:knowledge-graph",
+    tag: WS_METHODS.enterpriseKnowledgeGraph,
+    staleTimeMs: 0,
+    refreshIntervalMs: 10_000,
+  });
   const knowledgeGet = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:enterprise:knowledge-get",
     tag: WS_METHODS.enterpriseKnowledgeGet,
@@ -82,6 +88,7 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     registry.refresh(members({ environmentId, input: {} }));
     registry.refresh(org({ environmentId, input: {} }));
     registry.refresh(knowledgeList({ environmentId, input: {} }));
+    registry.refresh(knowledgeGraph({ environmentId, input: {} }));
     registry.refresh(proposalInbox({ environmentId, input: {} }));
     registry.refresh(proposalInbox({ environmentId, input: { countOnly: true } }));
     registry.refresh(teamThreads({ environmentId, input: {} }));
@@ -121,6 +128,13 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
         ),
     }),
     knowledgeList,
+    knowledgeGraph,
+    knowledgeRequestAccess: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:knowledge-request-access",
+      tag: WS_METHODS.enterpriseKnowledgeRequestAccess,
+      onSuccess: ({ environmentId }, registry) =>
+        Effect.sync(() => refreshAll(registry, environmentId)),
+    }),
     knowledgeGet,
     proposalInbox,
     ingestStart: createEnvironmentRpcCommand(runtime, {

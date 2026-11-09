@@ -533,7 +533,7 @@ describe("KnowledgeProposals", () => {
   );
 
   it.effect(
-    "holds area-access pending until admin approval and supports revocation by revert",
+    "holds area-access pending until lead approval and supports admin revocation by revert",
     () =>
       Effect.gen(function* () {
         const proposals = yield* KnowledgeProposals.KnowledgeProposals;
@@ -549,10 +549,10 @@ describe("KnowledgeProposals", () => {
         expect((yield* proposals.inbox(GERRY)).proposals).toMatchObject([
           { id: p.id, canDecide: false },
         ]);
-        expect(yield* codeOf(proposals.decide(ANA, { id: p.id, action: "approve" }))).toBe(
-          "access_denied",
-        );
-        yield* proposals.decide(ADMIN, { id: p.id, action: "approve" });
+        expect((yield* proposals.inbox(ANA)).proposals).toMatchObject([
+          { id: p.id, canDecide: true },
+        ]);
+        yield* proposals.decide(ANA, { id: p.id, action: "approve" });
         expect((yield* store.listGrants(GERRY)).map((g) => g.areaId)).toContain("ledger");
         expect(
           yield* codeOf(proposals.propose(GERRY, { ...create, path: "areas/ledger/grant.md" })),
