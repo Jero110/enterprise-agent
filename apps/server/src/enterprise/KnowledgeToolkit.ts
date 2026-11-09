@@ -25,7 +25,7 @@ import * as McpToolAccess from "../mcp/McpToolAccess.ts";
 import { EnterpriseClient } from "./EnterpriseClient.ts";
 import { EnterpriseHub } from "./EnterpriseHub.ts";
 import { ThreadKnowledge } from "./ThreadKnowledge.ts";
-import { asResult, hubResult, sessionId } from "./EnterpriseToolkit.ts";
+import { asResult, hubResult, hubSessionId } from "./EnterpriseToolkit.ts";
 
 const shared = {
   failure: OrchestratorMcpFailure,
@@ -124,9 +124,16 @@ const layerHub = McpToolAccess.toLayer(
   KnowledgeToolkit,
   Effect.gen(function* () {
     const hub = yield* EnterpriseHub;
+    const sessionId = hubSessionId(hub);
     return {
       knowledge_graph: McpToolAccess.reads(() =>
-        asResult(Effect.flatMap(sessionId, hub.knowledgeGraph)),
+        asResult(
+          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
+            scope.client === undefined && scope.thread !== undefined
+              ? hub.ingestionGraph(scope.thread.threadId)
+              : Effect.flatMap(sessionId, hub.knowledgeGraph),
+          ),
+        ),
       ),
       knowledge_request_access: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => hub.knowledgeRequestAccess(id, input))),
@@ -170,7 +177,13 @@ const layerHub = McpToolAccess.toLayer(
         ),
       ),
       knowledge_search: McpToolAccess.reads((input) =>
-        asResult(Effect.flatMap(sessionId, (id) => hub.knowledgeSearch(id, input))),
+        asResult(
+          Effect.flatMap(McpInvocationContext.McpInvocationContext, (scope) =>
+            scope.client === undefined && scope.thread !== undefined
+              ? hub.ingestionSearch(scope.thread.threadId, input)
+              : Effect.flatMap(sessionId, (id) => hub.knowledgeSearch(id, input)),
+          ),
+        ),
       ),
       knowledge_get: McpToolAccess.reads((input) =>
         asResult(

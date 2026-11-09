@@ -88,6 +88,10 @@ describe("EnterpriseHub", () => {
       } as const;
       expect(yield* codeOf(hub.ingestionPropose("unknown", proposal))).toBe("access_denied");
       expect(yield* codeOf(hub.ingestionList("unknown"))).toBe("access_denied");
+      expect(yield* codeOf(hub.ingestionGraph("unknown"))).toBe("access_denied");
+      expect(yield* codeOf(hub.ingestionSearch("unknown", { query: "Ledger" }))).toBe(
+        "access_denied",
+      );
       yield* store.saveIngestionRun({
         id: "run-1",
         threadId: "thread-1",
@@ -96,6 +100,14 @@ describe("EnterpriseHub", () => {
         status: "running",
       });
       expect(yield* hub.ingestionList("thread-1")).toHaveProperty("documents");
+      expect((yield* hub.ingestionGraph("thread-1")).nodes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "areas/risk/README.md", accessible: true }),
+        ]),
+      );
+      expect(
+        (yield* hub.ingestionSearch("thread-1", { query: "Ledger" })).hits.length,
+      ).toBeGreaterThan(0);
       for (const content of [
         "# No frontmatter",
         proposal.content.replace("general", "unknown"),
@@ -145,6 +157,10 @@ describe("EnterpriseHub", () => {
         status: "failed",
       });
       expect(yield* codeOf(hub.ingestionList("thread-1"))).toBe("access_denied");
+      expect(yield* codeOf(hub.ingestionGraph("thread-1"))).toBe("access_denied");
+      expect(yield* codeOf(hub.ingestionSearch("thread-1", { query: "Ledger" }))).toBe(
+        "access_denied",
+      );
       expect(yield* codeOf(hub.ingestionPropose("thread-1", proposal))).toBe("access_denied");
     }).pipe(Effect.provide(layer)),
   );

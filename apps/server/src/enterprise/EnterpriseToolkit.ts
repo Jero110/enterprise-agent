@@ -201,15 +201,16 @@ const noSession = new EnterpriseError({
 });
 
 /** The session the hub binds members to: the MCP client's, never an argument. */
-export const sessionId = McpInvocationContext.McpInvocationContext.pipe(
-  Effect.flatMap((scope) =>
-    scope.client !== undefined
-      ? Effect.succeed(scope.client.sessionId)
-      : scope.thread !== undefined
-        ? Effect.succeed(HOST_AGENT_SESSION)
-        : Effect.fail(noSession),
-  ),
-);
+export const hubSessionId = (hub: EnterpriseHub["Service"]) =>
+  McpInvocationContext.McpInvocationContext.pipe(
+    Effect.flatMap((scope) =>
+      scope.client !== undefined
+        ? Effect.succeed(scope.client.sessionId)
+        : scope.thread !== undefined
+          ? hub.assertOrdinaryAgent(scope.thread.threadId).pipe(Effect.as(HOST_AGENT_SESSION))
+          : Effect.fail(noSession),
+    ),
+  );
 
 export const asResult = <A, R>(effect: Effect.Effect<A, EnterpriseError, R>) =>
   effect.pipe(
@@ -225,6 +226,7 @@ export const layer = McpToolAccess.toLayer(
   Effect.gen(function* () {
     const runs = yield* RunRecords;
     const hub = yield* EnterpriseHub;
+    const sessionId = hubSessionId(hub);
     const ingestion = yield* EnterpriseIngestion;
     const team = yield* TeamPublication;
     return {

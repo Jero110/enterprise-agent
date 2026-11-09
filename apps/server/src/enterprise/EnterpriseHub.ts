@@ -40,6 +40,7 @@ import * as OrgImport from "./OrgImport.ts";
 export class EnterpriseHub extends Context.Service<
   EnterpriseHub,
   {
+    readonly assertOrdinaryAgent: (threadId: string) => Effect.Effect<void, EnterpriseError>;
     readonly ingestionInbox: (
       threadId: string,
       input: KnowledgeProposalInboxInput,
@@ -47,6 +48,11 @@ export class EnterpriseHub extends Context.Service<
     readonly ingestionList: (
       threadId: string,
     ) => Effect.Effect<KnowledgeDocumentList, EnterpriseError>;
+    readonly ingestionGraph: (threadId: string) => Effect.Effect<KnowledgeGraph, EnterpriseError>;
+    readonly ingestionSearch: (
+      threadId: string,
+      input: KnowledgeSearchInput,
+    ) => Effect.Effect<KnowledgeSearchResult, EnterpriseError>;
     readonly ingestionGet: (
       threadId: string,
       input: KnowledgeGetInput,
@@ -372,6 +378,13 @@ const make = Effect.gen(function* () {
     return { run, member };
   });
   return EnterpriseHub.of({
+    assertOrdinaryAgent: Effect.fn("EnterpriseHub.assertOrdinaryAgent")(function* (threadId) {
+      if ((yield* store.getIngestionRun(threadId)) !== null)
+        return yield* new EnterpriseError({
+          code: "access_denied",
+          message: "Ingestion agents may only propose knowledge changes and read knowledge.",
+        });
+    }),
     ingestionInbox: Effect.fn("EnterpriseHub.ingestionInbox")(function* (threadId, input) {
       const { member } = yield* ingestionIdentity(threadId);
       return yield* proposals.inbox(member.email, input);
@@ -381,6 +394,18 @@ const make = Effect.gen(function* () {
       const principal = yield* knowledge.getMemberPrincipal(member.email);
       if (principal === null) return yield* notAuthorized;
       return { documents: yield* knowledge.listDocuments(principal) };
+    }),
+    ingestionGraph: Effect.fn("EnterpriseHub.ingestionGraph")(function* (threadId) {
+      const { member } = yield* ingestionIdentity(threadId);
+      const principal = yield* knowledge.getMemberPrincipal(member.email);
+      if (principal === null) return yield* notAuthorized;
+      return yield* knowledge.graph(principal);
+    }),
+    ingestionSearch: Effect.fn("EnterpriseHub.ingestionSearch")(function* (threadId, input) {
+      const { member } = yield* ingestionIdentity(threadId);
+      const principal = yield* knowledge.getMemberPrincipal(member.email);
+      if (principal === null) return yield* notAuthorized;
+      return { hits: yield* knowledge.searchDocuments(principal, input.query) };
     }),
     ingestionGet: Effect.fn("EnterpriseHub.ingestionGet")(function* (threadId, input) {
       const { member } = yield* ingestionIdentity(threadId);
