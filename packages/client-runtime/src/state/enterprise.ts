@@ -70,6 +70,12 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     tag: WS_METHODS.enterpriseKnowledgeGet,
     staleTimeMs: 10_000,
   });
+  const ingestStatus = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:ingest-status",
+    tag: WS_METHODS.enterpriseIngestStatus,
+    staleTimeMs: 0,
+    refreshIntervalMs: 5_000,
+  });
   const proposalInbox = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:enterprise:proposal-inbox",
     tag: WS_METHODS.enterpriseProposalInbox,
@@ -184,6 +190,7 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     }),
     knowledgeGet,
     proposalInbox,
+    ingestStatus,
     ingestStart: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:ingest-start",
       tag: WS_METHODS.enterpriseIngestStart,

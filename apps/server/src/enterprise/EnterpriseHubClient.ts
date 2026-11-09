@@ -135,6 +135,9 @@ const make = Effect.gen(function* () {
     ingestStart: Effect.fn("EnterpriseHubClient.ingestStart")(function* (input) {
       return yield* ingestion.start(yield* session, input);
     }),
+    ingestStatus: Effect.fn("EnterpriseHubClient.ingestStatus")(function* (input) {
+      return yield* ingestion.status(yield* session, input);
+    }),
     teamList: Effect.flatMap(session, publication.list),
     teamGet: Effect.fn("EnterpriseHubClient.teamGet")(function* (input) {
       return yield* publication.get(yield* session, input);

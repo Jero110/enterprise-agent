@@ -139,7 +139,12 @@ export const layer = Layer.effect(
       ingestion = false,
     ) {
       const member = yield* memberOf(email);
-      if (!input.reason.trim() || input.evidence.some((e) => !e.trim() || /[\r\n]/.test(e)))
+      if (
+        !input.reason.trim() ||
+        input.evidence.some(
+          (e) => !e.trim() || /[\r\n]/.test(e) || (!ingestion && e.startsWith("ingestion:")),
+        )
+      )
         return yield* invalid;
       if (
         input.scope !== "global" &&

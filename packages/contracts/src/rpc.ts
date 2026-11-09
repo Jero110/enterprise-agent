@@ -40,6 +40,8 @@ import {
   EnterpriseConnectResult,
   EnterpriseIngestStartInput,
   EnterpriseIngestStartResult,
+  EnterpriseIngestStatusInput,
+  EnterpriseIngestStatusResult,
   EnterpriseMembers,
   EnterpriseOrg,
   EnterpriseOrgFiles,
@@ -590,6 +592,7 @@ export const WS_METHODS = {
   enterpriseProposalInbox: "enterprise.proposals.inbox",
   enterpriseProposalDecide: "enterprise.proposals.decide",
   enterpriseIngestStart: "enterprise.ingest.start",
+  enterpriseIngestStatus: "enterprise.ingest.status",
   enterpriseOrg: "enterprise.org",
   enterpriseConnector: "enterprise.connector",
   enterpriseOrgTemplate: "enterprise.org.template",
@@ -910,6 +913,11 @@ const enterpriseError = Schema.Union([EnterpriseError, EnvironmentAuthorizationE
 const WsEnterpriseIngestStartRpc = Rpc.make(WS_METHODS.enterpriseIngestStart, {
   payload: EnterpriseIngestStartInput,
   success: EnterpriseIngestStartResult,
+  error: enterpriseError,
+});
+const WsEnterpriseIngestStatusRpc = Rpc.make(WS_METHODS.enterpriseIngestStatus, {
+  payload: EnterpriseIngestStatusInput,
+  success: EnterpriseIngestStatusResult,
   error: enterpriseError,
 });
 const WsEnterpriseKnowledgeProposeRpc = Rpc.make(WS_METHODS.enterpriseKnowledgePropose, {
@@ -2307,6 +2315,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseKnowledgeListRpc,
   WsEnterpriseKnowledgeGetRpc,
   WsEnterpriseIngestStartRpc,
+  WsEnterpriseIngestStatusRpc,
   WsEnterpriseOrgRpc,
   WsEnterpriseConnectorRpc,
   WsEnterpriseOrgTemplateRpc,

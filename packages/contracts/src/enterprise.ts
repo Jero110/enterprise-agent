@@ -4,6 +4,7 @@ import { EnvironmentId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { PeerLinkCreateInput } from "./peerLink.ts";
 import { TeamMemberRole } from "./teamIdentity.ts";
 import { ModelSelection } from "./modelSelection.ts";
+import { OrchestrationV2RunStatus } from "./orchestrationV2.ts";
 
 /** Who the hub says a session is: its member, team and role. */
 export const EnterpriseHubIdentity = Schema.Struct({
@@ -42,6 +43,19 @@ export const EnterpriseIngestStartResult = Schema.Struct({
   ),
 });
 export type EnterpriseIngestStartResult = typeof EnterpriseIngestStartResult.Type;
+
+export const EnterpriseIngestStatusInput = Schema.Struct({ runId: TrimmedNonEmptyString });
+export type EnterpriseIngestStatusInput = typeof EnterpriseIngestStatusInput.Type;
+export const EnterpriseIngestStatusResult = Schema.Struct({
+  runId: Schema.String,
+  threadId: Schema.String,
+  status: Schema.Literals(["running", "completed", "failed"]),
+  agentStatus: Schema.NullOr(OrchestrationV2RunStatus),
+  sourceCount: Schema.Number,
+  proposedCount: Schema.Number,
+  pendingCount: Schema.Number,
+});
+export type EnterpriseIngestStatusResult = typeof EnterpriseIngestStatusResult.Type;
 
 export const EnterpriseStatus = Schema.Struct({
   identity: Schema.NullOr(EnterpriseIdentity),

@@ -6,6 +6,8 @@ import {
   ThreadId,
   type EnterpriseIngestStartInput,
   type EnterpriseIngestStartResult,
+  type EnterpriseIngestStatusInput,
+  type EnterpriseIngestStatusResult,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as IngestionSources from "./IngestionSources.ts";
@@ -35,6 +37,10 @@ export class EnterpriseIngestion extends Context.Service<
   EnterpriseIngestion,
   {
     readonly finish: (threadId: string, status: "completed" | "failed") => Effect.Effect<void>;
+    readonly status: (
+      sessionId: string,
+      input: EnterpriseIngestStatusInput,
+    ) => Effect.Effect<EnterpriseIngestStatusResult, EnterpriseError>;
     readonly start: (
       sessionId: string,
       input: EnterpriseIngestStartInput,
@@ -99,6 +105,27 @@ const make = Effect.gen(function* () {
   });
   return EnterpriseIngestion.of({
     finish,
+    status: Effect.fn("EnterpriseIngestion.status")(function* (sessionId, input) {
+      const member = yield* hub.whoami(sessionId);
+      const run = yield* store.getIngestionRunById(input.runId);
+      if (!run || run.adminEmail !== member.email)
+        return yield* new EnterpriseError({
+          code: "access_denied",
+          message: "Ingestion run is not available.",
+        });
+      const records = yield* threads
+        .getThreadRecords(ThreadId.make(run.threadId), ["runs"])
+        .pipe(Effect.orElseSucceed(() => null));
+      const counts = yield* store.ingestionProposalCounts(run.id, member.email);
+      return {
+        runId: run.id,
+        threadId: run.threadId,
+        status: run.status,
+        agentStatus: records?.runs.at(-1)?.status ?? null,
+        sourceCount: run.sourceCount,
+        ...counts,
+      };
+    }),
     start: Effect.fn("EnterpriseIngestion.start")(function* (sessionId, input) {
       const admin = yield* hub.whoami(sessionId);
       const destination = input.destination ?? "global";

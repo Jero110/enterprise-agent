@@ -341,7 +341,10 @@ describe("EnterpriseHub", () => {
           "invalid_proposal",
         );
       }
-      const first = yield* hub.ingestionPropose("thread-1", proposal);
+      const first = yield* hub.ingestionPropose("thread-1", {
+        ...proposal,
+        evidence: ["ingestion:forged"],
+      });
       expect(first).toMatchObject({
         proposedBy: JERO,
         evidence: ["ingestion:run-1"],
