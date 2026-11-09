@@ -594,6 +594,15 @@ it.effect("connecting shows the identity and disconnecting clears it with the me
       ).toBe("Failure");
       expect(registry.get(enterprise.proposalDecide.permissionAtom(env))).toBe(false);
       expect(registry.get(enterprise.ingestStart.permissionAtom(env))).toBe(false);
+      expect(registry.get(enterprise.connector.permissionAtom(env))).toBe(false);
+      expect(
+        (yield* Effect.promise(() =>
+          enterprise.connector.run(registry, {
+            environmentId: env,
+            input: { action: "introspect", provider: "postgres" },
+          }),
+        ))._tag,
+      ).toBe("Failure");
       expect(
         (yield* Effect.promise(() =>
           enterprise.ingestStart.run(registry, {
@@ -636,6 +645,7 @@ it.effect("connecting shows the identity and disconnecting clears it with the me
       expect(registry.get(enterprise.knowledgeUnpublish.permissionAtom(env))).toBe(true);
       expect(registry.get(enterprise.proposalDecide.permissionAtom(env))).toBe(true);
       expect(registry.get(enterprise.ingestStart.permissionAtom(env))).toBe(true);
+      expect(registry.get(enterprise.connector.permissionAtom(env))).toBe(true);
       expect((yield* connect)._tag).toBe("Success");
       expect(yield* readStatus).toEqual({ identity });
       expect((yield* readMembers).teams).toHaveLength(1);

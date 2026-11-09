@@ -1,5 +1,7 @@
 import {
   EnterpriseError,
+  type EnterpriseConnectorInput,
+  type EnterpriseConnectorResult,
   type KnowledgeProposeInput,
   type KnowledgeProposal,
   type KnowledgeProposalInbox,
@@ -34,6 +36,8 @@ import * as AreaKnowledge from "../knowledge/AreaKnowledge.ts";
 import * as EnterpriseStore from "./EnterpriseStore.ts";
 import * as KnowledgeProposals from "./KnowledgeProposals.ts";
 import * as OrgImport from "./OrgImport.ts";
+import * as Connectors from "./Connectors.ts";
+import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 
 /**
  * The hub never sees a member's environment id, so calls are keyed by the MCP
@@ -43,6 +47,10 @@ import * as OrgImport from "./OrgImport.ts";
 export class EnterpriseHub extends Context.Service<
   EnterpriseHub,
   {
+    readonly connector: (
+      sessionId: string,
+      input: EnterpriseConnectorInput,
+    ) => Effect.Effect<EnterpriseConnectorResult, EnterpriseError>;
     readonly ingestionInbox: (
       threadId: string,
       input: KnowledgeProposalInboxInput,
@@ -147,6 +155,7 @@ const notAuthorized = new EnterpriseError({
 
 const make = Effect.gen(function* () {
   const store = yield* EnterpriseStore.EnterpriseStore;
+  const connectors = yield* Connectors.Connectors;
   const knowledge = yield* AreaKnowledge.AreaKnowledge;
   const proposals = yield* KnowledgeProposals.KnowledgeProposals;
 
@@ -390,6 +399,10 @@ const make = Effect.gen(function* () {
     return { run, member };
   });
   return EnterpriseHub.of({
+    connector: Effect.fn("EnterpriseHub.connector")(function* (sessionId, input) {
+      const admin = yield* requireAdmin(sessionId);
+      return yield* connectors.execute(admin.email, input);
+    }),
     ingestionInbox: Effect.fn("EnterpriseHub.ingestionInbox")(function* (threadId, input) {
       const { member } = yield* ingestionIdentity(threadId);
       return yield* proposals.inbox(member.email, input);
@@ -506,4 +519,6 @@ const make = Effect.gen(function* () {
   });
 });
 
-export const layer = Layer.effect(EnterpriseHub, make);
+export const layer = Layer.effect(EnterpriseHub, make).pipe(
+  Layer.provide(Connectors.layer.pipe(Layer.provide(ServerSecretStore.layer))),
+);

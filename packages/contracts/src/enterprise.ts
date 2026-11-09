@@ -166,6 +166,29 @@ export const EnterpriseOrgImportResult = Schema.Struct({
 });
 export type EnterpriseOrgImportResult = typeof EnterpriseOrgImportResult.Type;
 
+export const EnterpriseConnectorProvider = Schema.Literals(["postgres", "supabase"]);
+export const EnterpriseConnectorInput = Schema.Union([
+  Schema.Struct({ action: Schema.Literal("list") }),
+  Schema.Struct({
+    action: Schema.Literal("connect"),
+    provider: EnterpriseConnectorProvider,
+    area: TrimmedNonEmptyString,
+    connectionString: Schema.String.check(Schema.isMaxLength(8192)),
+  }),
+  Schema.Struct({
+    action: Schema.Literals(["introspect", "disconnect"]),
+    provider: EnterpriseConnectorProvider,
+  }),
+]);
+export type EnterpriseConnectorInput = typeof EnterpriseConnectorInput.Type;
+export const EnterpriseConnectorResult = Schema.Struct({
+  connections: Schema.Array(
+    Schema.Struct({ provider: EnterpriseConnectorProvider, area: Schema.String }),
+  ),
+  proposedCount: Schema.Number,
+});
+export type EnterpriseConnectorResult = typeof EnterpriseConnectorResult.Type;
+
 /** Knowledge levels a conversation can switch off; the individual level has no source yet. */
 export const ThreadKnowledgeScope = Schema.Literals(["general", "area"]);
 export type ThreadKnowledgeScope = typeof ThreadKnowledgeScope.Type;
@@ -220,6 +243,11 @@ export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("Ente
     "knowledge_write_failed",
     "thread_not_found",
     "snapshot_unavailable",
+    "connector_invalid",
+    "connector_unreachable",
+    "connector_storage_failed",
+    "connector_not_found",
+    "connector_schema_too_large",
     "org_invalid_yaml",
     "org_invalid",
     "org_unknown_area",
