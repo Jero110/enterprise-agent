@@ -40,7 +40,7 @@ try {
   });
 
   await page.goto(`${origin}/`);
-  // React replaces the static #boot-shell splash when it mounts; showBootError fills it instead.
+  // React mounts into #root under the #boot-shell splash; showBootError fills the splash instead.
   const settled = await page.waitForSelector("#root > :not(#boot-shell), #boot-error-reload", {
     timeout: timeoutMs,
   });
