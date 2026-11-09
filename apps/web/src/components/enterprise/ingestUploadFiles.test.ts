@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vite-plus/test";
-import { uploadBatches, uploadFileError, uploadPath } from "./ingestUploadFiles";
+import {
+  droppedUploadFiles,
+  uploadBatches,
+  uploadFileError,
+  uploadPath,
+} from "./ingestUploadFiles";
 
 describe("manual knowledge folder uploads", () => {
+  it("rejects a dropped directory before FileReader can read its pseudo-file", () => {
+    const folder = { name: "raw", type: "", size: 0 };
+    const file = { name: "notes.md", type: "text/markdown", size: 10 };
+    expect(
+      droppedUploadFiles({
+        items: [{ kind: "file", webkitGetAsEntry: () => ({ isDirectory: true }) }],
+        files: [folder],
+      }),
+    ).toBeNull();
+    expect(droppedUploadFiles({ items: [], files: [folder] })).toBeNull();
+    expect(droppedUploadFiles({ items: [], files: [file] })).toEqual([file]);
+  });
   it("keeps 55 distinct relative raw paths including _manifest.csv across bounded upload batches", () => {
     const files = Array.from({ length: 54 }, (_, index) => ({
       name: `source-${index}.md`,

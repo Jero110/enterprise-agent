@@ -18,7 +18,12 @@ import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { areaDestinations, ingestStartError } from "./ingestDestinations";
-import { uploadBatches, uploadFileError, uploadPath } from "./ingestUploadFiles";
+import {
+  droppedUploadFiles,
+  uploadBatches,
+  uploadFileError,
+  uploadPath,
+} from "./ingestUploadFiles";
 
 function fileBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -181,7 +186,17 @@ function IngestionRun({
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
-          setFiles(Array.from(event.dataTransfer.files));
+          if (busy || !ingestion?.canStart) return;
+          const dropped = droppedUploadFiles(event.dataTransfer);
+          if (dropped === null) {
+            setFiles([]);
+            setError(
+              t("Folders cannot be dropped here. Use Choose folder to select raw/ instead."),
+            );
+            return;
+          }
+          setError(null);
+          setFiles(dropped);
         }}
       >
         {t("Drop files here or choose files")}
@@ -193,14 +208,23 @@ function IngestionRun({
           disabled={busy || !ingestion?.canStart}
           onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
         />
+        <span className="mt-2 block">{t("Choose folder (for raw/ and nested files)")}</span>
         <input
           aria-label={t("Choose folder")}
-          className="mt-2 block"
+          className="block"
           type="file"
           multiple
           ref={(input) => input?.setAttribute("webkitdirectory", "")}
           disabled={busy || !ingestion?.canStart}
-          onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+          onChange={(event) => {
+            const selected = droppedUploadFiles({ items: [], files: event.target.files ?? [] });
+            setFiles(selected ?? []);
+            setError(
+              selected === null
+                ? t("This folder could not be read. Choose folder again and select raw/.")
+                : null,
+            );
+          }}
         />
       </label>
       {files.length > 0 && (

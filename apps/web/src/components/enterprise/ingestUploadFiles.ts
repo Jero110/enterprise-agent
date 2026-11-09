@@ -8,6 +8,24 @@ export type IngestUploadFile = Pick<File, "name" | "size" | "type"> & {
   readonly webkitRelativePath?: string;
 };
 
+export function droppedUploadFiles<T extends IngestUploadFile>(drop: {
+  readonly items: ArrayLike<{
+    readonly kind: string;
+    readonly webkitGetAsEntry?: () => { readonly isDirectory: boolean } | null;
+  }>;
+  readonly files: ArrayLike<T>;
+}): T[] | null {
+  const files = Array.from(drop.files);
+  if (
+    Array.from(drop.items).some(
+      (item) => item.kind === "file" && item.webkitGetAsEntry?.()?.isDirectory,
+    ) ||
+    files.some((file) => file.size === 0 && file.type === "" && !file.name.includes("."))
+  )
+    return null;
+  return files;
+}
+
 export function uploadPath(file: IngestUploadFile): string {
   return file.webkitRelativePath || file.name;
 }
