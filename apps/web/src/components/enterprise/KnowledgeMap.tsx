@@ -31,9 +31,13 @@ function layerLabel(layer: string): string {
 function KnowledgeDocument({
   node,
   environmentId,
+  areaName,
+  refresh,
 }: {
   node: KnowledgeNode;
   environmentId: EnvironmentId;
+  areaName: string;
+  refresh: () => void;
 }) {
   const request = useAtomCommand(enterpriseEnvironment.knowledgeRequestAccess, {
     label: "request knowledge access",
@@ -47,7 +51,7 @@ function KnowledgeDocument({
     <div className="min-h-0 overflow-auto">
       <p className="mt-3 text-sm">{node.description}</p>
       <p className="mt-2 text-xs text-muted-foreground">
-        {node.areaId} · {node.private ? t("Private") : t("Shared")}
+        {areaName} · {!node.accessible || node.private ? t("Private") : t("Shared")}
       </p>
       {node.accessible ? (
         <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-muted/40 p-3 text-xs">
@@ -69,6 +73,16 @@ function KnowledgeDocument({
           >
             {requested ? t("Access requested") : t("Request access")}
           </Button>
+          {requested && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                {t("Waiting for the area lead. This document opens here after approval.")}
+              </p>
+              <Button size="xs" variant="outline" onClick={refresh}>
+                {t("Check access")}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -321,14 +335,22 @@ export function KnowledgeMap(props: {
                     {t("Close")}
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">{selected.description}</p>
-                <button
-                  type="button"
-                  className="mt-3 rounded-md border px-2 py-1 text-xs"
-                  onClick={() => setDocumentOpen(true)}
-                >
-                  {selected.accessible ? t("Open document ↗") : t("Private · Request access")}
-                </button>
+                <KnowledgeDocument
+                  key={selected.id}
+                  node={selected}
+                  environmentId={props.environmentId}
+                  areaName={areaName(selected.areaId)}
+                  refresh={graph.refresh}
+                />
+                {selected.accessible && (
+                  <button
+                    type="button"
+                    className="mt-3 rounded-md border px-2 py-1 text-xs"
+                    onClick={() => setDocumentOpen(true)}
+                  >
+                    {t("Open document ↗")}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -457,6 +479,8 @@ export function KnowledgeMap(props: {
               key={selected.id}
               node={selected}
               environmentId={props.environmentId}
+              areaName={areaName(selected.areaId)}
+              refresh={graph.refresh}
             />
           </div>
         )}
