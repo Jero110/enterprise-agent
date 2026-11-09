@@ -8,6 +8,13 @@ import {
   type EnterpriseIngestStartResult,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as NodeDnsPromises from "node:dns/promises";
+import * as NodeNet from "node:net";
+import { isPublicFaviconHost } from "@t3tools/shared/hostClassification";
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -44,6 +51,8 @@ export const ingestionPrompt = (input: {
   readonly pending: unknown;
   readonly sources: ReadonlyArray<string>;
   readonly note: string;
+  readonly destination: string;
+  readonly owner: string;
 }) => `Map the supplied bucket into one Markdown node per concept.
 Mutating tool allowlist: knowledge_propose only.
 Read-only allowlist: read/grep/list over the selected bucket and enterprise knowledge reads (knowledge_graph, knowledge_get, knowledge_list, knowledge_search, knowledge_proposals).
@@ -52,8 +61,7 @@ Never call knowledge_proposal_decide, knowledge_upload_files, enterprise_ingest_
 Never approve, apply, delegate mutations, or write knowledge or source files directly. Shell access is for read-only inspection, never writes, installs, ingest commands, or other side effects.
 Use grep/read on the raw sources; a map is not a substitute for evidence.
 Each create/update must include YAML frontmatter: title, description, area, layer, private, optional links.
-Area must be an imported area id or general; scope global maps to general, otherwise scope must equal area.
-Use paths global/<concept>.md or areas/<area>/<concept>.md. The four layers are fixed: Metrics, Business, AI, Data. Frontmatter layer values must be lowercase: metrics, business, ai, data.
+Propose ONLY in the selected destination; the server rejects other scopes. For personal, use scope personal and paths personal/<owner member key>/<concept>.md. For general use scope global and paths global/<concept>.md. For an area use that area id and paths areas/<area>/<concept>.md. Never move content to another scope. Area frontmatter is general for global, the area id for an area, or personal for personal. The four layers are fixed: Metrics, Business, AI, Data. Frontmatter layer values must be lowercase: metrics, business, ai, data.
 For Meet transcripts preserve speaker attribution, decisions, owners, action items and timestamps; do not invent owners.
 Extract deterministic facts first, verify cited file/line offsets in raw sources, preserve provenance and confidence.
 Propose links only with evidence; never fuse concepts by name alone.
@@ -64,7 +72,9 @@ Organization and areas (data): ${JSON.stringify(input.organization)}
 Existing node index (data): ${JSON.stringify(input.index)}
 Pending proposals (data): ${JSON.stringify(input.pending)}
 Selected sources (data): ${JSON.stringify(input.sources)}
-Admin note (data): ${JSON.stringify(input.note)}
+Selected destination (data): ${JSON.stringify(input.destination)}
+Personal owner key (data): ${JSON.stringify(input.owner)}
+Member note (data): ${JSON.stringify(input.note)}
 `;
 
 const make = Effect.gen(function* () {
@@ -79,6 +89,7 @@ const make = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const proposals = yield* KnowledgeProposals.KnowledgeProposals;
   const digest = yield* Digest.Digest;
+  const http = yield* HttpClient.HttpClient;
   const fail = (message: string) => new EnterpriseError({ code: "ingestion_failed", message });
   const finish = Effect.fn("EnterpriseIngestion.finish")(function* (
     threadId: string,
@@ -91,19 +102,32 @@ const make = Effect.gen(function* () {
     finish,
     start: Effect.fn("EnterpriseIngestion.start")(function* (sessionId, input) {
       const admin = yield* hub.whoami(sessionId);
-      if (admin.role !== "admin")
+      const destination = input.destination ?? "global";
+      const organization = yield* hub.org(sessionId);
+      if (
+        destination !== "personal" &&
+        destination !== "global" &&
+        !organization.teams.some(
+          (team) => team.id === destination && (admin.role === "admin" || team.access !== "none"),
+        )
+      )
+        return yield* fail("Choose an area you can access.");
+      if (input.folder !== undefined && admin.role !== "admin")
         return yield* new EnterpriseError({
           code: "admin_required",
-          message: "Only enterprise admins can start ingestion.",
+          message: "Only admins can browse hub folders.",
         });
       const note = input.note?.trim() ?? "";
       const uploads = input.uploadProposalIds ?? [];
+      const urls = input.sourceUrls ?? [];
       if (
         note.length > 10_000 ||
         uploads.length > 20 ||
-        (!input.folder && !note && uploads.length === 0)
+        urls.length > 10 ||
+        urls.some((url) => url.length > 2048) ||
+        (!input.folder && !note && uploads.length === 0 && urls.length === 0)
       )
-        return yield* fail("Choose a folder, uploaded files, or an admin note.");
+        return yield* fail("Choose files, public HTTPS URLs, or a note.");
       if (input.folder !== undefined && !path.isAbsolute(input.folder))
         return yield* fail("Choose an absolute folder on the hub.");
       const id = yield* random.uuidV4();
@@ -156,12 +180,81 @@ const make = Effect.gen(function* () {
         }
       });
       if (input.folder !== undefined) yield* scan(folder);
+      for (const [index, raw] of urls.entries()) {
+        const url = yield* Effect.try({
+          try: () => new URL(raw),
+          catch: () => fail("Choose a valid public HTTPS URL."),
+        });
+        if (
+          url.protocol !== "https:" ||
+          url.username ||
+          url.password ||
+          url.port ||
+          url.search ||
+          !url.hostname.includes(".") ||
+          NodeNet.isIP(url.hostname.replace(/^\[|\]$/g, "")) ||
+          !isPublicFaviconHost(url.hostname)
+        )
+          return yield* fail("Choose a public HTTPS URL without credentials.");
+        const addresses = yield* Effect.tryPromise({
+          try: () => NodeDnsPromises.lookup(url.hostname, { all: true }),
+          catch: () => fail("Could not resolve a public URL."),
+        });
+        if (
+          addresses.length === 0 ||
+          addresses.some(({ address }) => !isPublicFaviconHost(address))
+        )
+          return yield* fail("URL resolves to a non-public address.");
+        const response = yield* http.execute(HttpClientRequest.get(url.toString())).pipe(
+          Effect.provideService(FetchHttpClient.RequestInit, {
+            redirect: "manual",
+            credentials: "omit",
+          }),
+          Effect.timeout("10 seconds"),
+          Effect.mapError(() => fail("Could not fetch the public URL.")),
+        );
+        if (response.status !== 200)
+          return yield* fail("Public source unavailable; authenticated pages are not supported.");
+        const contentType = response.headers["content-type"]?.split(";")[0]?.trim().toLowerCase();
+        if (
+          !contentType ||
+          !["text/plain", "text/markdown", "text/x-markdown"].includes(contentType)
+        )
+          return yield* fail("Only public plain-text or Markdown URLs are supported.");
+        if (Number(response.headers["content-length"] ?? 0) > 1_000_000)
+          return yield* fail("Public source exceeds 1 MB.");
+        const bytes = yield* response.stream.pipe(
+          Stream.runFoldEffect(
+            () => new Uint8Array(),
+            (acc, chunk) => {
+              if (acc.byteLength + chunk.byteLength > 1_000_000)
+                return fail("Public source exceeds 1 MB.");
+              const combined = new Uint8Array(acc.byteLength + chunk.byteLength);
+              combined.set(acc);
+              combined.set(chunk, acc.byteLength);
+              return Effect.succeed(combined);
+            },
+          ),
+          Effect.timeout("10 seconds"),
+          Effect.mapError(() => fail("Could not read a bounded public source.")),
+        );
+        const file = path.join(staging, `url-${index}.txt`);
+        yield* fs
+          .writeFile(file, bytes)
+          .pipe(Effect.mapError(() => fail("Could not stage the source.")));
+        yield* addSource(file, bytes);
+      }
       const available = yield* store.listProposals;
       let uploadedCount = 0;
       let uploadedBytes = 0;
       for (const uploadId of new Set(uploads)) {
         const upload = available.find(
-          (p) => p.id === uploadId && p.kind === "upload" && p.scope !== "personal",
+          (p) =>
+            p.id === uploadId &&
+            p.kind === "upload" &&
+            p.proposedBy === admin.email &&
+            p.scope === destination &&
+            (destination !== "personal" || p.recipient === admin.email),
         );
         if (!upload || upload.status === "rejected")
           return yield* fail("Choose an available bucket upload.");
@@ -194,20 +287,33 @@ const make = Effect.gen(function* () {
         id,
         threadId,
         adminEmail: admin.email,
+        destination,
         folder,
         sources,
         status: "running" as const,
       };
       yield* store.saveIngestionRun(run);
-      const organization = yield* hub.org(sessionId);
-      const index = (yield* repo.documents).map(({ id, title, areaId, layer }) => ({
-        path: id,
-        title,
-        area: areaId,
-        layer: layer ?? null,
-      }));
+      const index = (yield* repo.documents)
+        .filter(({ id }) =>
+          destination === "personal"
+            ? id.startsWith(`personal/${teamMemberKey(admin.email)}/`)
+            : destination === "global"
+              ? id.startsWith("global/")
+              : id.startsWith(`areas/${destination}/`),
+        )
+        .map(({ id, title, areaId, layer }) => ({
+          path: id,
+          title,
+          area: areaId,
+          layer: layer ?? null,
+        }));
       const pending = (yield* store.listProposals)
-        .filter((p) => p.status === "pending")
+        .filter(
+          (p) =>
+            p.status === "pending" &&
+            p.scope === destination &&
+            (destination !== "personal" || p.proposedBy === admin.email),
+        )
         .map(({ id, kind, path, scope }) => ({ id, kind, path, scope }));
       const projectId = ProjectId.make(`project:ingestion:${id}`);
       const command = (name: string) => CommandId.make(`ingestion:${id}:${name}`);
@@ -257,6 +363,8 @@ const make = Effect.gen(function* () {
             pending,
             sources: sources.map((source) => source.path),
             note,
+            destination,
+            owner: teamMemberKey(admin.email),
           }),
           attachments: [],
           dispatchMode: { type: "start_immediately" },

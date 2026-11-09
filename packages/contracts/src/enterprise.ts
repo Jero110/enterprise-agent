@@ -28,6 +28,8 @@ export const EnterpriseIngestStartInput = Schema.Struct({
   uploadProposalIds: Schema.optionalKey(
     Schema.Array(TrimmedNonEmptyString).check(Schema.isMaxLength(20)),
   ),
+  sourceUrls: Schema.optionalKey(Schema.Array(TrimmedNonEmptyString).check(Schema.isMaxLength(10))),
+  destination: Schema.optionalKey(TrimmedNonEmptyString),
   modelSelection: ModelSelection,
 });
 export type EnterpriseIngestStartInput = typeof EnterpriseIngestStartInput.Type;

@@ -24,6 +24,7 @@ export interface IngestionRun {
   readonly id: string;
   readonly threadId: string;
   readonly adminEmail: string;
+  readonly destination?: string;
   readonly folder: string;
   readonly status: "running" | "completed" | "failed";
   readonly sources?: ReadonlyArray<{ readonly path: string; readonly hash: string }>;
@@ -551,8 +552,8 @@ const make = Effect.gen(function* () {
 
   const saveIngestionRun = Effect.fn("EnterpriseStore.saveIngestionRun")(
     function* (run: IngestionRun) {
-      yield* sql`INSERT INTO enterprise_ingestion_runs (id, thread_id, admin_email, folder, status)
-      VALUES (${run.id}, ${run.threadId}, ${normalizeEmail(run.adminEmail)}, ${run.folder}, ${run.status})
+      yield* sql`INSERT INTO enterprise_ingestion_runs (id, thread_id, admin_email, folder, status, destination)
+      VALUES (${run.id}, ${run.threadId}, ${normalizeEmail(run.adminEmail)}, ${run.folder}, ${run.status}, ${run.destination ?? "global"})
       ON CONFLICT (id) DO UPDATE SET status = excluded.status`;
       for (const source of run.sources ?? []) {
         yield* sql`INSERT INTO enterprise_ingestion_sources (run_id, path, hash)
@@ -578,6 +579,7 @@ const make = Effect.gen(function* () {
       id: string;
       thread_id: string;
       admin_email: string;
+      destination: string;
       folder: string;
       status: IngestionRun["status"];
     }>`
@@ -590,6 +592,7 @@ const make = Effect.gen(function* () {
               id: rows[0].id,
               threadId: rows[0].thread_id,
               adminEmail: rows[0].admin_email,
+              destination: rows[0].destination,
               folder: rows[0].folder,
               status: rows[0].status,
             },

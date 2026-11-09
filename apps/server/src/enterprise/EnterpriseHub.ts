@@ -397,10 +397,10 @@ const make = Effect.gen(function* () {
         message: "Only ingestion threads can propose as an admin.",
       });
     const member = yield* store.getMember(run.adminEmail);
-    if (member?.role !== "admin" || !(yield* store.canEnter(run.adminEmail)))
+    if (!member || !(yield* store.canEnter(run.adminEmail)))
       return yield* new EnterpriseError({
         code: "access_denied",
-        message: "The ingestion admin no longer has access.",
+        message: "The ingestion member no longer has access.",
       });
     return { run, member };
   });
@@ -454,10 +454,23 @@ const make = Effect.gen(function* () {
     }),
     ingestionPropose: Effect.fn("EnterpriseHub.ingestionPropose")(function* (threadId, input) {
       const { run, member } = yield* ingestionIdentity(threadId);
+      if (
+        input.scope !== (run.destination ?? "global") ||
+        input.targetScope !== undefined ||
+        input.kind === "move-scope" ||
+        input.kind === "area-access" ||
+        input.kind === "upload" ||
+        (input.scope === "personal" && input.path.split("/")[1] !== teamMemberKey(member.email))
+      )
+        return yield* new EnterpriseError({
+          code: "access_denied",
+          message: "Proposal exceeds this ingestion destination.",
+        });
       return yield* proposals.propose(
         member.email,
         {
           ...input,
+          ...(input.scope === "personal" ? { recipient: member.email } : {}),
           evidence: [...new Set([...input.evidence, `ingestion:${run.id}`])],
         },
         true,

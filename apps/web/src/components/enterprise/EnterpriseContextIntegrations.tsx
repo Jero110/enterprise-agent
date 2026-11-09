@@ -5,6 +5,7 @@ import {
   enterpriseEnvironment,
   enterpriseFiles,
   enterpriseFailureMessage,
+  useEnterpriseStatus,
 } from "~/state/enterprise";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -20,6 +21,7 @@ export function ConnectedIngestTab({
   modelSelection: ModelSelection;
 }) {
   const canStart = useAtomValue(enterpriseEnvironment.ingestStart.permissionAtom(environmentId));
+  const { identity } = useEnterpriseStatus();
   const start = useAtomCommand(enterpriseEnvironment.ingestStart, {
     label: "start knowledge ingestion",
   });
@@ -39,11 +41,12 @@ export function ConnectedIngestTab({
           if (result._tag === "Failure")
             throw new Error(enterpriseFailureMessage(squashAtomCommandFailure(result)));
         },
-        stageUpload: async (files) => {
+        stageUpload: async (files, destination) => {
           const result = await upload({
             environmentId,
             input: {
-              scope: "global",
+              scope: destination,
+              ...(destination === "personal" ? { recipient: identity!.email } : {}),
               reason: "Stage bucket for knowledge ingestion",
               files: [...files],
             },

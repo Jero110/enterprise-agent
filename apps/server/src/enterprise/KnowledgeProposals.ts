@@ -8,6 +8,7 @@ import {
   type KnowledgeUploadInput,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -121,9 +122,23 @@ export const layer = Layer.effect(
       const member = yield* memberOf(email);
       if (!input.reason.trim() || input.evidence.some((e) => !e.trim() || /[\r\n]/.test(e)))
         return yield* invalid;
-      if (input.scope !== "global" && (yield* store.getTeam(input.scope)) === null)
+      if (
+        input.scope !== "global" &&
+        input.scope !== "personal" &&
+        (yield* store.getTeam(input.scope)) === null
+      )
         return yield* invalid;
-      if (input.kind === "upload" || input.recipient !== undefined) return yield* invalid;
+      if (input.kind === "upload" || (input.scope !== "personal" && input.recipient !== undefined))
+        return yield* invalid;
+      if (
+        input.scope === "personal" &&
+        (!ingestion ||
+          input.recipient !== member.email ||
+          !new RegExp(
+            `^personal/${teamMemberKey(member.email)}/[a-z0-9][a-z0-9-]{0,79}\\.md$`,
+          ).test(input.path))
+      )
+        return yield* denied;
       if (ingestion && (input.kind === "create" || input.kind === "update")) {
         const node = KnowledgeRepo.documentOf(input.path, input.content ?? "");
         if (
@@ -155,7 +170,12 @@ export const layer = Layer.effect(
             message: "An access request for this area is already pending.",
           });
       } else {
-        const prefix = input.scope === "global" ? "global/" : `areas/${input.scope}/`;
+        const prefix =
+          input.scope === "global"
+            ? "global/"
+            : input.scope === "personal"
+              ? `personal/${teamMemberKey(member.email)}/`
+              : `areas/${input.scope}/`;
         const relative = input.path.slice(prefix.length);
         if (
           !input.path.startsWith(prefix) ||
@@ -175,6 +195,7 @@ export const layer = Layer.effect(
         if (
           member.role !== "admin" &&
           input.scope !== "global" &&
+          input.scope !== "personal" &&
           member.teamId !== input.scope &&
           !(yield* store.listGrants(member.email)).some((grant) => grant.areaId === input.scope)
         )

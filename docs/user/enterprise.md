@@ -30,13 +30,9 @@ Select a locked node and choose **Request access**. The area's lead or an admin 
 
 ## Load organization and knowledge
 
-Admins use **Conversation context → Ingest** on web or desktop. Members do not see this tab. Files selected on your device are uploaded to the connected hub; a hub folder path refers to the hub's filesystem, not your browser's computer.
+Enrolled members use **Conversation context → Ingest** on web or desktop. Choose **Personal** for knowledge only you own, an accessible **Area** for proposals reviewed by its lead or an admin, or **General** for proposals reviewed by an admin. Drop or choose files from your device, or paste public HTTPS links to plain text or Markdown. Authenticated websites are not supported. You can also enter a note about missing knowledge without files; a note is guidance, not evidence. Ingestion uses your selected agent model and subscription. Review proposals in **Changes**; starting a run does not approve or apply them.
 
-Start by downloading the `organization.yaml` and `areas.yaml` templates. Fill in people, their area, role and `reportsTo`, and the area IDs and names. Give each area at most one lead; that lead reviews access requests for the area. Select both files, preview the added, changed and removed people and areas, then confirm the import. Check removals carefully: removing a person revokes their access. Open **Organization** to see area leads, reporting relationships and your own areas.
-
-To load knowledge, stage a bucket of files or provide a hub folder, then start ingestion. The agent uses the organization's areas to propose knowledge nodes; review the proposals in **Changes** before they become current knowledge. Ingestion uses the admin's selected agent model and subscription. Upload staging alone does not add knowledge or approve a proposal.
-
-Return to **Ingest** for later uploads or another folder. You can also enter a note such as “We're missing the current Sales campaign policy” and start a run without new files. A note guides another ingestion run; it is not itself an approved change or a promise that the missing information exists.
+Admins can also download the `organization.yaml` and `areas.yaml` templates. Paste the completed YAML into the two inputs, preview the added, changed and removed people and areas, then confirm the import. Give each area at most one lead; that lead reviews access requests. Check removals carefully: removing a person revokes their access. Open **Organization** to see area leads and reporting relationships.
 
 ### Import database schemas
 

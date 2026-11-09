@@ -199,7 +199,7 @@ function EnterpriseContextDialog(props: {
                 ? t("To approve ({count})", { count: pendingCount })
                 : t("Changes", undefined, "knowledge")}
             </Tabs.Tab>
-            {identity?.role === "admin" && (
+            {identity && (
               <Tabs.Tab
                 value="ingest"
                 render={<Button size="sm" variant={tab === "ingest" ? "secondary" : "ghost"} />}
@@ -220,7 +220,7 @@ function EnterpriseContextDialog(props: {
           <Tabs.Panel value="changes" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             {open && <ContextChanges environmentId={props.environmentId} />}
           </Tabs.Panel>
-          {identity?.role === "admin" && (
+          {identity && (
             <Tabs.Panel value="ingest" className="flex min-h-0 flex-1 flex-col">
               {open && (
                 <ConnectedIngestTab

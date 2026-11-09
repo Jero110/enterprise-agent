@@ -1,4 +1,6 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -22,6 +24,7 @@ import * as Result from "effect/Result";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as ServerConfig from "../config.ts";
 import { stringify } from "yaml";
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
 import { documentOf } from "../knowledge/KnowledgeRepo.ts";
 import { layerKnowledge } from "../knowledge/KnowledgeRepo.testkit.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
@@ -33,9 +36,22 @@ import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
 
 const token = "ACME-BANK-DEV-2026";
 const modelSelection = { instanceId: ProviderInstanceId.make("codex"), model: "gpt-6-luna" };
-const layerFor = (commands: OrchestrationV2ServerCommand[]) =>
+const layerFor = (commands: OrchestrationV2ServerCommand[], responseStatus = 200) =>
   EnterpriseIngestion.layer.pipe(
     Layer.provideMerge(EnterpriseHub.layer),
+    Layer.provideMerge(
+      Layer.succeed(
+        HttpClient.HttpClient,
+        HttpClient.make((request) =>
+          Effect.succeed(
+            HttpClientResponse.fromWeb(
+              request,
+              new Response("Public source content", { status: responseStatus }),
+            ),
+          ),
+        ),
+      ),
+    ),
     Layer.provideMerge(layerKnowledge),
     Layer.provideMerge(layerSeededStore),
     Layer.provideMerge(
@@ -60,19 +76,110 @@ const layerFor = (commands: OrchestrationV2ServerCommand[]) =>
   );
 
 describe("EnterpriseIngestion", () => {
-  it.effect("rejects a non-admin before starting any work", () => {
+  it.effect("stages public URL sources and rejects unsafe URLs", () => {
     const commands: OrchestrationV2ServerCommand[] = [];
     return Effect.gen(function* () {
       const hub = yield* EnterpriseHub.EnterpriseHub;
       const ingestion = yield* EnterpriseIngestion.EnterpriseIngestion;
-      yield* hub.enroll("ana", { email: "ent.test.ana@gmail.com", token });
-      const result = yield* Effect.result(
-        ingestion.start("ana", { folder: "/not-needed", modelSelection }),
-      );
-      expect(Result.isFailure(result) && result.failure.code).toBe("admin_required");
+      const fs = yield* FileSystem.FileSystem;
+      yield* hub.enroll("admin", { email: "jeronimo.deli@gmail.com", token });
+      for (const url of [
+        "file:///etc/passwd",
+        "http://localhost/a",
+        "https://127.0.0.1/a",
+        "https://user:password@example.com/a",
+      ]) {
+        expect(
+          Result.isFailure(
+            yield* Effect.result(ingestion.start("admin", { sourceUrls: [url], modelSelection })),
+          ),
+        ).toBe(true);
+      }
       expect(commands).toEqual([]);
+      yield* ingestion.start("admin", {
+        sourceUrls: ["https://example.com/notes.txt"],
+        modelSelection,
+      });
+      const message = commands.find((command) => command.type === "message.dispatch")!;
+      const paths = JSON.parse(
+        /Selected sources \(data\): (.+)/.exec(message.text)![1]!,
+      ) as string[];
+      expect(yield* fs.readFileString(paths[0]!)).toContain("Public source content");
     }).pipe(Effect.provide(layerFor(commands)));
   });
+  it.effect("rejects redirects rather than following to an internal endpoint", () => {
+    const commands: OrchestrationV2ServerCommand[] = [];
+    return Effect.gen(function* () {
+      const hub = yield* EnterpriseHub.EnterpriseHub;
+      const ingestion = yield* EnterpriseIngestion.EnterpriseIngestion;
+      yield* hub.enroll("admin", { email: "jeronimo.deli@gmail.com", token });
+      const result = yield* Effect.result(
+        ingestion.start("admin", {
+          sourceUrls: ["https://example.com/redirect"],
+          modelSelection,
+        }),
+      );
+      expect(Result.isFailure(result) && result.failure.code).toBe("ingestion_failed");
+      expect(commands).toEqual([]);
+    }).pipe(Effect.provide(layerFor(commands, 302)));
+  });
+  it.effect(
+    "members cannot browse hub folders and can propose only their own personal nodes",
+    () => {
+      const commands: OrchestrationV2ServerCommand[] = [];
+      return Effect.gen(function* () {
+        const hub = yield* EnterpriseHub.EnterpriseHub;
+        const ingestion = yield* EnterpriseIngestion.EnterpriseIngestion;
+        yield* hub.enroll("ana", { email: "ent.test.ana@gmail.com", token });
+        const result = yield* Effect.result(
+          ingestion.start("ana", { folder: "/not-needed", modelSelection }),
+        );
+        expect(Result.isFailure(result) && result.failure.code).toBe("admin_required");
+        expect(commands).toEqual([]);
+        const run = yield* ingestion.start("ana", {
+          note: "My process",
+          destination: "personal",
+          modelSelection,
+        });
+        const owner = teamMemberKey("ent.test.ana@gmail.com");
+        const proposal = {
+          kind: "create",
+          scope: "personal",
+          path: `personal/${owner}/process.md`,
+          content:
+            "---\ntitle: Process\ndescription: Personal process\narea: personal\nlayer: business\nprivate: true\n---\nMy process",
+          reason: "Personal note",
+          evidence: [],
+        } as const;
+        for (const forged of [
+          { ...proposal, scope: "global", path: "global/process.md" },
+          { ...proposal, path: `personal/${teamMemberKey("jeronimo.deli@gmail.com")}/process.md` },
+          { ...proposal, kind: "move-scope" as const, targetScope: "global" },
+        ]) {
+          const denied = yield* Effect.result(hub.ingestionPropose(run.threadId, forged));
+          expect(Result.isFailure(denied) && denied.failure.code).toBe("access_denied");
+        }
+        const accepted = yield* hub.ingestionPropose(run.threadId, proposal);
+        expect(accepted).toMatchObject({
+          scope: "personal",
+          recipient: "ent.test.ana@gmail.com",
+          status: "pending",
+        });
+        yield* hub.enroll("admin", { email: "jeronimo.deli@gmail.com", token });
+        expect(
+          (yield* hub.proposalInbox("admin", {})).proposals.some((p) => p.id === accepted.id),
+        ).toBe(false);
+        const otherDecision = yield* Effect.result(
+          hub.proposalDecide("admin", { id: accepted.id, action: "approve" }),
+        );
+        expect(Result.isFailure(otherDecision) && otherDecision.failure.code).toBe(
+          "proposal_not_found",
+        );
+        const approved = yield* hub.proposalDecide("ana", { id: accepted.id, action: "approve" });
+        expect(approved.status).toBe("applied");
+      }).pipe(Effect.provide(layerFor(commands)));
+    },
+  );
   it.effect(
     "skips completed content hashes, retries failures and supports note-only runs with an index",
     () => {
@@ -106,7 +213,8 @@ describe("EnterpriseIngestion", () => {
         yield* ingestion.start("admin", { note: "We're missing payment owners", modelSelection });
         const message = commands.filter((command) => command.type === "message.dispatch").at(-1)!;
         expect(message.text).toContain("We're missing payment owners");
-        expect(message.text).toContain('"path":"areas/ledger/README.md"');
+        expect(message.text).toContain('"path":"global/overview.md"');
+        expect(message.text).not.toContain('"path":"areas/ledger/README.md"');
         expect(message.text).toContain("Existing node index");
         const invalid = yield* Effect.result(ingestion.start("admin", { modelSelection }));
         expect(Result.isFailure(invalid)).toBe(true);
@@ -230,7 +338,7 @@ describe("EnterpriseIngestion", () => {
           new URL("./fixtures/kavak-planning.meet.txt", import.meta.url).pathname,
         );
         const upload = yield* hub.proposalUpload("admin", {
-          scope: "global",
+          scope: "cx",
           reason: "Planning call bucket",
           files: [
             {
@@ -242,6 +350,7 @@ describe("EnterpriseIngestion", () => {
         });
         const run = yield* ingestion.start("admin", {
           uploadProposalIds: [upload.id],
+          destination: "cx",
           modelSelection,
         });
         const message = commands.find((command) => command.type === "message.dispatch")!;

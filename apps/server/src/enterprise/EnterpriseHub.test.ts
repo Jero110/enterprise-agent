@@ -209,7 +209,7 @@ describe("EnterpriseHub", () => {
         );
       }).pipe(Effect.provide(layer)),
   );
-  it.effect("attributes ingestion proposals only to registered admin threads", () =>
+  it.effect("attributes ingestion proposals only to registered destination-scoped threads", () =>
     Effect.gen(function* () {
       const hub = yield* EnterpriseHub.EnterpriseHub;
       const store = yield* EnterpriseStore.EnterpriseStore;
@@ -280,11 +280,12 @@ describe("EnterpriseHub", () => {
         id: "run-2",
         threadId: "thread-2",
         adminEmail: ANA,
+        destination: "personal",
         folder: "/source",
         status: "running",
       });
       expect(yield* codeOf(hub.ingestionPropose("thread-2", proposal))).toBe("access_denied");
-      expect(yield* codeOf(hub.ingestionList("thread-2"))).toBe("access_denied");
+      expect(yield* hub.ingestionList("thread-2")).toHaveProperty("documents");
       yield* store.saveIngestionRun({
         id: "run-1",
         threadId: "thread-1",
