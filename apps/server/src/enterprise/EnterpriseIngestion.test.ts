@@ -3,6 +3,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import {
   ProviderInstanceId,
+  EnvironmentId,
   type ApplicationStoredEvent,
   type OrchestrationV2ServerCommand,
 } from "@t3tools/contracts";
@@ -14,6 +15,8 @@ import * as Stream from "effect/Stream";
 import * as ApplicationEvents from "../persistence/OrchestrationEventStore.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as KnowledgeProposals from "./KnowledgeProposals.ts";
+import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
+import { hubSessionId } from "./EnterpriseToolkit.ts";
 import * as Result from "effect/Result";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as ServerConfig from "../config.ts";
@@ -192,9 +195,37 @@ describe("EnterpriseIngestion", () => {
       const message = commands.find((command) => command.type === "message.dispatch");
       expect(message?.text).toContain("Organization and areas");
       expect(message?.text).toContain("Ledger");
-      expect(message?.text).toContain("knowledge_propose");
+      expect(message?.text).toContain("Mutating tool allowlist: knowledge_propose only.");
+      expect(message?.text).toContain(
+        "Read-only allowlist: read/grep/list over the selected bucket and enterprise knowledge reads (knowledge_graph, knowledge_get, knowledge_list, knowledge_search, knowledge_proposals).",
+      );
+      expect(message?.text).toContain(
+        "No file writes, mutating shell commands, or other enterprise mutations are allowed.",
+      );
+      expect(message?.text).toContain(
+        "Never call knowledge_proposal_decide, knowledge_upload_files, enterprise_ingest_start, or enterprise_org_import.",
+      );
       expect(message?.text).toContain("Metrics, Business, AI, Data");
       expect(message?.text).toContain("Existing node index");
+      const otherEnterpriseTools = yield* Effect.result(
+        hubSessionId(hub).pipe(
+          Effect.provideService(McpInvocationContext.McpInvocationContext, {
+            environmentId: EnvironmentId.make("hub"),
+            capabilities: new Set(),
+            issuedAt: 0,
+            requestNamespace: "ingestion",
+            client: undefined,
+            thread: {
+              threadId: result.threadId,
+              providerSessionId: "ingestion",
+              providerInstanceId: modelSelection.instanceId,
+            },
+          }),
+        ),
+      );
+      expect(Result.isFailure(otherEnterpriseTools) && otherEnterpriseTools.failure.code).toBe(
+        "access_denied",
+      );
       expect(yield* store.getIngestionRun(result.threadId)).toMatchObject({
         id: result.runId,
         adminEmail: "jeronimo.deli@gmail.com",

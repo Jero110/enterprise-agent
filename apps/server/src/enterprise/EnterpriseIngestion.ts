@@ -45,7 +45,11 @@ export const ingestionPrompt = (input: {
   readonly sources: ReadonlyArray<string>;
   readonly note: string;
 }) => `Map the supplied bucket into one Markdown node per concept.
-Only call knowledge_propose for knowledge changes. Never approve, apply, or write knowledge or source files directly.
+Mutating tool allowlist: knowledge_propose only.
+Read-only allowlist: read/grep/list over the selected bucket and enterprise knowledge reads (knowledge_graph, knowledge_get, knowledge_list, knowledge_search, knowledge_proposals).
+No file writes, mutating shell commands, or other enterprise mutations are allowed.
+Never call knowledge_proposal_decide, knowledge_upload_files, enterprise_ingest_start, or enterprise_org_import.
+Never approve, apply, delegate mutations, or write knowledge or source files directly. Shell access is for read-only inspection, never writes, installs, ingest commands, or other side effects.
 Use grep/read on the raw sources; a map is not a substitute for evidence.
 Each create/update must include YAML frontmatter: title, description, area, layer, private, optional links.
 Area must be an imported area id or general; scope global maps to general, otherwise scope must equal area.
