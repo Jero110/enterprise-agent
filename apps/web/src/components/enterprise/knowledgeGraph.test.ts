@@ -90,6 +90,8 @@ describe("embedded knowledge graph", () => {
     graph.send({ type: "knowledge-nodes", nodes });
     expect(graph.inspect("nodes.length")).toBe(2000);
     expect(graph.inspect("links.length")).toBe(1999);
+    expect(graph.inspect("nodes.filter(n => n.hub).length")).toBe(4);
+    expect(graph.inspect("nodes.every(n => Math.hypot(n.x, n.z) <= RAD)")).toBe(true);
     expect(
       graph.inspect("nodes.every(n => n.x === n.fx && n.z === n.fz && n.fy === LAYERS[n.li].y)"),
     ).toBe(true);
