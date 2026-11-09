@@ -9,6 +9,7 @@ import { ES_SETTINGS } from "./settings";
 import { ES_SETTINGS_ADVANCED } from "./settingsAdvanced";
 import { ES_SHELL } from "./shell";
 import { ES_TEAM } from "./team";
+import { ES_TEAM_MESSAGES } from "./teamMessages";
 import { ES_WIKI_SOURCES } from "./wikiSources";
 
 export const ES_DICTIONARY: Readonly<Record<string, string>> = {
@@ -24,4 +25,5 @@ export const ES_DICTIONARY: Readonly<Record<string, string>> = {
   ...ES_HUB_KNOWLEDGE,
   ...ES_HUB_HEADER,
   ...ES_HUB_TEAM,
+  ...ES_TEAM_MESSAGES,
 };

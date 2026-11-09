@@ -46,4 +46,6 @@ export const ES_HOME: Readonly<Record<string, string>> = {
   "nothing shared yet": "nada compartido aún",
   "1 shared chat": "1 chat compartido",
   "{count} shared chats": "{count} chats compartidos",
+  "1 new message": "1 mensaje nuevo",
+  "{count} new messages": "{count} mensajes nuevos",
 };

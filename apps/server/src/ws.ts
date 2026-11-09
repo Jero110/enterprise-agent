@@ -6,6 +6,7 @@ import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as EnterpriseThreadAuthor from "./enterprise/EnterpriseThreadAuthor.ts";
 import * as ProjectBoards from "./project/ProjectBoards.ts";
 import * as TeamContinuation from "./team/TeamContinuation.ts";
+import * as TeamMessenger from "./team/TeamMessenger.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
 import { EnterpriseSession } from "./enterprise/EnterpriseSession.ts";
 import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
@@ -1487,6 +1488,7 @@ export const layerWsRpc = (
       const peerLinks = yield* PeerLinks.PeerLinks;
       const enterprise = yield* EnterpriseClient.EnterpriseClient;
       const teamContinuation = yield* TeamContinuation.TeamContinuation;
+      const teamMessenger = yield* TeamMessenger.TeamMessenger;
       const projectBoards = yield* ProjectBoards.ProjectBoards;
       const teamReporter = yield* TeamReporter.TeamReporter;
       const threadKnowledge = yield* ThreadKnowledge.ThreadKnowledge;
@@ -2671,6 +2673,16 @@ export const layerWsRpc = (
         [WS_METHODS.teamThreadGet]: (input) => enterprise.teamGet(input),
         [WS_METHODS.teamThreadContinue]: (input) => teamContinuation.continue(input),
         [WS_METHODS.teamThreadPublish]: (input) => teamReporter.publish(input, currentSession),
+        [WS_METHODS.teamMessagesList]: () => enterprise.messagesList,
+        [WS_METHODS.teamMessageSend]: (input) => teamMessenger.send(input),
+        [WS_METHODS.teamMessageRead]: (input) => enterprise.messageRead(input),
+        [WS_METHODS.teamMessageDecide]: (input) =>
+          teamMessenger.decide(input).pipe(
+            // A new skill only shows up in the composer after the providers rescan their folders.
+            Effect.tap((message) =>
+              message.status === "installed" ? providerRegistry.refresh() : Effect.void,
+            ),
+          ),
         [WS_METHODS.projectBoardGet]: (input) => projectBoards.get(input),
         [WS_METHODS.projectBoardSave]: (input) => projectBoards.save(input),
         [WS_METHODS.enterpriseStatus]: () => enterprise.status,
@@ -3490,6 +3502,7 @@ export const layer = Layer.unwrap(
     const peerLinks = yield* PeerLinks.PeerLinks;
     const enterprise = yield* EnterpriseClient.EnterpriseClient;
     const teamContinuation = yield* TeamContinuation.TeamContinuation;
+    const teamMessenger = yield* TeamMessenger.TeamMessenger;
     const projectBoards = yield* ProjectBoards.ProjectBoards;
     const threadAuthor = yield* Effect.serviceOption(EnterpriseThreadAuthor.EnterpriseThreadAuthor);
     const teamReporter = yield* TeamReporter.TeamReporter;
@@ -3586,6 +3599,7 @@ export const layer = Layer.unwrap(
               Layer.provide(Layer.succeed(PeerLinks.PeerLinks, peerLinks)),
               Layer.provide(Layer.succeed(EnterpriseClient.EnterpriseClient, enterprise)),
               Layer.provide(Layer.succeed(TeamContinuation.TeamContinuation, teamContinuation)),
+              Layer.provide(Layer.succeed(TeamMessenger.TeamMessenger, teamMessenger)),
               Layer.provide(Layer.succeed(ProjectBoards.ProjectBoards, projectBoards)),
               Layer.provide(Layer.succeed(TeamReporter.TeamReporter, teamReporter)),
               Layer.provide(Layer.succeed(ThreadKnowledge.ThreadKnowledge, threadKnowledge)),

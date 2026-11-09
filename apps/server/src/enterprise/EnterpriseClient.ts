@@ -33,6 +33,10 @@ import {
   TeamThreadSnapshot,
   TeamPublicationResult,
   type TeamThreadPublishInput,
+  TeamMessage,
+  type TeamMessageDecideInput,
+  type TeamMessageHubSendInput,
+  type TeamMessageReference,
   type TeamThreadReference,
   type TeamThreadReport,
 } from "@t3tools/contracts";
@@ -103,6 +107,16 @@ export class EnterpriseClient extends Context.Service<
     readonly teamPublish: (
       input: TeamThreadPublishInput,
     ) => Effect.Effect<TeamPublicationResult, EnterpriseError>;
+    readonly messagesList: Effect.Effect<ReadonlyArray<TeamMessage>, EnterpriseError>;
+    readonly messageSend: (
+      input: TeamMessageHubSendInput,
+    ) => Effect.Effect<TeamMessage, EnterpriseError>;
+    readonly messageRead: (
+      input: TeamMessageReference,
+    ) => Effect.Effect<TeamMessage, EnterpriseError>;
+    readonly messageDecide: (
+      input: TeamMessageDecideInput,
+    ) => Effect.Effect<TeamMessage, EnterpriseError>;
     readonly connect: (
       input: EnterpriseConnectInput,
     ) => Effect.Effect<EnterpriseConnectResult, EnterpriseError | PeerLinkError>;
@@ -402,6 +416,18 @@ const make = Effect.gen(function* () {
       withConnection((hub) =>
         callResult(hub, "enterprise_team_publish", input, TeamPublicationResult),
       ),
+    ),
+    messagesList: withConnection((hub) =>
+      callResult(hub, "enterprise_messages_list", {}, Schema.Array(TeamMessage)),
+    ),
+    messageSend: Effect.fn("EnterpriseClient.messageSend")((input) =>
+      withConnection((hub) => callResult(hub, "enterprise_message_send", input, TeamMessage)),
+    ),
+    messageRead: Effect.fn("EnterpriseClient.messageRead")((input) =>
+      withConnection((hub) => callResult(hub, "enterprise_message_read", input, TeamMessage)),
+    ),
+    messageDecide: Effect.fn("EnterpriseClient.messageDecide")((input) =>
+      withConnection((hub) => callResult(hub, "enterprise_message_decide", input, TeamMessage)),
     ),
     connect,
     disconnect,

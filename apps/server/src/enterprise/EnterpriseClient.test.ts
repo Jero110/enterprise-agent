@@ -23,6 +23,7 @@ import * as EnterpriseClient from "./EnterpriseClient.ts";
 import * as EnterpriseHub from "./EnterpriseHub.ts";
 import * as EnterpriseIngestion from "./EnterpriseIngestion.ts";
 import * as RunRecords from "./RunRecords.ts";
+import * as TeamMessages from "../team/TeamMessages.ts";
 import * as TeamPublication from "../team/TeamPublication.ts";
 import { layerSeededStore } from "./EnterpriseStore.testkit.ts";
 import * as EnterpriseToolkit from "./EnterpriseToolkit.ts";
@@ -35,6 +36,7 @@ const hubDescriptor = descriptorOf("environment-hub", "Hub", { enterpriseOnboard
 const serveHub = Effect.gen(function* () {
   const services = EnterpriseHub.layer.pipe(
     Layer.provideMerge(TeamPublication.layer),
+    Layer.provideMerge(TeamMessages.layer),
     Layer.provideMerge(RunRecords.layer),
     Layer.provideMerge(layerKnowledge),
     Layer.provideMerge(layerSeededStore),

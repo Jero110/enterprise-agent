@@ -16,6 +16,10 @@ import {
   TeamThreadSnapshot,
   TeamThreadPublishInput,
   TeamPublicationResult,
+  TeamMessage,
+  TeamMessageDecideInput,
+  TeamMessageHubSendInput,
+  TeamMessageReference,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -29,6 +33,7 @@ import { EnterpriseHub } from "./EnterpriseHub.ts";
 import { HOST_AGENT_SESSION } from "./EnterpriseSession.ts";
 import { EnterpriseIngestion } from "./EnterpriseIngestion.ts";
 import { TeamPublication } from "../team/TeamPublication.ts";
+import { TeamMessages } from "../team/TeamMessages.ts";
 
 /**
  * Refusals travel as data, so the member's IDE can tell a wrong token from a
@@ -138,6 +143,35 @@ const TeamPublishTool = Tool.make("enterprise_team_publish", {
   success: hubResult(TeamPublicationResult),
 });
 
+const messageShared = {
+  ...shared,
+  dependencies: [McpInvocationContext.McpInvocationContext, TeamMessages],
+};
+const MessagesListTool = Tool.make("enterprise_messages_list", {
+  ...messageShared,
+  description: "Member IDE only: your direct messages and skill requests, newest first.",
+  parameters: emptyParameters,
+  success: hubResult(Schema.Array(TeamMessage)),
+}).annotate(Tool.Readonly, true);
+const MessageSendTool = Tool.make("enterprise_message_send", {
+  ...messageShared,
+  description: "Member IDE only: send a message or a skill request to a colleague.",
+  parameters: TeamMessageHubSendInput,
+  success: hubResult(TeamMessage),
+});
+const MessageReadTool = Tool.make("enterprise_message_read", {
+  ...messageShared,
+  description: "Member IDE only: mark a received message as read.",
+  parameters: TeamMessageReference,
+  success: hubResult(TeamMessage),
+});
+const MessageDecideTool = Tool.make("enterprise_message_decide", {
+  ...messageShared,
+  description: "Member IDE only: record that a received skill request was installed or declined.",
+  parameters: TeamMessageDecideInput,
+  success: hubResult(TeamMessage),
+});
+
 const RunReportTool = Tool.make("enterprise_run_report", {
   ...shared,
   dependencies: [McpInvocationContext.McpInvocationContext, RunRecords],
@@ -163,6 +197,10 @@ export const EnterpriseToolkit = Toolkit.make(
   TeamListTool,
   TeamGetTool,
   TeamPublishTool,
+  MessagesListTool,
+  MessageSendTool,
+  MessageReadTool,
+  MessageDecideTool,
   EnrollTool,
   WhoAmITool,
   DisconnectTool,
@@ -188,6 +226,19 @@ export const sessionId = McpInvocationContext.McpInvocationContext.pipe(
   ),
 );
 
+const hostAgentDenied = new EnterpriseError({
+  code: "access_denied",
+  message: "Messages are sent by people from their IDE, not by agents.",
+});
+/** Like {@link sessionId}, but never a hub agent: an agent can't message or install on anyone's behalf. */
+const memberSessionId = McpInvocationContext.McpInvocationContext.pipe(
+  Effect.flatMap((scope) =>
+    scope.client !== undefined
+      ? Effect.succeed(scope.client.sessionId)
+      : Effect.fail(scope.thread !== undefined ? hostAgentDenied : noSession),
+  ),
+);
+
 export const asResult = <A, R>(effect: Effect.Effect<A, EnterpriseError, R>) =>
   effect.pipe(
     Effect.map((value) => ({ ok: true as const, value })),
@@ -204,6 +255,7 @@ export const layer = McpToolAccess.toLayer(
     const hub = yield* EnterpriseHub;
     const ingestion = yield* EnterpriseIngestion;
     const team = yield* TeamPublication;
+    const messages = yield* TeamMessages;
     return {
       enterprise_run_report: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => runs.report(id, input))),
@@ -225,6 +277,18 @@ export const layer = McpToolAccess.toLayer(
       ),
       enterprise_team_publish: McpToolAccess.reads((input) =>
         asResult(Effect.flatMap(sessionId, (id) => team.publish(id, input))),
+      ),
+      enterprise_messages_list: McpToolAccess.reads(() =>
+        asResult(Effect.flatMap(memberSessionId, messages.list)),
+      ),
+      enterprise_message_send: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(memberSessionId, (id) => messages.send(id, input))),
+      ),
+      enterprise_message_read: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(memberSessionId, (id) => messages.read(id, input))),
+      ),
+      enterprise_message_decide: McpToolAccess.reads((input) =>
+        asResult(Effect.flatMap(memberSessionId, (id) => messages.decide(id, input))),
       ),
 
       enterprise_enroll: McpToolAccess.reads((input) =>

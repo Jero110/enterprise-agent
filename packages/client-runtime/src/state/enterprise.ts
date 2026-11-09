@@ -66,6 +66,16 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     staleTimeMs: 0,
     refreshIntervalMs: 10_000,
   });
+  const teamMessages = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:team-messages",
+    tag: WS_METHODS.teamMessagesList,
+    staleTimeMs: 0,
+    refreshIntervalMs: 10_000,
+  });
+  const refreshMessages = (
+    { environmentId }: { readonly environmentId: EnvironmentId },
+    registry: AtomRegistry.AtomRegistry,
+  ) => Effect.sync(() => registry.refresh(teamMessages({ environmentId, input: {} })));
   const teamThread = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:enterprise:team-thread",
     tag: WS_METHODS.teamThreadGet,
@@ -81,6 +91,7 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     registry.refresh(proposalInbox({ environmentId, input: {} }));
     registry.refresh(proposalInbox({ environmentId, input: { countOnly: true } }));
     registry.refresh(teamThreads({ environmentId, input: {} }));
+    registry.refresh(teamMessages({ environmentId, input: {} }));
   };
   return {
     projectBoard,
@@ -128,6 +139,23 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     }),
     teamThreads,
     teamThread,
+    teamMessages,
+    sendTeamMessage: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:team-message-send",
+      tag: WS_METHODS.teamMessageSend,
+      onSuccess: refreshMessages,
+    }),
+    readTeamMessage: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:team-message-read",
+      tag: WS_METHODS.teamMessageRead,
+      onSuccess: refreshMessages,
+    }),
+    // Settles either way: a failed install may still have been answered by someone else.
+    decideTeamMessage: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:team-message-decide",
+      tag: WS_METHODS.teamMessageDecide,
+      onSettled: refreshMessages,
+    }),
     continueTeamThread: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:team-thread-continue",
       tag: WS_METHODS.teamThreadContinue,

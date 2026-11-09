@@ -35,6 +35,11 @@ export const TeamWorkCard = memo(function TeamWorkCard({
       ? enterpriseEnvironment.teamThreads({ environmentId: primaryEnvironmentId, input: {} })
       : null,
   );
+  const inbox = useEnvironmentQuery(
+    connected && primaryEnvironmentId !== null
+      ? enterpriseEnvironment.teamMessages({ environmentId: primaryEnvironmentId, input: {} })
+      : null,
+  );
   const [boardOpen, setBoardOpen] = useState(false);
   if (isPending) return null;
 
@@ -58,6 +63,10 @@ export const TeamWorkCard = memo(function TeamWorkCard({
   const teammateThreads = (shared.data ?? []).filter(
     (thread) => thread.ownerEmail !== identity.email && thread.parentThreadId === null,
   );
+
+  const unreadMessages = (inbox.data ?? []).filter(
+    (message) => !message.outgoing && message.status === "unread",
+  ).length;
 
   return (
     <div className={CARD_CLASS_NAME} data-home-team-work>
@@ -97,6 +106,14 @@ export const TeamWorkCard = memo(function TeamWorkCard({
         {teammateThreads.length === 0
           ? t("nothing shared yet")
           : countLabel(teammateThreads.length, "1 shared chat", "{count} shared chats")}
+        {unreadMessages > 0 ? (
+          <>
+            <span className="mx-1">·</span>
+            <span className="font-medium text-primary">
+              {countLabel(unreadMessages, "1 new message", "{count} new messages")}
+            </span>
+          </>
+        ) : null}
       </p>
       <ProjectsBoardDialog
         environmentId={environmentId}
