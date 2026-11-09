@@ -400,6 +400,7 @@
             "*",
           );
         });
+      const layerGuides = [];
       // reuse the library's own three.js classes: once the first default sphere exists, borrow its Mesh, material and geometry
       let SG,
         BG,
@@ -454,6 +455,25 @@
         P.needsUpdate = true;
         BG.computeVertexNormals();
         ringMat = new Mat({ color: "#dcdee2" });
+        // Plane outlines are scene decoration, never searchable knowledge nodes.
+        if (!layerGuides.length && !proposalMode) {
+          const geometry = SG.clone();
+          for (const layer of LAYERS) {
+            for (let index = 0; index < 110; index++) {
+              const angle = (index / 110) * Math.PI * 2;
+              const mesh = new Mesh(geometry, ringMat);
+              mesh.scale.setScalar(0.9 / r0);
+              mesh.position.set(
+                Math.cos(angle) * (RAD + 10),
+                layer.y,
+                Math.sin(angle) * (RAD + 10),
+              );
+              mesh.visible = !hidden.has(layer.id);
+              G.scene().add(mesh);
+              layerGuides.push({ mesh, layer: layer.id });
+            }
+          }
+        }
         G.nodeThreeObject(mk);
       }
 
@@ -513,6 +533,9 @@
             (c.onclick = () => {
               const l = c.dataset.l;
               hidden.has(l) ? hidden.delete(l) : hidden.add(l);
+              layerGuides.forEach((guide) => {
+                guide.mesh.visible = !hidden.has(guide.layer);
+              });
               if (sel && hidden.has(sel.layer)) {
                 sel = null;
                 hover = null;
@@ -602,22 +625,30 @@
         nb.clear();
         const areas = [...new Set(previews.map((n) => n.areaId))].sort();
         const counts = new Map();
+        const totals = new Map();
+        for (const p of previews) {
+          const key = p.areaId + ":" + p.layer;
+          totals.set(key, (totals.get(key) || 0) + 1);
+        }
         for (const p of previews) {
           const li = LAYERS.findIndex((l) => l.id === p.layer);
           if (li < 0) continue;
           const key = p.areaId + ":" + p.layer;
           const index = counts.get(key) || 0;
           counts.set(key, index + 1);
-          const angle = (areas.indexOf(p.areaId) / Math.max(areas.length, 1)) * Math.PI * 2;
-          const radius = 5 * Math.sqrt(index);
-          const x = Math.cos(angle) * RAD * 0.65 + Math.cos(index * 2.4) * radius;
-          const z = Math.sin(angle) * RAD * 0.65 + Math.sin(index * 2.4) * radius;
+          const angle =
+            (areas.indexOf(p.areaId) / Math.max(areas.length, 1)) * Math.PI * 2 + li * 0.5;
+          const radius =
+            Math.min(60, RAD * 0.35) * Math.sqrt(index / Math.max(1, totals.get(key) - 1));
+          const x = Math.cos(angle) * RAD * 0.5 + Math.cos(index * 2.4) * radius;
+          const z = Math.sin(angle) * RAD * 0.5 + Math.sin(index * 2.4) * radius;
           const node = {
             id: p.id,
             t: p.title,
             areaId: p.areaId,
             layer: p.layer,
             owner: p.areaId,
+            hub: index === 0,
             li,
             x,
             z,
