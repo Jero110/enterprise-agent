@@ -136,6 +136,9 @@ function IngestionRun({
   });
   const [stagedCount, setStagedCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const runStatus = useEnvironmentQuery(
+    run ? enterpriseEnvironment.ingestStatus({ environmentId, input: { runId: run.runId } }) : null,
+  );
   const { sourceUrls, selectedFiles } = ingestSourceSelection(sourceMode, urls, files);
   const start = async () => {
     if (!ingestion || busy) return;
@@ -416,12 +419,58 @@ function IngestionRun({
       )}
       {run && (
         <div role="status" className="space-y-2 rounded-xl border bg-muted/20 p-4 text-sm">
-          <p className="font-medium">{t("Agent run started")}</p>
-          <p className="text-muted-foreground">
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-medium">
+              {runStatus.data?.status === "completed"
+                ? t("Agent run completed")
+                : runStatus.data?.status === "failed"
+                  ? t("Agent run failed")
+                  : t("Agent run started")}
+            </p>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => {
+                setRun(null);
+                try {
+                  sessionStorage.removeItem(runKey);
+                } catch {
+                  // Storage may be unavailable; the visible run still closes.
+                }
+              }}
+            >
+              {t("Dismiss")}
+            </Button>
+          </div>
+          {runStatus.data ? (
+            <p className="text-muted-foreground">
+              {t(
+                "Agent: {status} · {sources} sources · {proposals} proposals ({pending} awaiting review)",
+                {
+                  status: runStatus.data.agentStatus ?? runStatus.data.status,
+                  sources: runStatus.data.sourceCount,
+                  proposals: runStatus.data.proposedCount,
+                  pending: runStatus.data.pendingCount,
+                },
+              )}
+            </p>
+          ) : (
+            <p className="text-muted-foreground">
+              {runStatus.error
+                ? t("Could not load the current run status.")
+                : t("Checking run status…")}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
             {t(
-              "Proposals will appear in Changes for your review. Nothing is approved automatically.",
+              "Proposals appear in Changes as the agent prepares them; nothing is approved automatically.",
             )}
           </p>
+          {runStatus.error && (
+            <Button size="xs" variant="outline" onClick={runStatus.refresh}>
+              {t("Retry status")}
+            </Button>
+          )}
           <div className="flex flex-wrap items-center gap-4">
             {identity?.hubEnvironmentId === environmentId ? (
               <Link
