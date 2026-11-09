@@ -77,6 +77,9 @@ const make = Effect.gen(function* () {
     }),
     listMembers: Effect.flatMap(session, hub.listMembers),
     org: Effect.flatMap(session, hub.org),
+    orgImport: Effect.fn("EnterpriseHubClient.orgImport")(function* (files, apply) {
+      return yield* hub.orgImport(yield* session, files, apply);
+    }),
     authorize: Effect.fn("EnterpriseHubClient.authorize")(function* (input) {
       return yield* hub.authorize(yield* session, input);
     }),

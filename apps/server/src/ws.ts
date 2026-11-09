@@ -7,6 +7,7 @@ import * as EnterpriseThreadAuthor from "./enterprise/EnterpriseThreadAuthor.ts"
 import * as ProjectBoards from "./project/ProjectBoards.ts";
 import * as TeamContinuation from "./team/TeamContinuation.ts";
 import * as EnterpriseClient from "./enterprise/EnterpriseClient.ts";
+import * as OrgImport from "./enterprise/OrgImport.ts";
 import { EnterpriseSession } from "./enterprise/EnterpriseSession.ts";
 import * as ThreadKnowledge from "./enterprise/ThreadKnowledge.ts";
 import * as TeamReporter from "./team/TeamReporter.ts";
@@ -2684,6 +2685,9 @@ export const layerWsRpc = (
         [WS_METHODS.enterpriseKnowledgePropose]: (input) => enterprise.knowledgePropose(input),
         [WS_METHODS.enterpriseIngestStart]: (input) => enterprise.ingestStart(input),
         [WS_METHODS.enterpriseOrg]: () => enterprise.org,
+        [WS_METHODS.enterpriseOrgTemplate]: () => Effect.succeed(OrgImport.template),
+        [WS_METHODS.enterpriseOrgImportPreview]: (input) => enterprise.orgImport(input, false),
+        [WS_METHODS.enterpriseOrgImportApply]: (input) => enterprise.orgImport(input, true),
         [WS_METHODS.enterpriseThreadContext]: (input) => threadKnowledge.get(input),
         [WS_METHODS.enterpriseThreadContextSet]: (input) => threadKnowledge.set(input),
         [WS_METHODS.enterpriseProposalInbox]: (input) => enterprise.proposalInbox(input),

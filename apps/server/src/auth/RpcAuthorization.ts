@@ -91,6 +91,8 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.enterpriseStatus]: AuthAccessReadScope,
   [WS_METHODS.enterpriseMembersList]: AuthAccessReadScope,
   [WS_METHODS.enterpriseOrg]: AuthAccessReadScope,
+  [WS_METHODS.enterpriseOrgTemplate]: AuthAccessReadScope,
+  [WS_METHODS.enterpriseOrgImportPreview]: AuthAccessReadScope,
   [WS_METHODS.enterpriseThreadContext]: AuthOrchestrationReadScope,
   [WS_METHODS.enterpriseKnowledgeList]: AuthAccessReadScope,
   [WS_METHODS.enterpriseKnowledgeGet]: AuthAccessReadScope,

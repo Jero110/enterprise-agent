@@ -82,6 +82,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.enterpriseKnowledgePropose]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseProposalDecide]: AuthAccessWriteScope,
   [WS_METHODS.enterpriseIngestStart]: AuthAccessWriteScope,
+  [WS_METHODS.enterpriseOrgImportApply]: AuthAccessWriteScope,
   // Turns a conversation's knowledge access on or off, like other thread settings.
   [WS_METHODS.enterpriseThreadContextSet]: AuthOrchestrationOperateScope,
 } as const;

@@ -36,6 +36,10 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     tag: WS_METHODS.enterpriseOrg,
     staleTimeMs: 10_000,
   });
+  const orgTemplate = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:enterprise:org-template",
+    tag: WS_METHODS.enterpriseOrgTemplate,
+  });
   // The conversation's knowledge cards: hub-filtered documents plus this thread's switches and reads.
   const threadContext = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:enterprise:thread-context",
@@ -95,6 +99,18 @@ export function createEnterpriseEnvironmentAtoms<R, E>(
     status,
     members,
     org,
+    orgTemplate,
+    // A preview writes nothing, so it refreshes nothing.
+    orgImportPreview: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:org-import-preview",
+      tag: WS_METHODS.enterpriseOrgImportPreview,
+    }),
+    orgImportApply: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:enterprise:org-import-apply",
+      tag: WS_METHODS.enterpriseOrgImportApply,
+      onSuccess: ({ environmentId }, registry) =>
+        Effect.sync(() => refreshAll(registry, environmentId)),
+    }),
     threadContext,
     setThreadContext: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:enterprise:thread-context-set",

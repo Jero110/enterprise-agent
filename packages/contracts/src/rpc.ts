@@ -42,6 +42,8 @@ import {
   EnterpriseIngestStartResult,
   EnterpriseMembers,
   EnterpriseOrg,
+  EnterpriseOrgFiles,
+  EnterpriseOrgImportResult,
   EnterpriseRevokeMemberInput,
   EnterpriseStatus,
   ThreadContext,
@@ -571,6 +573,9 @@ export const WS_METHODS = {
   enterpriseProposalDecide: "enterprise.proposals.decide",
   enterpriseIngestStart: "enterprise.ingest.start",
   enterpriseOrg: "enterprise.org",
+  enterpriseOrgTemplate: "enterprise.org.template",
+  enterpriseOrgImportPreview: "enterprise.org.importPreview",
+  enterpriseOrgImportApply: "enterprise.org.importApply",
   enterpriseThreadContext: "enterprise.threadContext",
   enterpriseThreadContextSet: "enterprise.threadContext.set",
   serverUpdateSettings: "server.updateSettings",
@@ -906,6 +911,21 @@ const WsEnterpriseProposalDecideRpc = Rpc.make(WS_METHODS.enterpriseProposalDeci
 const WsEnterpriseOrgRpc = Rpc.make(WS_METHODS.enterpriseOrg, {
   payload: Schema.Struct({}),
   success: EnterpriseOrg,
+  error: enterpriseError,
+});
+const WsEnterpriseOrgTemplateRpc = Rpc.make(WS_METHODS.enterpriseOrgTemplate, {
+  payload: Schema.Struct({}),
+  success: EnterpriseOrgFiles,
+  error: enterpriseError,
+});
+const WsEnterpriseOrgImportPreviewRpc = Rpc.make(WS_METHODS.enterpriseOrgImportPreview, {
+  payload: EnterpriseOrgFiles,
+  success: EnterpriseOrgImportResult,
+  error: enterpriseError,
+});
+const WsEnterpriseOrgImportApplyRpc = Rpc.make(WS_METHODS.enterpriseOrgImportApply, {
+  payload: EnterpriseOrgFiles,
+  success: EnterpriseOrgImportResult,
   error: enterpriseError,
 });
 const WsEnterpriseThreadContextRpc = Rpc.make(WS_METHODS.enterpriseThreadContext, {
@@ -2214,6 +2234,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsEnterpriseKnowledgeGetRpc,
   WsEnterpriseIngestStartRpc,
   WsEnterpriseOrgRpc,
+  WsEnterpriseOrgTemplateRpc,
+  WsEnterpriseOrgImportPreviewRpc,
+  WsEnterpriseOrgImportApplyRpc,
   WsEnterpriseThreadContextRpc,
   WsEnterpriseThreadContextSetRpc,
   WsEnterpriseKnowledgeProposeRpc,

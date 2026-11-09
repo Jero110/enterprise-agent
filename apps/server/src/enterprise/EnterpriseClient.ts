@@ -19,6 +19,8 @@ import {
   ExecutionEnvironmentDescriptor,
   EnterpriseMembers,
   EnterpriseOrg,
+  type EnterpriseOrgFiles,
+  EnterpriseOrgImportResult,
   type EnterpriseRevokeMemberInput,
   type EnterpriseStatus,
   KnowledgeDocument,
@@ -109,6 +111,11 @@ export class EnterpriseClient extends Context.Service<
     readonly disconnect: Effect.Effect<{ readonly disconnected: boolean }>;
     readonly listMembers: Effect.Effect<EnterpriseMembers, EnterpriseError>;
     readonly org: Effect.Effect<EnterpriseOrg, EnterpriseError>;
+    /** Admin only on the hub: previews the org import, and writes it when `apply`. */
+    readonly orgImport: (
+      files: EnterpriseOrgFiles,
+      apply: boolean,
+    ) => Effect.Effect<EnterpriseOrgImportResult, EnterpriseError>;
     readonly authorize: (
       input: EnterpriseAuthorizeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
@@ -409,6 +416,16 @@ const make = Effect.gen(function* () {
       callResult(hub, "enterprise_members", {}, EnterpriseMembers),
     ),
     org: withConnection((hub) => callResult(hub, "enterprise_org", {}, EnterpriseOrg)),
+    orgImport: Effect.fn("EnterpriseClient.orgImport")((files, apply) =>
+      withConnection((hub) =>
+        callResult(
+          hub,
+          "enterprise_org_import",
+          { ...files, mode: apply ? "apply" : "preview" },
+          EnterpriseOrgImportResult,
+        ),
+      ),
+    ),
     authorize: Effect.fn("EnterpriseClient.authorize")((input) =>
       withConnection((hub) =>
         callResult(hub, "enterprise_member_authorize", input, EnterpriseMembers),
