@@ -146,7 +146,10 @@ describe("EnterpriseHub", () => {
         expect(yield* codeOf(hub.knowledgeGet("recipient", { path: itemPath }))).toBe(
           "document_not_found",
         );
-        yield* hub.knowledgeShare("owner", { path: itemPath, grantee });
+        yield* hub.knowledgeShare("admin", { path: itemPath, grantee });
+        expect((yield* hub.knowledgeGet("recipient", { path: itemPath })).content).toBe(
+          item.content,
+        );
         yield* store.revokeMember(ANA);
         expect(yield* codeOf(hub.knowledgeGet("recipient", { path: itemPath }))).toBe(
           "document_not_found",

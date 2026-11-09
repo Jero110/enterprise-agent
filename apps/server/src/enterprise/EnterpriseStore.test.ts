@@ -112,14 +112,22 @@ describe("EnterpriseStore", () => {
           status: "running",
         });
         yield* store.moveMember("ent.test.bruno@gmail.com", "frontend");
-        yield* store.grantKnowledgeShare("personal/owner/skill.md", {
-          kind: "area",
-          target: "risk",
-        });
-        yield* store.grantKnowledgeShare("personal/owner/skill.md", {
-          kind: "area",
-          target: "risk",
-        });
+        yield* store.grantKnowledgeShare(
+          "personal/owner/skill.md",
+          {
+            kind: "area",
+            target: "risk",
+          },
+          "ent.test.ana@gmail.com",
+        );
+        yield* store.grantKnowledgeShare(
+          "personal/owner/skill.md",
+          {
+            kind: "area",
+            target: "risk",
+          },
+          "jeronimo.deli@gmail.com",
+        );
         yield* store.saveProposal({
           id: "durable-request",
           kind: "area-access",
@@ -162,6 +170,10 @@ describe("EnterpriseStore", () => {
         expect(yield* store.getIngestionRun("not-an-ingestion")).toBeNull();
         expect(yield* store.listKnowledgeShares).toEqual([
           { path: "personal/owner/skill.md", kind: "area", target: "risk" },
+        ]);
+        const sql = yield* SqlClient.SqlClient;
+        expect(yield* sql`SELECT granted_by, granted_at FROM enterprise_knowledge_shares`).toEqual([
+          { granted_by: "ent.test.ana@gmail.com", granted_at: expect.any(String) },
         ]);
         yield* store.revokeKnowledgeShare("personal/owner/skill.md", {
           kind: "area",

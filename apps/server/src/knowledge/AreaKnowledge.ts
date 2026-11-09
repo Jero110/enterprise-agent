@@ -336,7 +336,7 @@ export const layer = Layer.effect(
         const content = `---\n${stringifyYaml({ title: item.title, description: item.description, area: "personal", layer: item.layer, private: true, links: [], itemKind: item.kind })}---\n${item.content}`;
         yield* writePersonal(current, input.path, content, existing !== undefined);
       }
-      yield* store.grantKnowledgeShare(input.path, grantee);
+      yield* store.grantKnowledgeShare(input.path, grantee, current.email);
       return yield* sharing(current);
     }, sharingMutex.withPermits(1));
 

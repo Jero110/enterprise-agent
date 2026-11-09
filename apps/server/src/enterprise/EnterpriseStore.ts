@@ -141,6 +141,7 @@ export class EnterpriseStore extends Context.Service<
     readonly grantKnowledgeShare: (
       path: string,
       grantee: KnowledgeShareGrantee,
+      actor: string,
     ) => Effect.Effect<void>;
     readonly revokeKnowledgeShare: (
       path: string,
@@ -480,13 +481,15 @@ const make = Effect.gen(function* () {
   >`SELECT path, kind, target FROM enterprise_knowledge_shares ORDER BY path, kind, target`.pipe(
     Effect.orDie,
   );
-  const grantKnowledgeShare = Effect.fn("EnterpriseStore.grantKnowledgeShare")(
-    (path: string, grantee: KnowledgeShareGrantee) =>
-      sql`INSERT INTO enterprise_knowledge_shares (path, kind, target) VALUES (${path}, ${grantee.kind}, ${grantee.target}) ON CONFLICT DO NOTHING`.pipe(
-        Effect.asVoid,
-        Effect.orDie,
-      ),
-  );
+  const grantKnowledgeShare = Effect.fn("EnterpriseStore.grantKnowledgeShare")(function* (
+    path: string,
+    grantee: KnowledgeShareGrantee,
+    actor: string,
+  ) {
+    const now = yield* nowIso;
+    yield* sql`INSERT INTO enterprise_knowledge_shares (path, kind, target, granted_by, granted_at)
+        VALUES (${path}, ${grantee.kind}, ${grantee.target}, ${normalizeEmail(actor)}, ${now}) ON CONFLICT DO NOTHING`;
+  }, Effect.orDie);
   const revokeKnowledgeShare = Effect.fn("EnterpriseStore.revokeKnowledgeShare")(
     (path: string, grantee?: KnowledgeShareGrantee) =>
       (grantee === undefined
