@@ -746,12 +746,34 @@
         docs.length = 0;
         byId.clear();
         nb.clear();
-        const areas = [...new Set(previews.map((n) => n.areaId))].sort();
         const counts = new Map();
         const totals = new Map();
+        const areasByLayer = new Map(LAYERS.map((layer) => [layer.id, new Set()]));
         for (const p of previews) {
+          if (!areasByLayer.has(p.layer)) continue;
           const key = p.areaId + ":" + p.layer;
           totals.set(key, (totals.get(key) || 0) + 1);
+          areasByLayer.get(p.layer).add(p.areaId);
+        }
+        const frames = new Map();
+        for (const layer of LAYERS) {
+          const areas = [...areasByLayer.get(layer.id)].sort();
+          const centerRadius = areas.length < 2 ? 0 : RAD * (areas.length === 2 ? 0.5 : 0.58);
+          const clusterRadius =
+            areas.length < 2
+              ? RAD * 0.93
+              : Math.min(
+                  RAD - centerRadius - 8,
+                  centerRadius * Math.sin(Math.PI / areas.length) - 6,
+                );
+          areas.forEach((areaId, index) => {
+            const angle = (index / areas.length) * Math.PI * 2 + LAYERS.indexOf(layer) * 0.4;
+            frames.set(areaId + ":" + layer.id, {
+              cx: Math.cos(angle) * centerRadius,
+              cz: Math.sin(angle) * centerRadius,
+              radius: clusterRadius,
+            });
+          });
         }
         for (const p of previews) {
           const li = LAYERS.findIndex((l) => l.id === p.layer);
@@ -759,12 +781,12 @@
           const key = p.areaId + ":" + p.layer;
           const index = counts.get(key) || 0;
           counts.set(key, index + 1);
-          const angle =
-            (areas.indexOf(p.areaId) / Math.max(areas.length, 1)) * Math.PI * 2 + li * 0.5;
-          const radius =
-            Math.min(60, RAD * 0.35) * Math.sqrt(index / Math.max(1, totals.get(key) - 1));
-          const x = Math.cos(angle) * RAD * 0.5 + Math.cos(index * 2.4) * radius;
-          const z = Math.sin(angle) * RAD * 0.5 + Math.sin(index * 2.4) * radius;
+          const frame = frames.get(key);
+          const total = totals.get(key);
+          const radius = total === 1 ? 0 : frame.radius * Math.sqrt((index + 0.5) / total);
+          const angle = index * 2.399963229728653;
+          const x = frame.cx + Math.cos(angle) * radius;
+          const z = frame.cz + Math.sin(angle) * radius;
           const node = {
             id: p.id,
             t: p.title,
