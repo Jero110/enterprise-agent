@@ -833,7 +833,12 @@
       }
       // Injected knowledge: hubs are key nodes, leaves are documents. Nodes already on the map keep
       // their position, so adding one document never re-lays out the rest.
+      let shownSignature = "";
       function showNodes(previews) {
+        // the parent resends the same map after unrelated refetches; rebuilding it is the lag
+        const signature = JSON.stringify(previews);
+        if (!proposalMode && signature === shownSignature) return;
+        shownSignature = signature;
         proposalMode = false;
         const placed = new Map();
         for (const n of nodes)
@@ -956,6 +961,10 @@
           return;
         }
         if (event.data?.type !== "knowledge-scopes") return;
+        const unchanged = Object.keys(scopes).every(
+          (key) => scopes[key] === event.data.scopes[key],
+        );
+        if (unchanged) return;
         Object.assign(scopes, event.data.scopes);
         if (sel && !scopeActive(sel)) {
           sel = null;
