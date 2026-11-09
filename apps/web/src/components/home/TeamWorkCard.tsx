@@ -46,7 +46,7 @@ export const TeamWorkCard = memo(function TeamWorkCard({
           {t("Projects and team")}
         </div>
         <p className="text-muted-foreground text-xs">
-          {t("Join your company's team to see its projects and what your teammates share.")}
+          {t("Join your company's team to see its projects.")}
         </p>
       </div>
     );
@@ -58,7 +58,6 @@ export const TeamWorkCard = memo(function TeamWorkCard({
   const teammateThreads = (shared.data ?? []).filter(
     (thread) => thread.ownerEmail !== identity.email && thread.parentThreadId === null,
   );
-  const teammates = new Set(teammateThreads.map((thread) => thread.ownerEmail)).size;
 
   return (
     <div className={CARD_CLASS_NAME} data-home-team-work>
@@ -77,12 +76,12 @@ export const TeamWorkCard = memo(function TeamWorkCard({
           {t("Open board")}
         </Button>
       </div>
-      <p className="text-muted-foreground text-xs tabular-nums">
+      <p className="truncate text-muted-foreground text-xs tabular-nums">
         {tasks.length === 0 ? (
-          t("No tasks on this project's board yet.")
+          t("No tasks yet")
         ) : (
           <>
-            {countLabel(inProgress, "1 task in progress", "{count} tasks in progress")}
+            {countLabel(inProgress, "1 in progress", "{count} in progress")}
             {blocked > 0 ? (
               <>
                 <span className="mx-1">·</span>
@@ -93,21 +92,11 @@ export const TeamWorkCard = memo(function TeamWorkCard({
             ) : null}
           </>
         )}
-      </p>
-      <p className="flex items-center gap-1.5 text-muted-foreground text-xs tabular-nums">
-        <UsersIcon aria-hidden className="size-3.5 shrink-0" />
+        <span className="mx-1">·</span>
+        <UsersIcon aria-hidden className="me-1 inline size-3.5 align-[-0.15em]" />
         {teammateThreads.length === 0
-          ? t("Your team hasn't shared conversations yet.")
-          : teammates === 1
-            ? countLabel(
-                teammateThreads.length,
-                "1 teammate shared 1 conversation",
-                "1 teammate shared {count} conversations",
-              )
-            : t("{people} teammates shared {count} conversations", {
-                people: teammates,
-                count: teammateThreads.length,
-              })}
+          ? t("nothing shared yet")
+          : countLabel(teammateThreads.length, "1 shared chat", "{count} shared chats")}
       </p>
       <ProjectsBoardDialog
         environmentId={environmentId}
