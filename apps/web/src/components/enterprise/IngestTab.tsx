@@ -51,6 +51,7 @@ export function IngestTab({
       <OrgImport environmentId={environmentId} />
       <section aria-label={t("Connectors")} className="space-y-3 rounded-xl border p-4">
         <h2 className="font-medium">{t("Connectors")}</h2>
+        {/* T4 slot: <ConnectorsSection environmentId={environmentId} /> */}
         {connectors ?? (
           <p className="text-sm text-muted-foreground">
             {t("Connectors are not available on this hub yet.")}
