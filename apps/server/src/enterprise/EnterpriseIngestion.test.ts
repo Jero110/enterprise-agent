@@ -540,6 +540,59 @@ describe("EnterpriseIngestion", () => {
       }).pipe(Effect.provide(layerFor(commands)));
     },
   );
+  it.effect(
+    "classifies a manual raw folder without staging other areas or personal sources into the selected area",
+    () => {
+      const commands: OrchestrationV2ServerCommand[] = [];
+      return Effect.gen(function* () {
+        const hub = yield* EnterpriseHub.EnterpriseHub;
+        const ingestion = yield* EnterpriseIngestion.EnterpriseIngestion;
+        const fs = yield* FileSystem.FileSystem;
+        yield* hub.enroll("admin", { email: "jeronimo.deli@gmail.com", token });
+        const files = [
+          {
+            relativePath: "raw/_manifest.csv",
+            text: "path,tipo_fuente,area_acceso,owner,fecha,descripcion\nmeet/morning.txt,meet,ledger,persona-alfa,2026-01-02,Reunión sintética\nrisk/restricted.txt,documento_md,risk,persona-beta,2026-01-02,Política restringida\npersonal/private.txt,documento_md,personal/persona-alfa,persona-alfa,2026-01-02,Nota privada\n",
+          },
+          {
+            relativePath: "raw/meet/morning.txt",
+            text: "ACORDADA: preparar borrador. PENDIENTE: autorización. Persona Alfa revisa.",
+          },
+          { relativePath: "raw/risk/restricted.txt", text: "RESTRICTED_MUST_NOT_BE_STAGED" },
+          { relativePath: "raw/personal/private.txt", text: "PERSONAL_MUST_NOT_BE_STAGED" },
+        ];
+        const upload = yield* hub.proposalUpload("admin", {
+          scope: "ledger",
+          reason: "Synthetic manual bucket",
+          files: files.map((file) => ({
+            name: file.relativePath.split("/").at(-1)!,
+            relativePath: file.relativePath,
+            mimeType: "text/plain",
+            base64: Buffer.from(file.text).toString("base64"),
+          })),
+        });
+        const run = yield* ingestion.start("admin", {
+          destination: "ledger",
+          uploadProposalIds: [upload.id],
+          modelSelection,
+        });
+        const message = commands.find((command) => command.type === "message.dispatch")!;
+        const paths = JSON.parse(
+          /Selected sources \(data\): (.+)/.exec(message.text)![1]!,
+        ) as string[];
+        expect(paths).toHaveLength(1);
+        expect(paths[0]).toContain("raw/meet/morning.txt");
+        expect(yield* fs.readFileString(paths[0]!)).toBe(files[1]!.text);
+        expect(message.text).toContain('"owner":"persona-alfa"');
+        expect(message.text).toContain('"layer":"business"');
+        expect(run.skippedSources).toHaveLength(2);
+        for (const file of files.slice(2))
+          expect(
+            yield* fs.exists(paths[0]!.replace("raw/meet/morning.txt", file.relativePath)),
+          ).toBe(false);
+      }).pipe(Effect.provide(layerFor(commands)));
+    },
+  );
   it.effect("starts an ordinary thread attributed to the authenticated admin", () => {
     const commands: OrchestrationV2ServerCommand[] = [];
     return Effect.gen(function* () {
