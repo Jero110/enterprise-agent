@@ -21,6 +21,7 @@ import { t } from "~/i18n";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { areaDestinations, ingestStartError } from "./ingestDestinations";
+import { ingestSourceSelection, type IngestSourceMode } from "./ingestSourceSelection";
 import {
   droppedUploadFiles,
   uploadBatches,
@@ -110,7 +111,7 @@ function IngestionRun({
   const runKey = `t3:enterprise-ingest:${environmentId}:${identity?.email ?? ""}`;
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
-  const [sourceMode, setSourceMode] = useState<"url" | "folder" | "files">("url");
+  const [sourceMode, setSourceMode] = useState<IngestSourceMode>("url");
   const [destination, setDestination] = useState("personal");
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState("");
@@ -135,8 +136,7 @@ function IngestionRun({
   });
   const [stagedCount, setStagedCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const sourceUrls = sourceMode === "url" ? urls.split(/[\s,]+/).filter(Boolean) : [];
-  const selectedFiles = sourceMode === "url" ? [] : files;
+  const { sourceUrls, selectedFiles } = ingestSourceSelection(sourceMode, urls, files);
   const start = async () => {
     if (!ingestion || busy) return;
     const fileError = uploadFileError(selectedFiles);
