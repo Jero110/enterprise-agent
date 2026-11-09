@@ -60,7 +60,37 @@ describe("EnterpriseHub", () => {
           layer: "ai",
           content: "# Review\nPrivate skill instructions",
         } as const;
-        const share = { path: itemPath, item, grantee };
+        const share = { path: itemPath, grantee };
+        expect(
+          yield* codeOf(hub.knowledgePublishPersonal("recipient", { path: itemPath, item })),
+        ).toBe("access_denied");
+        expect(
+          yield* codeOf(
+            hub.knowledgePublishPersonal("owner", { path: "areas/risk/README.md", item }),
+          ),
+        ).toBe("invalid_proposal");
+        yield* hub.knowledgePublishPersonal("owner", { path: itemPath, item });
+        const repo = yield* KnowledgeRepo;
+        const privateVersion = yield* repo.version(itemPath);
+        yield* hub.knowledgePublishPersonal("owner", {
+          path: itemPath,
+          item: { ...item, content: "# Updated local source" },
+        });
+        expect(yield* repo.version(itemPath)).toBe(privateVersion);
+        expect((yield* hub.knowledgeGet("owner", { path: itemPath })).content).toBe(item.content);
+        expect((yield* hub.knowledgeSharing("owner")).sharedByMe).toMatchObject([
+          { id: itemPath, grants: [] },
+        ]);
+        expect((yield* hub.knowledgeSharing("recipient")).sharedWithMe).toEqual([]);
+        expect(
+          (yield* hub.knowledgeList("owner")).documents.some((doc) => doc.id === itemPath),
+        ).toBe(true);
+        expect(
+          (yield* hub.knowledgeSearch("owner", { query: "Private skill instructions" })).hits,
+        ).toMatchObject([{ id: itemPath }]);
+        expect(yield* codeOf(hub.knowledgeGet("recipient", { path: itemPath }))).toBe(
+          "document_not_found",
+        );
         expect(
           yield* codeOf(hub.knowledgeShare("owner", { ...share, path: "../../escape.md" })),
         ).toBe("invalid_proposal");
@@ -82,11 +112,13 @@ describe("EnterpriseHub", () => {
         ).toBe("invalid_proposal");
         expect(
           yield* codeOf(
-            hub.knowledgeShare("owner", { ...share, item: { ...item, layer: "business" } }),
+            hub.knowledgePublishPersonal("owner", {
+              path: `personal/${ownerKey}/other.md`,
+              item: { ...item, layer: "business" },
+            }),
           ),
         ).toBe("invalid_proposal");
         yield* hub.knowledgeShare("owner", share);
-        const repo = yield* KnowledgeRepo;
         const version = yield* repo.version(itemPath);
         yield* hub.knowledgeShare("owner", share);
         expect(yield* repo.version(itemPath)).toBe(version);
@@ -97,6 +129,9 @@ describe("EnterpriseHub", () => {
           { id: itemPath },
         ]);
         expect((yield* hub.knowledgeSharing("admin")).sharedWithMe).toEqual([]);
+        expect(yield* codeOf(hub.knowledgeGet("admin", { path: itemPath }))).toBe(
+          "document_not_found",
+        );
         expect(
           (yield* hub.knowledgeGraph("recipient")).nodes.find((node) => node.id === itemPath),
         ).toMatchObject({ content: item.content, accessible: true, layer: "ai" });
@@ -146,9 +181,8 @@ describe("EnterpriseHub", () => {
         expect(yield* codeOf(hub.knowledgeGet("recipient", { path: itemPath }))).toBe(
           "document_not_found",
         );
-        yield* hub.knowledgeShare("admin", { path: itemPath, grantee });
-        expect((yield* hub.knowledgeGet("recipient", { path: itemPath })).content).toBe(
-          item.content,
+        expect(yield* codeOf(hub.knowledgeShare("admin", { path: itemPath, grantee }))).toBe(
+          "access_denied",
         );
         yield* store.revokeMember(ANA);
         expect(yield* codeOf(hub.knowledgeGet("recipient", { path: itemPath }))).toBe(

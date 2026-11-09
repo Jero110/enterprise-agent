@@ -21,6 +21,7 @@ import {
   type KnowledgeDocumentList,
   type KnowledgeGraph,
   type KnowledgeShareInput,
+  type KnowledgePublishPersonalInput,
   type KnowledgeShareRevokeInput,
   type KnowledgeSharing,
   type KnowledgeGetInput,
@@ -120,6 +121,10 @@ export class EnterpriseHub extends Context.Service<
       input: EnterpriseRevokeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
     /** Knowledge calls are scoped by the enrolled member's team and grants, re-read each call. */
+    readonly knowledgePublishPersonal: (
+      sessionId: string,
+      input: KnowledgePublishPersonalInput,
+    ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
     readonly knowledgeShare: (
       sessionId: string,
       input: KnowledgeShareInput,
@@ -358,7 +363,9 @@ const make = Effect.gen(function* () {
   const principalOf = Effect.fn("EnterpriseHub.principalOf")(function* (sessionId: string) {
     const identity = yield* whoami(sessionId);
     const principal = yield* knowledge.getMemberPrincipal(identity.email);
-    return principal === null ? yield* notAuthorized : principal;
+    if (principal === null) return yield* notAuthorized;
+    yield* knowledge.initializeLocalPersonalSkills(principal);
+    return principal;
   });
 
   const knowledgeList: EnterpriseHub["Service"]["knowledgeList"] = Effect.fn(
@@ -496,6 +503,11 @@ const make = Effect.gen(function* () {
     orgImport,
     authorize,
     revoke,
+    knowledgePublishPersonal: Effect.fn("EnterpriseHub.knowledgePublishPersonal")(
+      function* (sessionId, input) {
+        return yield* knowledge.publishPersonal(yield* principalOf(sessionId), input);
+      },
+    ),
     knowledgeShare: Effect.fn("EnterpriseHub.knowledgeShare")(function* (sessionId, input) {
       return yield* knowledge.share(yield* principalOf(sessionId), input);
     }),

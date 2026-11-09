@@ -144,7 +144,8 @@ export function KnowledgeMap(props: {
     ...node,
     path: node.id,
     kind: "document",
-    scope: node.areaId === "general" ? "general" : "area",
+    scope:
+      node.areaId === "personal" ? "individual" : node.areaId === "general" ? "general" : "area",
   }));
   const selected = nodes.find((node) => node.id === selectedId);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- send metadata only to the sandboxed graph
@@ -169,7 +170,7 @@ export function KnowledgeMap(props: {
   );
   const areaName = (areaId: string) =>
     org.data?.teams.find((team) => team.id === areaId)?.name ?? areaId;
-  const enabledSkills = props.skills.filter((skill) => skill.enabled);
+  const personalNodes = nodes.filter((node) => node.scope === "individual");
   const areaDocuments = props.cards.find((card) => card.scope === "area")?.documents ?? [];
   const areas = [...new Map(areaDocuments.map((doc) => [doc.areaId, doc])).values()];
   const nodeEnabled = (node: KnowledgeNode) =>
@@ -192,11 +193,13 @@ export function KnowledgeMap(props: {
                 : t("Personal knowledge");
           const count =
             scope === "individual"
-              ? enabledSkills.length
+              ? personalNodes.length
               : (props.cards.find((card) => card.scope === scope)?.documents.length ?? 0);
           const countLabel =
             scope === "individual"
-              ? t("{count} skills", { count })
+              ? count === 1
+                ? t("{count} item", { count })
+                : t("{count} items", { count })
               : count === 1
                 ? t("{count} document", { count })
                 : t("{count} documents", { count });
@@ -375,7 +378,7 @@ export function KnowledgeMap(props: {
             {(["general", "area", "individual"] as const).map((scope) => (
               <details
                 key={scope}
-                // Personal lists the device's skill ids; keep it folded so the list stays about company knowledge.
+                // Keep the personal inventory folded without changing the graph layout.
                 open={!SHOW_KNOWLEDGE_GRAPH && scope !== "individual"}
                 className={cn("py-2", !enabled(scope) && "opacity-40")}
               >
@@ -392,15 +395,8 @@ export function KnowledgeMap(props: {
                       : t("Personal")}
                 </summary>
                 {!SHOW_KNOWLEDGE_GRAPH &&
-                  scope === "individual" &&
-                  enabledSkills.map((skill) => (
-                    <p key={skill.name} className="truncate px-4 py-1 text-xs">
-                      {skill.name}
-                    </p>
-                  ))}
-                {!SHOW_KNOWLEDGE_GRAPH &&
                   (scope === "individual"
-                    ? enabledSkills.length === 0
+                    ? personalNodes.length === 0
                     : !nodes.some((node) => node.scope === scope)) && (
                     <p className="px-4 py-1 text-xs text-muted-foreground">
                       {t("Nothing here yet")}

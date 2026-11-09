@@ -276,7 +276,8 @@
           /[&<>"']/g,
           (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
         );
-      const scopeOf = (n) => (n.areaId === "general" ? "general" : "area");
+      const scopeOf = (n) =>
+        n.areaId === "personal" ? "individual" : n.areaId === "general" ? "general" : "area";
       const scopeActive = (n) => n.ring || n.proposal || n.proposalGroup || scopes[scopeOf(n)];
       const describe = (n) => ({
         id: n.id,

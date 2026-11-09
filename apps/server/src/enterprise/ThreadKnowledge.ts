@@ -58,7 +58,9 @@ export const layer = Layer.effect(
         scope,
         enabled: !off.has(scope),
         documents: documents
-          .filter((document) => scopeOf(document.areaId) === scope)
+          .filter(
+            (document) => document.areaId !== "personal" && scopeOf(document.areaId) === scope,
+          )
           .map((document) => ({
             path: document.id,
             title: document.title,
@@ -101,7 +103,8 @@ export const layer = Layer.effect(
       switchedOff(threadId).pipe(
         Effect.map(
           (off) =>
-            !off.has(scopeOf(areaId)) && (areaId === "general" || !off.has(`area:${areaId}`)),
+            areaId === "personal" ||
+            (!off.has(scopeOf(areaId)) && (areaId === "general" || !off.has(`area:${areaId}`))),
         ),
       );
 

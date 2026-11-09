@@ -9,6 +9,7 @@ import * as Path from "effect/Path";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 
 import { PREAUTHORIZED_ADMIN_EMAIL } from "@t3tools/contracts";
+import { teamMemberKey } from "@t3tools/shared/teamMemberKey";
 
 import * as AreaKnowledge from "./AreaKnowledge.ts";
 import * as TeamIdentity from "../auth/TeamIdentity.ts";
@@ -47,6 +48,33 @@ const layerAreaKnowledge = (overrides?: Partial<ServerConfig.ServerConfig["Servi
   );
 
 describe("AreaKnowledge", () => {
+  it.effect(
+    "initializes only the authenticated dev owner's registered checkout skills without grants or overwrites",
+    () =>
+      Effect.gen(function* () {
+        const knowledge = yield* AreaKnowledge.AreaKnowledge;
+        const owner = (yield* knowledge.getMemberPrincipal(PREAUTHORIZED_ADMIN_EMAIL))!;
+        const other = (yield* knowledge.getMemberPrincipal("ent.test.ana@gmail.com"))!;
+        const path = `personal/${teamMemberKey(owner.email)}/test-t3-app.md`;
+        yield* knowledge.initializeLocalPersonalSkills(other);
+        expect((yield* knowledge.sharing(owner)).sharedByMe).toEqual([]);
+        yield* knowledge.initializeLocalPersonalSkills(owner);
+        expect(
+          (yield* knowledge.sharing(owner)).sharedByMe.find((item) => item.id === path),
+        ).toMatchObject({ grants: [] });
+        const saved = yield* knowledge.readDocument(owner, path);
+        expect(saved.content).toContain("test-t3-app");
+        expect((yield* knowledge.listDocuments(other)).some((doc) => doc.id === path)).toBe(false);
+        expect((yield* knowledge.graph(other)).nodes.some((node) => node.id === path)).toBe(false);
+        expect(Exit.isFailure(yield* knowledge.readDocument(other, path).pipe(Effect.exit))).toBe(
+          true,
+        );
+        const repo = yield* KnowledgeRepo.KnowledgeRepo;
+        const version = yield* repo.version(path);
+        yield* knowledge.initializeLocalPersonalSkills(owner);
+        expect(yield* repo.version(path)).toBe(version);
+      }).pipe(Effect.provide(layerAreaKnowledge({ devUrl: new URL("http://localhost:5173") }))),
+  );
   it.effect(
     "graph previews expose metadata but never a forbidden body, including guessed paths",
     () =>

@@ -66,9 +66,13 @@ export const PersonalKnowledgeItem = Schema.Struct({
   layer: KnowledgeLayer,
   content: Schema.String.check(Schema.isMaxLength(200_000)),
 });
+export const KnowledgePublishPersonalInput = Schema.Struct({
+  path: TrimmedNonEmptyString,
+  item: PersonalKnowledgeItem,
+});
+export type KnowledgePublishPersonalInput = typeof KnowledgePublishPersonalInput.Type;
 export const KnowledgeShareInput = Schema.Struct({
   path: TrimmedNonEmptyString,
-  item: Schema.optionalKey(PersonalKnowledgeItem),
   grantee: KnowledgeShareGrantee,
 });
 export type KnowledgeShareInput = typeof KnowledgeShareInput.Type;

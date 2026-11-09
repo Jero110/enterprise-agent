@@ -30,6 +30,7 @@ import {
   KnowledgeGraph,
   KnowledgeSharing,
   type KnowledgeShareInput,
+  type KnowledgePublishPersonalInput,
   type KnowledgeShareRevokeInput,
   type KnowledgeGetInput,
   type KnowledgeSearchInput,
@@ -132,6 +133,9 @@ export class EnterpriseClient extends Context.Service<
       input: EnterpriseRevokeMemberInput,
     ) => Effect.Effect<EnterpriseMembers, EnterpriseError>;
     /** The hub's answer for this member; the IDE never filters or caches knowledge itself. */
+    readonly knowledgePublishPersonal: (
+      input: KnowledgePublishPersonalInput,
+    ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
     readonly knowledgeShare: (
       input: KnowledgeShareInput,
     ) => Effect.Effect<KnowledgeSharing, EnterpriseError>;
@@ -462,6 +466,11 @@ const make = Effect.gen(function* () {
     revoke: Effect.fn("EnterpriseClient.revoke")((input) =>
       withConnection((hub) =>
         callResult(hub, "enterprise_member_revoke", input, EnterpriseMembers),
+      ),
+    ),
+    knowledgePublishPersonal: Effect.fn("EnterpriseClient.knowledgePublishPersonal")((input) =>
+      withConnection((hub) =>
+        callResult(hub, "knowledge_publish_personal", input, KnowledgeSharing),
       ),
     ),
     knowledgeShare: Effect.fn("EnterpriseClient.knowledgeShare")((input) =>
