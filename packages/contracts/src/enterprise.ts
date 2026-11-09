@@ -243,6 +243,7 @@ export class EnterpriseError extends Schema.TaggedError<EnterpriseError>()("Ente
     "access_denied",
     "invalid_proposal",
     "ingestion_failed",
+    "ingestion_empty_destination",
     "proposal_not_found",
     "conflict",
     "knowledge_write_failed",
