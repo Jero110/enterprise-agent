@@ -1,0 +1,135 @@
+people:
+  - email: ernesto.villalobos@kavak-demo.mx
+    name: Ernesto Villalobos
+    area: direccion
+    role: admin
+  - email: magdalena.ruvalcaba@kavak-demo.mx
+    name: Magdalena Ruvalcaba
+    area: ventas
+    role: lead
+    reportsTo: ernesto.villalobos@kavak-demo.mx
+  - email: rodrigo.esquivel@kavak-demo.mx
+    name: Rodrigo Esquivel
+    area: ventas
+    role: member
+    reportsTo: magdalena.ruvalcaba@kavak-demo.mx
+  - email: emiliano.cardenas@kavak-demo.mx
+    name: Emiliano Cárdenas
+    area: ventas
+    role: member
+    reportsTo: magdalena.ruvalcaba@kavak-demo.mx
+  - email: paola.villasenor@kavak-demo.mx
+    name: Paola Villaseñor
+    area: ventas
+    role: member
+    reportsTo: rodrigo.esquivel@kavak-demo.mx
+  - email: adriana.montemayor@kavak-demo.mx
+    name: Adriana Montemayor
+    area: cx
+    role: lead
+    reportsTo: ernesto.villalobos@kavak-demo.mx
+  - email: julian.ochoa@kavak-demo.mx
+    name: Julián Ochoa
+    area: cx
+    role: member
+    reportsTo: adriana.montemayor@kavak-demo.mx
+  - email: maria.trevino@kavak-demo.mx
+    name: María Treviño
+    area: cx
+    role: member
+    reportsTo: julian.ochoa@kavak-demo.mx
+  - email: iker.salcedo@kavak-demo.mx
+    name: Iker Salcedo
+    area: cx
+    role: member
+    reportsTo: julian.ochoa@kavak-demo.mx
+  - email: brenda.saucedo@kavak-demo.mx
+    name: Brenda Saucedo
+    area: cx
+    role: member
+    reportsTo: julian.ochoa@kavak-demo.mx
+  - email: oscar.peralta@kavak-demo.mx
+    name: Óscar Peralta
+    area: cx
+    role: member
+    reportsTo: julian.ochoa@kavak-demo.mx
+  - email: tomas.arreola@kavak-demo.mx
+    name: Tomás Arreola
+    area: ingenieria
+    role: lead
+    reportsTo: ernesto.villalobos@kavak-demo.mx
+  - email: renata.olvera@kavak-demo.mx
+    name: Renata Olvera
+    area: ingenieria
+    role: member
+    reportsTo: tomas.arreola@kavak-demo.mx
+  - email: francisco.lozano@kavak-demo.mx
+    name: Francisco Lozano
+    area: ingenieria
+    role: member
+    reportsTo: renata.olvera@kavak-demo.mx
+  - email: valeria.quintanilla@kavak-demo.mx
+    name: Valeria Quintanilla
+    area: ingenieria
+    role: member
+    reportsTo: renata.olvera@kavak-demo.mx
+  - email: diego.barragan@kavak-demo.mx
+    name: Diego Barragán
+    area: ingenieria
+    role: member
+    reportsTo: tomas.arreola@kavak-demo.mx
+  - email: sofia.elizondo@kavak-demo.mx
+    name: Sofía Elizondo
+    area: data
+    role: lead
+    reportsTo: ernesto.villalobos@kavak-demo.mx
+  - email: mateo.zubiria@kavak-demo.mx
+    name: Mateo Zubiría
+    area: data
+    role: member
+    reportsTo: sofia.elizondo@kavak-demo.mx
+  - email: camila.robles@kavak-demo.mx
+    name: Camila Robles
+    area: data
+    role: member
+    reportsTo: sofia.elizondo@kavak-demo.mx
+  - email: hernan.bustamante@kavak-demo.mx
+    name: Hernán Bustamante
+    area: operaciones
+    role: lead
+    reportsTo: ernesto.villalobos@kavak-demo.mx
+  - email: ximena.galindo@kavak-demo.mx
+    name: Ximena Galindo
+    area: operaciones
+    role: member
+    reportsTo: hernan.bustamante@kavak-demo.mx
+  - email: lucia.arriaga@kavak-demo.mx
+    name: Lucía Arriaga
+    area: financiamiento
+    role: lead
+    reportsTo: ernesto.villalobos@kavak-demo.mx
+  - email: andres.toscano@kavak-demo.mx
+    name: Andrés Toscano
+    area: financiamiento
+    role: member
+    reportsTo: lucia.arriaga@kavak-demo.mx
+  - email: daniela.cervera@kavak-demo.mx
+    name: Daniela Cervera
+    area: marketing
+    role: lead
+    reportsTo: ernesto.villalobos@kavak-demo.mx
+  - email: santiago.medina@kavak-demo.mx
+    name: Santiago Medina
+    area: marketing
+    role: member
+    reportsTo: daniela.cervera@kavak-demo.mx
+  - email: natalia.pineda@kavak-demo.mx
+    name: Natalia Pineda
+    area: people
+    role: lead
+    reportsTo: ernesto.villalobos@kavak-demo.mx
+  - email: gabriel.ugalde@kavak-demo.mx
+    name: Gabriel Ugalde
+    area: legal
+    role: lead
+    reportsTo: ernesto.villalobos@kavak-demo.mx

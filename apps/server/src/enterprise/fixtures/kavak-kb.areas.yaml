@@ -1,0 +1,31 @@
+areas:
+  - id: direccion
+    name: Dirección General
+    description: Dirección y decisiones de la empresa.
+  - id: ventas
+    name: Ventas
+    description: Campañas, promociones y pricing comercial.
+  - id: cx
+    name: Experiencia del cliente
+    description: Atención, playbooks y CX Assistant.
+  - id: ingenieria
+    name: Ingeniería
+    description: Desarrollo de producto y agentes.
+  - id: data
+    name: Data
+    description: Analítica, diccionario y data warehouse.
+  - id: operaciones
+    name: Operaciones
+    description: Hubs, inspección y reacondicionamiento.
+  - id: financiamiento
+    name: Financiamiento
+    description: Crédito, originación y productos financieros.
+  - id: marketing
+    name: Marketing
+    description: Comunicación y campañas.
+  - id: people
+    name: People
+    description: Organigrama, onboarding y accesos.
+  - id: legal
+    name: Legal
+    description: Asuntos legales y políticas.
