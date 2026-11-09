@@ -18,6 +18,9 @@ function graphHarness() {
       classList: { add: () => void; remove: () => void };
       addEventListener: () => void;
       querySelectorAll: () => never[];
+      replaceChildren: () => void;
+      append: (child: unknown) => void;
+      hidden: boolean;
     }
   >();
   const element = (id: string) => {
@@ -29,6 +32,9 @@ function graphHarness() {
         classList: { add() {}, remove() {} },
         addEventListener() {},
         querySelectorAll: () => [],
+        replaceChildren() {},
+        append() {},
+        hidden: false,
       });
     return elements.get(id)!;
   };
@@ -51,7 +57,17 @@ function graphHarness() {
   );
   const context = {
     ForceGraph3D: () => () => graph,
-    document: { getElementById: element, querySelectorAll: () => [] },
+    document: {
+      getElementById: element,
+      querySelectorAll: () => [],
+      createElement: () => ({
+        type: "",
+        title: "",
+        textContent: "",
+        setAttribute() {},
+        onclick: () => {},
+      }),
+    },
     window: {
       parent,
       addEventListener: (_name: string, listener: (typeof receive)[number]) =>
@@ -78,6 +94,7 @@ describe("embedded knowledge graph", () => {
     })();
     const graph = graphHarness();
     expect(graph.inspect("nodes.length")).toBe(0);
+    expect(graph.inspect('document.getElementById("empty-stage").hidden')).toBe(false);
     const nodes = Array.from({ length: 2000 }, (_, index) => ({
       id: `area/ledger/${index}.md`,
       title: `Real ${index}`,
@@ -89,6 +106,7 @@ describe("embedded knowledge graph", () => {
     }));
     graph.send({ type: "knowledge-nodes", nodes });
     expect(graph.inspect("nodes.length")).toBe(2000);
+    expect(graph.inspect('document.getElementById("empty-stage").hidden')).toBe(true);
     expect(graph.inspect("links.length")).toBe(1999);
     expect(graph.inspect("nodes.filter(n => n.hub).length")).toBe(0);
     expect(graph.inspect("nodes.every(n => Math.hypot(n.x, n.z) <= RAD)")).toBe(true);
@@ -104,6 +122,7 @@ describe("embedded knowledge graph", () => {
     expect(vi.getTimerCount()).toBe(0);
     graph.send({ type: "knowledge-nodes", nodes: [] });
     expect(graph.inspect("nodes.length + links.length")).toBe(0);
+    expect(graph.inspect('document.getElementById("empty-stage").hidden')).toBe(false);
   });
 
   it("keeps accepted CX Business and private Ventas Data Markdown as real linked documents", () => {
@@ -135,5 +154,9 @@ describe("embedded knowledge graph", () => {
       ["areas/cx/experience.md", "areas/ventas/sales.md"],
     ]);
     expect(graph.inspect("nodes.every(n => !('content' in n))")).toBe(true);
+    expect(graph.inspect('activeArea = "cx"; nodes.filter(vis).map(n => n.id)')).toEqual([
+      "areas/cx/experience.md",
+    ]);
+    expect(graph.inspect("activeArea = null; nodes.filter(vis).length")).toBe(2);
   });
 });
